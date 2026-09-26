@@ -108,8 +108,12 @@ class MusicRepository {
             { lrcLib.searchByQuery("$cleanArtist $cleanTitle") },
         )
 
+        // If *every* request failed outright (rather than answering "nothing found"), say so —
+        // the caller shows "you're offline" instead of the misleading "this song has no lyrics".
+        var failures = 0
+        var lastFailure: Throwable? = null
         for (attempt in attempts) {
-            val results = runCatching { attempt() }.getOrDefault(emptyList())
+            val results = runCatching { attempt() }.getOrElse { failures++; lastFailure = it; emptyList() }
             results.firstOrNull { !it.syncedLyrics.isNullOrBlank() }?.let {
                 return@safeCall LyricsResponse(it.syncedLyrics, it.plainLyrics)
             }
@@ -118,7 +122,11 @@ class MusicRepository {
             }
         }
 
-        val direct = runCatching { lrcLib.get(cleanArtist, cleanTitle) }.getOrNull()
+        val directResult = runCatching { lrcLib.get(cleanArtist, cleanTitle) }
+        if (directResult.isFailure && directResult.exceptionOrNull() is java.io.IOException && failures == attempts.size) {
+            throw directResult.exceptionOrNull() ?: lastFailure!!
+        }
+        val direct = directResult.getOrNull()
         if (direct != null && (!direct.syncedLyrics.isNullOrBlank() || !direct.plainLyrics.isNullOrBlank())) {
             return@safeCall LyricsResponse(direct.syncedLyrics, direct.plainLyrics)
         }

@@ -13,7 +13,6 @@ class NowPlayingViewModel : ViewModel() {
     private val prefs = DaydreaminApp.instance.prefs
 
     val likedIds: StateFlow<Set<String>> = prefs.likedIds.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, emptySet())
-    val nowPlayingStyle: StateFlow<String> = prefs.nowPlayingStyle.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, "Classic")
 
     fun toggleLiked(song: Song) {
         viewModelScope.launch { prefs.toggleLiked(song) }

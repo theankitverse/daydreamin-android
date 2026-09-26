@@ -10,6 +10,10 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.Brush
+import coil.imageLoader
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import com.daydreamin.app.ui.theme.Motion
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -73,6 +77,16 @@ fun MiniPlayer(
     onClick: () -> Unit,
 ) {
     val tint = rememberArtworkColor(song.cover.ifBlank { song.artworkUrl }, fallback = BrandViolet)
+    // Warm the full-size cover into memory while the song plays, so opening Now Playing has the
+    // real artwork to fly from the first frame (a cache hit — no load-then-fade mid-flight).
+    val context = androidx.compose.ui.platform.LocalContext.current
+    androidx.compose.runtime.LaunchedEffect(song.artworkUrl) {
+        if (song.artworkUrl.isNotBlank()) {
+            context.imageLoader.enqueue(
+                coil.request.ImageRequest.Builder(context).data(com.daydreamin.app.ui.theme.artworkModel(song.artworkUrl)).size(1080).build(),
+            )
+        }
+    }
     val blur = remember {
         HazeStyle(backgroundColor = BgBase, tints = listOf(HazeTint(Color.Black.copy(alpha = 0.32f))), blurRadius = 34.dp, noiseFactor = 0.05f)
     }
@@ -95,7 +109,16 @@ fun MiniPlayer(
             // A new song crossfades in (art and text together) instead of the text just changing.
             Crossfade(targetState = song, animationSpec = tween(320), label = "miniSong", modifier = Modifier.weight(1f)) { shown ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Artwork(url = shown.artworkUrl, shape = RoundedCornerShape(12.dp), modifier = Modifier.size(48.dp))
+                    Artwork(
+                        url = shown.artworkUrl,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .size(48.dp)
+                            // Now Playing grows out of (and lands back into) exactly this spot…
+                            .onGloballyPositioned { PlayerSheet.miniArtworkBounds = it.boundsInWindow() }
+                            // …and while it's open or in flight, the flying artwork *is* this artwork.
+                            .graphicsLayer { alpha = ((0.12f - PlayerSheet.expansion) / 0.12f).coerceIn(0f, 1f) }, // cross-fades with the flying one over the last stretch
+                    )
                     Column(modifier = Modifier.weight(1f).padding(horizontal = Space.s)) {
                         Text(shown.title, style = MaterialTheme.typography.titleSmall, color = TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(shown.artist, style = MaterialTheme.typography.bodySmall, color = TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)

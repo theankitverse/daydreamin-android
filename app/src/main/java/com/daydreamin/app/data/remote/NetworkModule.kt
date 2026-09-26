@@ -25,6 +25,16 @@ object NetworkModule {
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
+        // Identify ourselves. LRCLIB (behind Cloudflare) answers OkHttp's default "okhttp/x.y.z"
+        // User-Agent with HTTP 520 — every lyrics lookup failed until this — and its API docs ask
+        // clients to name themselves anyway.
+        .addInterceptor { chain ->
+            chain.proceed(
+                chain.request().newBuilder()
+                    .header("User-Agent", "Daydreamin/${BuildConfig.VERSION_NAME} (Android; +https://github.com/daydreamin)")
+                    .build(),
+            )
+        }
         .addInterceptor(logging)
         .build()
 

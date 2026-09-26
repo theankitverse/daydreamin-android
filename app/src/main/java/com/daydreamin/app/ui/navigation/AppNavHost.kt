@@ -44,7 +44,10 @@ import com.daydreamin.app.ui.components.DaydreaminBottomBar
 import com.daydreamin.app.ui.components.MiniPlayer
 import com.daydreamin.app.ui.screens.home.HomeScreen
 import com.daydreamin.app.ui.screens.library.LibraryScreen
-import com.daydreamin.app.ui.screens.lyrics.LyricsScreen
+import com.daydreamin.app.ui.components.PlayerSheet
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.ui.graphics.graphicsLayer
 import com.daydreamin.app.ui.screens.nowplaying.NowPlayingScreen
 import com.daydreamin.app.ui.screens.profile.ProfileScreen
 import com.daydreamin.app.ui.screens.profile.StatisticsScreen
@@ -64,7 +67,10 @@ fun AppNavHost() {
 
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
-    val showChrome = currentRoute in Dest.bottomNavRoutes
+    val onTab = currentRoute in Dest.bottomNavRoutes
+    // While Now Playing grows out of the mini player, the chrome stays on screen fading out
+    // (the route has already changed, but the flight hasn't finished).
+    val showChrome = onTab || (currentRoute == Dest.NOW_PLAYING && PlayerSheet.morphInProgress)
     val hazeState = remember { HazeState() }
     val glassStyle = daydreamGlassStyle()
     val chromeStyle = remember {
@@ -80,7 +86,7 @@ fun AppNavHost() {
 
     ModalNavigationDrawer(
         drawerState = drawerState,
-        gesturesEnabled = showChrome,
+        gesturesEnabled = onTab,
         drawerContent = {
             AppDrawerContent(
                 hazeState = hazeState,
@@ -108,7 +114,10 @@ fun AppNavHost() {
                     // Progressive: clear at the top edge, fully frosted by the nav bar — so the
                     // floating mini player (which blurs on its own) sits over a soft fade, not a slab.
                     Column(
-                        modifier = Modifier.hazeEffect(state = hazeState, style = chromeStyle) {
+                        modifier = Modifier
+                            // Fades away as Now Playing opens and back as it closes into the mini player.
+                            .graphicsLayer { alpha = 1f - PlayerSheet.expansion }
+                            .hazeEffect(state = hazeState, style = chromeStyle) {
                             progressive = HazeProgressive.verticalGradient(
                                 easing = androidx.compose.animation.core.FastOutSlowInEasing,
                                 startY = 0f,
@@ -137,7 +146,10 @@ fun AppNavHost() {
                                     modifier = Modifier.padding(top = 10.dp, bottom = 2.dp),
                                     onTogglePlay = { PlayerController.togglePlayPause() },
                                     onNext = { PlayerController.next() },
-                                    onClick = { navController.navigate(Dest.NOW_PLAYING) },
+                                    onClick = {
+                                        PlayerSheet.requestMorphOpen()
+                                        navController.navigate(Dest.NOW_PLAYING)
+                                    },
                                 )
                             }
                         }
@@ -153,8 +165,14 @@ fun AppNavHost() {
                 // Fade-through: the outgoing screen clears first, then the incoming one fades in and
                 // settles from a hair smaller — two screens' text never overlaps mid-transition.
                 enterTransition = { fadeThroughEnter() },
-                exitTransition = { fadeOut(tween(90)) },
-                popEnterTransition = { fadeThroughEnter() },
+                // Opening Now Playing keeps the current screen visible beneath it for the whole flight;
+                // closing it reveals that screen instantly (it was "under" the player all along).
+                exitTransition = {
+                    if (targetState.destination.route == Dest.NOW_PLAYING) ExitTransition.KeepUntilTransitionsFinished else fadeOut(tween(90))
+                },
+                popEnterTransition = {
+                    if (initialState.destination.route == Dest.NOW_PLAYING) EnterTransition.None else fadeThroughEnter()
+                },
                 popExitTransition = { fadeOut(tween(90)) },
             ) {
                 composable(Dest.SPLASH) {
@@ -175,20 +193,27 @@ fun AppNavHost() {
                 }
                 // Modal-style destinations — pushed up from the bottom over whatever's behind
                 // them, like a sheet, instead of the flat tab crossfade above.
+                // Now Playing choreographs its own open/close (artwork flying to and from the mini
+                // player) off this transition; the navigation-level effects are only the fallback
+                // for when there's no mini player to fly from/to.
                 composable(
                     Dest.NOW_PLAYING,
-                    enterTransition = { slideUpEnter() },
+                    enterTransition = { if (PlayerSheet.isMorphPending) EnterTransition.None else slideUpEnter() },
                     exitTransition = { fadeOut(tween(150)) },
-                    popExitTransition = { slideDownExit() },
+                    popExitTransition = {
+                        // KeepUntilTransitionsFinished (not None): stay composed while the artwork flies home.
+                        if (targetState.destination.route in Dest.bottomNavRoutes && PlayerSheet.miniArtworkBounds != null) ExitTransition.KeepUntilTransitionsFinished else slideDownExit()
+                    },
                     popEnterTransition = { fadeIn(tween(200)) },
                 ) {
-                    Box(Modifier.statusBarsPadding()) {
-                        NowPlayingScreen(
-                            onBack = { navController.popBackStack() },
-                            onQueueClick = { navController.navigate(Dest.QUEUE) },
-                            onLyricsClick = { navController.navigate(Dest.LYRICS) },
-                        )
-                    }
+                    NowPlayingScreen(
+                        visibility = this,
+                        closingToMini = {
+                            navController.currentBackStackEntry?.destination?.route in Dest.bottomNavRoutes && PlayerSheet.miniArtworkBounds != null
+                        },
+                        onBack = { navController.popBackStack() },
+                        onQueueClick = { navController.navigate(Dest.QUEUE) },
+                    )
                 }
                 composable(
                     Dest.QUEUE,
@@ -197,13 +222,6 @@ fun AppNavHost() {
                     popExitTransition = { slideDownExit() },
                     popEnterTransition = { fadeIn(tween(200)) },
                 ) { Box(Modifier.statusBarsPadding()) { QueueScreen(onBack = { navController.popBackStack() }) } }
-                composable(
-                    Dest.LYRICS,
-                    enterTransition = { slideUpEnter() },
-                    exitTransition = { fadeOut(tween(150)) },
-                    popExitTransition = { slideDownExit() },
-                    popEnterTransition = { fadeIn(tween(200)) },
-                ) { Box(Modifier.statusBarsPadding()) { LyricsScreen(onBack = { navController.popBackStack() }) } }
                 composable(
                     Dest.SETTINGS,
                     enterTransition = { slideUpEnter() },

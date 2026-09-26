@@ -8,7 +8,6 @@ object Dest {
     const val PROFILE = "profile"
     const val NOW_PLAYING = "now_playing"
     const val QUEUE = "queue"
-    const val LYRICS = "lyrics"
     const val SETTINGS = "settings"
     const val THEME_CUSTOMIZE = "theme_customize"
     const val STATISTICS = "statistics"

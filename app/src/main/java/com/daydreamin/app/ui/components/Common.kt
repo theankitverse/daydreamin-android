@@ -133,6 +133,9 @@ fun Artwork(
             ),
         contentAlignment = Alignment.Center,
     ) {
+        // Sits under the image: shows only while a cover is loading or when it can't load at all
+        // (offline, dead link), so a missing cover is a quiet music note — never an empty hole.
+        Icon(Icons.Filled.MusicNote, contentDescription = null, tint = TextMuted.copy(alpha = 0.45f), modifier = Modifier.fillMaxSize(0.24f))
         if (!url.isNullOrBlank()) {
             val context = androidx.compose.ui.platform.LocalContext.current
             val model = remember(url) {
@@ -145,8 +148,6 @@ fun Artwork(
                 contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                 modifier = Modifier.fillMaxSize().graphicsLayer { scaleX = zoom; scaleY = zoom },
             )
-        } else {
-            Icon(Icons.Filled.MusicNote, contentDescription = null, tint = TextMuted)
         }
     }
 }
@@ -199,19 +200,32 @@ fun BrandGlow(modifier: Modifier = Modifier, color: Color) {
  * that. Cheap enough to sit behind a card that scrolls.
  */
 @Composable
-fun ArtworkBackdrop(url: String?, modifier: Modifier = Modifier, blur: androidx.compose.ui.unit.Dp = 28.dp) {
+fun ArtworkBackdrop(url: String?, modifier: Modifier = Modifier, blur: androidx.compose.ui.unit.Dp = 28.dp, tiny: Boolean = false) {
     if (url.isNullOrBlank()) return
     val context = androidx.compose.ui.platform.LocalContext.current
-    val model = remember(url) {
-        coil.request.ImageRequest.Builder(context).data(artworkModel(url)).size(48).crossfade(400).build()
+    // tiny: for full-screen backdrops — decoded at ~20px, so upscaling alone already turns the
+    // cover into a soft wash of its colors, and only a light blur is needed to melt the texel
+    // edges (a much smaller radius than blurring a detailed image into mush).
+    val decodePx = if (tiny) 20 else 48
+    val model = remember(url, decodePx) {
+        coil.request.ImageRequest.Builder(context)
+            .data(artworkModel(url))
+            .size(decodePx)
+            // EXACT: must really be tiny — otherwise Coil happily reuses the full-size cover
+            // already in memory, and the "wash" comes out as a sharp photo.
+            .precision(coil.size.Precision.EXACT)
+            .memoryCacheKey("backdrop:$decodePx:$url")
+            .crossfade(400)
+            .build()
     }
     val zoom = artworkZoom(url)
     AsyncImage(
         model = model,
         contentDescription = null,
         contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+        filterQuality = androidx.compose.ui.graphics.FilterQuality.High,
         modifier = modifier
             .graphicsLayer { scaleX = zoom * 1.15f; scaleY = zoom * 1.15f }
-            .blur(blur, androidx.compose.ui.draw.BlurredEdgeTreatment.Unbounded),
+            .then(if (blur > 0.dp) Modifier.blur(blur, androidx.compose.ui.draw.BlurredEdgeTreatment.Unbounded) else Modifier),
     )
 }
