@@ -58,7 +58,6 @@ import com.daydreamin.app.ui.screens.queue.QueueScreen
 import com.daydreamin.app.ui.screens.search.SearchScreen
 import com.daydreamin.app.ui.screens.search.SearchFocus
 import com.daydreamin.app.ui.screens.settings.SettingsScreen
-import com.daydreamin.app.ui.screens.splash.SplashScreen
 import com.daydreamin.app.ui.screens.themecustomize.ThemeCustomizeScreen
 import kotlinx.coroutines.launch
 
@@ -165,7 +164,7 @@ fun AppNavHost() {
           Box(Modifier.fillMaxSize()) {
             NavHost(
                 navController = navController,
-                startDestination = Dest.SPLASH,
+                startDestination = Dest.HOME,
                 modifier = Modifier.hazeSource(hazeState),
                 // Fade-through: the outgoing screen clears first, then the incoming one fades in and
                 // settles from a hair smaller — two screens' text never overlaps mid-transition.
@@ -180,9 +179,6 @@ fun AppNavHost() {
                 },
                 popExitTransition = { fadeOut(tween(90)) },
             ) {
-                composable(Dest.SPLASH) {
-                    SplashScreen(onFinished = { navController.navigateTopLevel(Dest.HOME, popSplash = true) })
-                }
                 composable(Dest.HOME) {
                     HomeScreen(onOpenDrawer = { scope.launch { drawerState.open() } }, onSearchClick = { SearchFocus.requested = true; navController.navigateTopLevel(Dest.SEARCH) }, contentPadding = padding)
                 }
@@ -300,18 +296,11 @@ private fun androidx.navigation.NavController.popIfOn(route: String) {
     if (currentBackStackEntry?.destination?.route == route) popBackStack()
 }
 
-private fun androidx.navigation.NavController.navigateTopLevel(route: String, popSplash: Boolean = false) {
+private fun androidx.navigation.NavController.navigateTopLevel(route: String) {
     navigate(route) {
-        // Popping the start destination (splash) by its string route hits a route-matching
-        // bug in this Navigation-Compose version; popping by the graph's own id instead
-        // is the version-safe way to discard it from the back stack entirely.
-        if (popSplash) {
-            popUpTo(graph.id) { inclusive = true }
-        } else {
-            popUpTo(graph.findStartDestination().id) { saveState = true }
-        }
+        popUpTo(graph.findStartDestination().id) { saveState = true }
         launchSingleTop = true
-        restoreState = !popSplash
+        restoreState = true
     }
 }
 

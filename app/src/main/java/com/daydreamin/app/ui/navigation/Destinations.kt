@@ -1,7 +1,6 @@
 package com.daydreamin.app.ui.navigation
 
 object Dest {
-    const val SPLASH = "splash"
     const val HOME = "home"
     const val SEARCH = "search"
     const val LIBRARY = "library"
