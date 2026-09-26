@@ -136,4 +136,26 @@ class LibraryBackupTest {
         assertEquals(1, merged.likedSongs.size)
         assertEquals(0, summary.likedAdded)
     }
+
+    // --- profile (added later; must stay optional in both directions) ---
+
+    @Test fun profileRoundTripsThroughTheFile() {
+        val original = lib(liked = listOf(song("1"))).copy(
+            profile = ProfileBackup(name = "Ankit", accent = "Cyan", equalizer = "Bass Boost", loudnessBoost = false, offlineOnWifiOnly = true, avatarJpegBase64 = "AAEC"),
+        )
+        assertEquals(original, parseLibraryBackup(original.toJson()))
+    }
+
+    @Test fun backupsFromBeforeProfilesExistedStillImport() {
+        val parsed = parseLibraryBackup("""{"app":"daydreamin","version":1,"likedSongs":[{"id":"7","title":"T","artist":"A"}]}""")
+        assertEquals(null, parsed.profile)
+        assertEquals(listOf("7"), parsed.likedSongs.map { it.id })
+    }
+
+    @Test fun mergingNeverTouchesTheProfileOnThisDevice() {
+        val mine = lib(liked = listOf(song("a"))).copy(profile = ProfileBackup(name = "Me"))
+        val theirs = lib(liked = listOf(song("b"))).copy(profile = ProfileBackup(name = "Someone else"))
+        val (merged, _) = mergeLibraries(mine, theirs)
+        assertEquals("Me", merged.profile?.name)
+    }
 }

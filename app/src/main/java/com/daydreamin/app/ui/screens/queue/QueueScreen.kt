@@ -512,6 +512,9 @@ private fun QueueRow(
         Row(
             modifier = Modifier
                 .matchParentSize()
+                // Clipped at the row's resting bounds, so a swiped-away row slides out of its own
+                // lane instead of drawing over the screen edge.
+                .clip(Radius.cardShape)
                 .graphicsLayer { translationX = swipe.value; rowWidth = size.width.coerceAtLeast(1f) }
                 .clip(Radius.cardShape)
                 // The lifted row is the only one on glass — it's the thing in your hand.

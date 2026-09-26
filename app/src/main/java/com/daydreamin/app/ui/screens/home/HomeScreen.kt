@@ -47,6 +47,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.Alignment
@@ -115,7 +117,6 @@ import dev.chrisbanes.haze.hazeSource
 import java.time.LocalTime
 import androidx.lifecycle.viewmodel.compose.viewModel as composeViewModel
 
-private const val DISPLAY_NAME = "Ankit"
 private val TopBarHeight = 60.dp
 private val QuickPickRowHeight = 66.dp
 private val SpotlightHeight = 216.dp
@@ -313,10 +314,11 @@ private fun Greeting() {
             else -> "Up late"
         }
     }
+    val name by com.daydreamin.app.DaydreaminApp.instance.prefs.userName.collectAsState(initial = "")
     Text(
         buildAnnotatedString {
             append(greeting)
-            withStyle(SpanStyle(color = TextSecondary)) { append(", $DISPLAY_NAME") }
+            if (name.isNotBlank()) withStyle(SpanStyle(color = TextSecondary)) { append(", ${name.trim().substringBefore(' ')}") }
         },
         style = MaterialTheme.typography.displaySmall,
         color = TextPrimary,
@@ -379,20 +381,13 @@ private fun HomeTopBar(haze: HazeState, statusTop: Dp, scrollY: () -> Float, onS
 
 @Composable
 private fun Avatar(onClick: () -> Unit) {
-    Box(
+    // The avatar doubles as the menu button — announced as such.
+    com.daydreamin.app.ui.components.UserAvatar(
+        size = 40.dp,
         modifier = Modifier
-            .size(40.dp)
-            // The avatar doubles as the menu button — announced as such.
             .semantics(mergeDescendants = true) { contentDescription = "Menu" }
-            .pressable(onClick = onClick)
-            .border(1.5.dp, Brush.linearGradient(listOf(BrandPurple, BrandPink)), CircleShape)
-            .padding(3.dp)
-            .clip(CircleShape)
-            .background(Brush.linearGradient(listOf(BrandViolet.copy(alpha = 0.55f), BrandPink.copy(alpha = 0.35f)))),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(DISPLAY_NAME.take(1), style = MaterialTheme.typography.titleSmall, color = Color.White)
-    }
+            .pressable(onClick = onClick),
+    )
 }
 
 // ---------------------------------------------------------------- sections
@@ -501,10 +496,14 @@ private fun QuickPicksGrid(songs: List<Song>, nowPlaying: () -> NowPlaying) {
 
 @Composable
 private fun QuickPickRow(song: Song, isCurrent: Boolean, isPlaying: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    // Long-press for the song menu (play next, add to queue, like, playlists) — same as everywhere else.
+    var menuOpen by remember { mutableStateOf(false) }
+    val openPlayer = com.daydreamin.app.ui.components.LocalOpenPlayer.current
     Row(
-        modifier = modifier.fillMaxWidth().height(QuickPickRowHeight).pressable(onClick = onClick),
+        modifier = modifier.fillMaxWidth().height(QuickPickRowHeight).pressable(onLongClick = { menuOpen = true }, onClick = { if (isCurrent) openPlayer() else onClick() }),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (menuOpen) com.daydreamin.app.ui.components.SongMenu(song = song, onDismiss = { menuOpen = false })
         Artwork(url = song.cover.ifBlank { song.artworkUrl }, shape = Radius.thumbShape, modifier = Modifier.size(52.dp))
         Column(modifier = Modifier.weight(1f).padding(horizontal = Space.s + 2.dp)) {
             Text(
@@ -535,7 +534,10 @@ private fun CardRow(songs: List<Song>, cardSize: Dp, nowPlaying: () -> NowPlayin
 
 @Composable
 private fun ArtCard(song: Song, size: Dp, isCurrent: Boolean, isPlaying: Boolean, onClick: () -> Unit) {
-    Column(modifier = Modifier.width(size).pressable(onClick = onClick)) {
+    var menuOpen by remember { mutableStateOf(false) }
+    val openPlayer = com.daydreamin.app.ui.components.LocalOpenPlayer.current
+    Column(modifier = Modifier.width(size).pressable(onLongClick = { menuOpen = true }, onClick = { if (isCurrent) openPlayer() else onClick() })) {
+        if (menuOpen) com.daydreamin.app.ui.components.SongMenu(song = song, onDismiss = { menuOpen = false })
         Box {
             Artwork(url = song.artworkUrl, shape = Radius.cardShape, modifier = Modifier.size(size))
             if (isCurrent) {

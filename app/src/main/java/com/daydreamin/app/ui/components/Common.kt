@@ -50,64 +50,8 @@ import com.daydreamin.app.ui.theme.TextMuted
 import com.daydreamin.app.ui.theme.TextPrimary
 import com.daydreamin.app.ui.theme.TextSecondary
 
-@Composable
-fun SectionHeader(
-    title: String,
-    modifier: Modifier = Modifier,
-    actionLabel: String? = null,
-    onAction: (() -> Unit)? = null,
-) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(title, style = MaterialTheme.typography.titleLarge, color = TextPrimary, fontWeight = FontWeight.Bold)
-        if (actionLabel != null) {
-            Text(
-                actionLabel,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.clickable { onAction?.invoke() },
-            )
-        }
-    }
-}
 
-@Composable
-fun FilterChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val bg = if (selected) MaterialTheme.colorScheme.primary else SurfaceVariant
-    val fg = if (selected) Color.White else TextSecondary
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(50))
-            .background(bg)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 9.dp),
-    ) {
-        Text(label, color = fg, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium)
-    }
-}
 
-@Composable
-fun GlassCard(
-    modifier: Modifier = Modifier,
-    contentPadding: PaddingValues = PaddingValues(16.dp),
-    content: @Composable () -> Unit,
-) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(18.dp))
-            .background(Surface)
-            .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(18.dp))
-            .padding(contentPadding),
-    ) { content() }
-}
 
 /**
  * Album art. [edge] draws a hairline just inside the artwork's border — on true black, a dark
@@ -152,47 +96,8 @@ fun Artwork(
     }
 }
 
-@Composable
-fun FullScreenLoading(modifier: Modifier = Modifier) {
-    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-    }
-}
 
-@Composable
-fun EmptyState(
-    message: String,
-    modifier: Modifier = Modifier,
-    icon: @Composable (() -> Unit)? = null,
-) {
-    Column(
-        modifier = modifier.fillMaxWidth().padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        icon?.invoke()
-        Text(message, color = TextSecondary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
-    }
-}
 
-/** Small rotating vinyl-ish accent used on the splash screen. */
-@Composable
-fun BrandGlow(modifier: Modifier = Modifier, color: Color) {
-    val transition = rememberInfiniteTransition(label = "glow")
-    val scale by transition.animateFloat(
-        initialValue = 0.9f,
-        targetValue = 1.05f,
-        animationSpec = infiniteRepeatable(tween(1800, easing = LinearEasing), RepeatMode.Reverse),
-        label = "glowScale",
-    )
-    Box(
-        modifier = modifier
-            .graphicsLayer { scaleX = scale; scaleY = scale }
-            .background(
-                Brush.radialGradient(listOf(color.copy(alpha = 0.35f), Color.Transparent)),
-                CircleShape,
-            ),
-    )
-}
 
 /**
  * Artwork as light rather than as a picture: decoded tiny (so upscaling alone already softens

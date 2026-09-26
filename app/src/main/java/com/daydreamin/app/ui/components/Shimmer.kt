@@ -46,26 +46,4 @@ fun Modifier.shimmer(): Modifier {
     return this.background(brush)
 }
 
-@Composable
-fun ShimmerSongRow(modifier: Modifier = Modifier) {
-    Row(modifier = modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Box(modifier = Modifier.size(52.dp).clip(RoundedCornerShape(10.dp)).shimmer())
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(start = 12.dp)
-                .align(Alignment.CenterVertically),
-        ) {
-            Box(modifier = Modifier.fillMaxWidth(0.6f).height(14.dp).clip(RoundedCornerShape(4.dp)).shimmer())
-            Spacer(modifier = Modifier.height(6.dp))
-            Box(modifier = Modifier.fillMaxWidth(0.4f).height(12.dp).clip(RoundedCornerShape(4.dp)).shimmer())
-        }
-    }
-}
 
-@Composable
-fun ShimmerSongList(modifier: Modifier = Modifier, count: Int = 6) {
-    Column(modifier = modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
-        repeat(count) { ShimmerSongRow() }
-    }
-}

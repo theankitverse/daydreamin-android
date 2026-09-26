@@ -26,6 +26,22 @@ data class LibraryBackup(
     val likedSongs: List<Song> = emptyList(),
     val playlists: List<Playlist> = emptyList(),
     val history: List<Song> = emptyList(),
+    /** Who the user is and how they set the app up. Optional: backups made before it existed simply don't have it. */
+    val profile: ProfileBackup? = null,
+)
+
+/**
+ * The personal side of a backup. Every field is optional so a partial one still restores what it
+ * has; [avatarJpegBase64] is the profile picture itself (a small JPEG — the app keeps it ≤ 512 px).
+ */
+@Serializable
+data class ProfileBackup(
+    val name: String? = null,
+    val accent: String? = null,
+    val equalizer: String? = null,
+    val loudnessBoost: Boolean? = null,
+    val offlineOnWifiOnly: Boolean? = null,
+    val avatarJpegBase64: String? = null,
 )
 
 /** What an import actually changed — shown to the user, and what makes "nothing new" detectable. */
@@ -110,6 +126,8 @@ fun mergeLibraries(current: LibraryBackup, incoming: LibraryBackup, limit: Int =
     val historyAdded = mergedHistory.size - currentHistory.take(limit).size
 
     val merged = current.copy(
+        // The profile is applied separately (only onto a device that hasn't been set up yet) —
+        // merging never changes who you are on a device you're already using.
         likedSongs = currentLiked + newLiked,
         playlists = mergedPlaylists,
         history = mergedHistory,

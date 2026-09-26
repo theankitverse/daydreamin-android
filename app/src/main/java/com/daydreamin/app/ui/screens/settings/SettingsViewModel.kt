@@ -7,7 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.daydreamin.app.DaydreaminApp
 import com.daydreamin.app.data.prefs.BackupFormatException
 import com.daydreamin.app.data.prefs.ImportSummary
-import com.daydreamin.app.data.prefs.parseLibraryBackup
+import com.daydreamin.app.data.prefs.restoreLibrary
 import com.daydreamin.app.data.prefs.toJson
 import com.daydreamin.app.data.youtube.YouTubeExtractorService
 import com.daydreamin.app.player.EqPreset
@@ -20,9 +20,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
-
-/** A real backup is a few hundred KB even for thousands of songs; anything far past this isn't one. */
-private const val MAX_BACKUP_BYTES = 10 * 1024 * 1024
 
 enum class ExtractorState { UNKNOWN, CHECKING, OK, FAILED }
 
@@ -90,7 +87,7 @@ class SettingsViewModel : ViewModel() {
                     val stream = resolver.openOutputStream(uri, "wt") ?: throw IOException("no output stream")
                     stream.use { it.write(backup.toJson().toByteArray(Charsets.UTF_8)) }
                 }
-                "Exported ${backup.likedSongs.size} liked songs, ${backup.playlists.size} playlists, ${backup.history.size} history entries."
+                "Exported ${count(backup.likedSongs.size, "liked song")}, ${count(backup.playlists.size, "playlist")} and ${count(backup.history.size, "recently played song")}."
             } catch (e: IOException) {
                 "Couldn't write the file: ${e.message ?: "unknown error"}"
             } catch (e: SecurityException) {
@@ -99,19 +96,11 @@ class SettingsViewModel : ViewModel() {
         }
     }
 
-    fun importLibrary(resolver: ContentResolver, uri: Uri) {
+    fun importLibrary(context: android.content.Context, uri: Uri) {
         viewModelScope.launch {
             _backupStatus.value = try {
-                val text = withContext(Dispatchers.IO) {
-                    val stream = resolver.openInputStream(uri) ?: throw IOException("no input stream")
-                    stream.use { input ->
-                        // Read one byte past the cap so an oversized file is detected, not silently truncated into "invalid JSON".
-                        val bytes = input.readNBytes(MAX_BACKUP_BYTES + 1)
-                        if (bytes.size > MAX_BACKUP_BYTES) throw BackupFormatException("That file is too large to be a Daydreamin backup.")
-                        String(bytes, Charsets.UTF_8)
-                    }
-                }
-                describeImport(prefs.importLibrary(parseLibraryBackup(text)))
+                val result = restoreLibrary(context, prefs, uri, keepBackingUpHere = false)
+                describeImport(result.summary)
             } catch (e: BackupFormatException) {
                 e.message ?: "That doesn't look like a Daydreamin library backup."
             } catch (e: IOException) {
@@ -122,13 +111,23 @@ class SettingsViewModel : ViewModel() {
         }
     }
 
+    val autoBackupAt: StateFlow<Long> = prefs.autoBackupAt.stateIn(viewModelScope, SharingStarted.Eagerly, 0L)
+
+    /** "Back up now" in Settings. */
+    fun backupNow(context: android.content.Context) {
+        viewModelScope.launch {
+            val ok = runCatching { com.daydreamin.app.data.prefs.AutoBackup.writeNow(context, prefs) }.getOrDefault(false)
+            com.daydreamin.app.ui.components.Toaster.show(if (ok) "Backed up to Download/Daydreamin" else "Nothing to back up yet")
+        }
+    }
+
     private fun describeImport(summary: ImportSummary): String {
         if (summary.isEmpty) return "Nothing new — everything in that backup is already in your library."
         val parts = buildList {
-            if (summary.likedAdded > 0) add("${summary.likedAdded} liked songs")
-            if (summary.playlistsAdded > 0) add("${summary.playlistsAdded} playlists")
-            if (summary.playlistSongsAdded > 0) add("${summary.playlistSongsAdded} playlist songs")
-            if (summary.historyAdded > 0) add("${summary.historyAdded} history entries")
+            if (summary.likedAdded > 0) add(count(summary.likedAdded, "liked song"))
+            if (summary.playlistsAdded > 0) add(count(summary.playlistsAdded, "playlist"))
+            if (summary.playlistSongsAdded > 0) add(count(summary.playlistSongsAdded, "playlist song"))
+            if (summary.historyAdded > 0) add(count(summary.historyAdded, "recently played song"))
         }
         return "Imported ${parts.joinToString(", ")}."
     }
@@ -137,3 +136,5 @@ class SettingsViewModel : ViewModel() {
     fun setDownloadWifiOnly(v: Boolean) = viewModelScope.launch { prefs.setDownloadWifiOnly(v) }
     fun setEqualizerPreset(v: String) = viewModelScope.launch { prefs.setEqualizerPreset(v) }
 }
+
+private fun count(n: Int, word: String) = "$n $word" + if (n == 1) "" else "s"

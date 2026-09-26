@@ -35,3 +35,9 @@ object PlayerSheet {
         morphInProgress = false
     }
 }
+
+/**
+ * "Open Now Playing" for any screen, provided once by the navigation host — so tapping the song
+ * that's already playing opens the player everywhere instead of restarting it.
+ */
+val LocalOpenPlayer = androidx.compose.runtime.staticCompositionLocalOf<() -> Unit> { {} }

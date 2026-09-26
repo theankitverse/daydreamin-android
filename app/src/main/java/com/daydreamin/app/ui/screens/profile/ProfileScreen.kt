@@ -1,5 +1,21 @@
 package com.daydreamin.app.ui.screens.profile
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.window.Dialog
+import com.daydreamin.app.ui.components.UserAvatar
+import com.daydreamin.app.ui.components.encodeAvatar
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -71,7 +87,6 @@ import com.daydreamin.app.ui.theme.Space
 import com.daydreamin.app.ui.theme.glass
 import com.daydreamin.app.ui.theme.rememberArtworkLight
 
-private const val DISPLAY_NAME = "Ankit"
 private val DefaultLight = ArtworkLight(key = BrandViolet, fill = Color(0xFF3D3A9E))
 private val Muted = Color.White.copy(alpha = 0.55f)
 
@@ -203,25 +218,106 @@ fun ProfileScreen(
 
 // ---------------------------------------------------------------- pieces
 
-/** Monogram in the brand gradient, ringed like the Home avatar. */
+/** Your photo (or initial) and name; tapping either opens [EditProfileDialog]. */
 @Composable
 private fun Header() {
-    Column(Modifier.fillMaxWidth().padding(horizontal = Space.gutter), horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(
-            Modifier
-                .size(104.dp)
-                .shadow(28.dp, CircleShape, ambientColor = BrandPurple, spotColor = BrandPurple)
-                .border(2.dp, Brush.linearGradient(listOf(BrandPurple, BrandPink)), CircleShape)
-                .padding(5.dp)
-                .clip(CircleShape)
-                .background(Brush.linearGradient(listOf(BrandViolet.copy(alpha = 0.85f), BrandPink.copy(alpha = 0.7f)))),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(DISPLAY_NAME.take(1), style = MaterialTheme.typography.displaySmall.copy(fontSize = 40.sp), color = Color.White)
+    val prefs = DaydreaminApp.instance.prefs
+    val name by prefs.userName.collectAsState(initial = "")
+    var editing by remember { mutableStateOf(false) }
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = Space.gutter),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(Modifier.pressable(onClick = { editing = true })) {
+            UserAvatar(size = 104.dp, modifier = Modifier.shadow(28.dp, CircleShape, ambientColor = BrandPurple, spotColor = BrandPurple))
+            Box(
+                Modifier.align(Alignment.BottomEnd).size(32.dp).clip(CircleShape).background(Color.White).border(3.dp, BgBase, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) { Icon(Icons.Rounded.Edit, contentDescription = "Edit profile", tint = Color.Black, modifier = Modifier.size(15.dp)) }
         }
         Spacer(Modifier.height(14.dp))
-        Text(DISPLAY_NAME, style = MaterialTheme.typography.displaySmall, color = Color.White)
+        Text(
+            name.ifBlank { "Add your name" },
+            style = MaterialTheme.typography.displaySmall,
+            color = if (name.isBlank()) Color.White.copy(alpha = 0.5f) else Color.White,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.pressable(onClick = { editing = true }),
+        )
         Text("Music for a calmer you", style = MaterialTheme.typography.bodyMedium, color = Muted)
+    }
+    if (editing) EditProfileDialog(initialName = name, onDismiss = { editing = false })
+}
+
+/** Change name and photo — the same glass card language as the app's other dialogs. */
+@Composable
+private fun EditProfileDialog(initialName: String, onDismiss: () -> Unit) {
+    val prefs = DaydreaminApp.instance.prefs
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    var name by remember { mutableStateOf(initialName) }
+    val hasPhoto by prefs.avatarVersion.collectAsState(initial = 0L)
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) scope.launch { encodeAvatar(context, uri)?.let { prefs.setAvatar(it) } }
+    }
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            Modifier.fillMaxWidth().glass(RoundedCornerShape(24.dp), Glass.Regular, tint = Color(0xF2141418)).padding(22.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text("Edit profile", style = MaterialTheme.typography.titleLarge, color = Color.White)
+            Spacer(Modifier.height(18.dp))
+            Box(Modifier.pressable(onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) })) {
+                UserAvatar(size = 96.dp, overrideName = name)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 8.dp)) {
+                Text(
+                    if (hasPhoto != 0L) "Change photo" else "Add photo",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color.White.copy(alpha = 0.8f),
+                    modifier = Modifier.pressable(onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }).padding(8.dp),
+                )
+                if (hasPhoto != 0L) {
+                    Text(
+                        "Remove",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color(0xFFFF8A80),
+                        modifier = Modifier.pressable(onClick = { scope.launch { prefs.setAvatar(null) } }).padding(8.dp),
+                    )
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            BasicTextField(
+                value = name,
+                onValueChange = { name = it.take(40) },
+                singleLine = true,
+                textStyle = MaterialTheme.typography.titleMedium.copy(color = Color.White, textAlign = androidx.compose.ui.text.style.TextAlign.Center),
+                cursorBrush = SolidColor(Color.White),
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
+                modifier = Modifier.fillMaxWidth(),
+                decorationBox = { inner ->
+                    Box(Modifier.fillMaxWidth().height(52.dp).glass(Radius.pill, Glass.Clear).padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
+                        if (name.isEmpty()) Text("Your name", style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.35f))
+                        inner()
+                    }
+                },
+            )
+            Spacer(Modifier.height(20.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                Text("Cancel", style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.7f), modifier = Modifier.pressable(onClick = onDismiss).padding(horizontal = 14.dp, vertical = 10.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "Save",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color.Black,
+                    modifier = Modifier
+                        .pressable(onClick = { scope.launch { prefs.setUserName(name) }; onDismiss() })
+                        .clip(Radius.pill)
+                        .background(Color.White)
+                        .padding(horizontal = 18.dp, vertical = 10.dp),
+                )
+            }
+        }
     }
 }
 

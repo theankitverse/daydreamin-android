@@ -41,6 +41,7 @@ import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ChevronLeft
+import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.FileUpload
@@ -126,7 +127,7 @@ fun SettingsScreen(onBack: () -> Unit) {
         if (uri != null) vm.exportLibrary(context.contentResolver, uri)
     }
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) vm.importLibrary(context.contentResolver, uri)
+        if (uri != null) vm.importLibrary(context, uri)
     }
 
     var confirmClear by remember { mutableStateOf(false) }
@@ -198,6 +199,20 @@ fun SettingsScreen(onBack: () -> Unit) {
 
             // ---- Library
             item { Section("Your library") }
+            if (com.daydreamin.app.data.prefs.AutoBackup.isSupported) {
+                item {
+                    val at by vm.autoBackupAt.collectAsState()
+                    ActionRow(
+                        icon = Icons.Rounded.CloudDone,
+                        title = "Automatic backup",
+                        body = "A copy of your likes, playlists, history and profile is kept in Download/Daydreamin, so uninstalling never loses them. " +
+                            if (at > 0) "Last saved ${relativeTime(at)}." else "Saves as soon as your library has something in it.",
+                        action = "Back up now",
+                        onClick = { vm.backupNow(context) },
+                    )
+                }
+                item { Hairline() }
+            }
             item {
                 ActionRow(
                     icon = Icons.Rounded.FileUpload,
@@ -567,5 +582,15 @@ private fun formatBytes(bytes: Long): String {
         mb >= 0.1 -> String.format(Locale.US, "%.1f MB", mb)
         bytes > 0 -> "< 0.1 MB"
         else -> "0 MB"
+    }
+}
+
+private fun relativeTime(atMs: Long): String {
+    val mins = (System.currentTimeMillis() - atMs) / 60_000
+    return when {
+        mins < 1 -> "just now"
+        mins < 60 -> "$mins min ago"
+        mins < 24 * 60 -> "${mins / 60} h ago"
+        else -> SimpleDateFormat("d MMM", Locale.getDefault()).format(Date(atMs))
     }
 }

@@ -23,6 +23,10 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.IntRect
 import com.daydreamin.app.ui.screens.intro.LaunchIntro
+import com.daydreamin.app.ui.screens.onboarding.OnboardingScreen
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import com.daydreamin.app.ui.navigation.AppNavHost
 import com.daydreamin.app.ui.theme.DaydreaminTheme
 import com.daydreamin.app.ui.theme.accentByName
@@ -38,6 +42,17 @@ class MainActivity : ComponentActivity() {
      * foreground, clipped to this device's icon shape) filling the icon view. Drawn ourselves
      * rather than copied from the view, which on Android 12+ may be a surface we can't read.
      */
+    private var askedForNotifications = false
+    private fun askForNotifications() {
+        if (askedForNotifications) return
+        askedForNotifications = true
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
     private fun renderLauncherIcon(width: Int, height: Int): ImageBitmap? = runCatching {
         val drawable = ContextCompat.getDrawable(this, R.mipmap.ic_launcher) ?: return null
         val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
@@ -55,8 +70,11 @@ class MainActivity : ComponentActivity() {
         // songs (requested the instant the process started — DaydreaminApp.chartPrefetch).
         val splash = installSplashScreen()
         splash.setOnExitAnimationListener { provider ->
-            val icon = provider.iconView
-            if (icon.width > 0 && icon.height > 0) {
+            // Launches not started from the home screen (a notification, a link, `am start`) can get a
+            // plain launch screen with no icon at all — and then iconView throws. The intro then
+            // simply draws the icon in its default spot.
+            val icon = runCatching { provider.iconView }.getOrNull()
+            if (icon != null && icon.width > 0 && icon.height > 0) {
                 val at = IntArray(2).also { icon.getLocationInWindow(it) }
                 introLogoBounds = IntRect(at[0], at[1], at[0] + icon.width, at[1] + icon.height)
                 introLogo = renderLauncherIcon(icon.width, icon.height)
@@ -73,21 +91,28 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
         )
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) {
-            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
 
         // Only a fresh launch plays the intro — not a rotation or a return from the background.
         val coldStart = savedInstanceState == null
         setContent {
             val accentName by DaydreaminApp.instance.prefs.accentName.collectAsState(initial = "Violet")
             var showIntro by rememberSaveable { mutableStateOf(coldStart) }
+            // null until the store has been read — nothing is shown over Home until we know.
+            val onboarded by DaydreaminApp.instance.prefs.onboarded.collectAsState(initial = null)
+            val scope = rememberCoroutineScope()
+            // Asked for once the user can see what it's for (after setup and the intro), not over them.
+            LaunchedEffect(onboarded, showIntro) {
+                if (onboarded == true && !showIntro && DaydreaminApp.instance.prefs.claimNotificationAsk()) askForNotifications()
+            }
             DaydreaminTheme(accent = accentByName(accentName)) {
                 Box(Modifier.fillMaxSize()) {
-                    // Home composes underneath from the first frame, so it's ready the moment the intro leaves.
-                    AppNavHost()
+                    // Home composes underneath from the first frame, so it's ready the moment the intro
+                    // leaves — except during first-run setup, which must own every touch (and the
+                    // screen reader) until it's done.
+                    if (onboarded == true) AppNavHost()
+                    if (onboarded == false) {
+                        OnboardingScreen(onDone = { scope.launch { DaydreaminApp.instance.prefs.setOnboarded() } })
+                    }
                     if (showIntro) {
                         val app = DaydreaminApp.instance
                         LaunchIntro(

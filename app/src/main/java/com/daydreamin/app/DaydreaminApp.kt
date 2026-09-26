@@ -49,6 +49,9 @@ class DaydreaminApp : Application() {
         YouTubeExtractorService.init()
         Log.d(TAG, "YouTubeExtractorService.init() at +${SystemClock.elapsedRealtime() - processStartAtMs}ms (took ${SystemClock.elapsedRealtime() - newPipeStart}ms)")
 
+        // Keeps a copy of the library in Download/Daydreamin so it survives an uninstall.
+        com.daydreamin.app.data.prefs.AutoBackup.start(this, prefs, appScope)
+
         Log.d(TAG, "DaydreaminApp.onCreate() done at +${SystemClock.elapsedRealtime() - processStartAtMs}ms")
     }
 

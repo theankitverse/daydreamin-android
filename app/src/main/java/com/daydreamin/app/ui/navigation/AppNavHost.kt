@@ -95,15 +95,14 @@ fun AppNavHost() {
             AppDrawerContent(
                 hazeState = hazeState,
                 glassStyle = glassStyle,
+                currentRoute = currentRoute,
                 onHome = { closeDrawer(); navController.navigateTopLevel(Dest.HOME) },
                 onSearch = { closeDrawer(); navController.navigateTopLevel(Dest.SEARCH) },
                 onLibrary = { closeDrawer(); navController.navigateTopLevel(Dest.LIBRARY) },
+                onProfile = { closeDrawer(); navController.navigateTopLevel(Dest.PROFILE) },
                 onStatistics = { closeDrawer(); navController.navigate(Dest.STATISTICS) },
-                onDownloads = { closeDrawer(); navController.navigate(Dest.SETTINGS) },
+                onTheme = { closeDrawer(); navController.navigate(Dest.THEME_CUSTOMIZE) },
                 onSettings = { closeDrawer(); navController.navigate(Dest.SETTINGS) },
-                onFeedback = { closeDrawer() },
-                onDiscord = { closeDrawer() },
-                onAbout = { closeDrawer(); navController.navigate(Dest.SETTINGS) },
             )
         },
     ) {
@@ -162,6 +161,13 @@ fun AppNavHost() {
                 }
             },
         ) { padding ->
+          val openPlayer = remember(navController) {
+              {
+                  PlayerSheet.requestMorphOpen()
+                  navController.navigate(Dest.NOW_PLAYING)
+              }
+          }
+          androidx.compose.runtime.CompositionLocalProvider(com.daydreamin.app.ui.components.LocalOpenPlayer provides openPlayer) {
           Box(Modifier.fillMaxSize()) {
             NavHost(
                 navController = navController,
@@ -267,17 +273,18 @@ fun AppNavHost() {
                     exitTransition = { fadeOut(tween(150)) },
                     popExitTransition = { slideDownExit() },
                     popEnterTransition = { fadeIn(tween(200)) },
-                ) { Box(Modifier.statusBarsPadding()) { ThemeCustomizeScreen(onBack = { navController.popBackStack() }) } }
+                ) { ThemeCustomizeScreen(onBack = { navController.popIfOn(Dest.THEME_CUSTOMIZE) }) }
                 composable(
                     Dest.STATISTICS,
                     enterTransition = { slideUpEnter() },
                     exitTransition = { fadeOut(tween(150)) },
                     popExitTransition = { slideDownExit() },
                     popEnterTransition = { fadeIn(tween(200)) },
-                ) { Box(Modifier.statusBarsPadding()) { StatisticsScreen(onBack = { navController.popBackStack() }) } }
+                ) { StatisticsScreen(onBack = { navController.popIfOn(Dest.STATISTICS) }) }
             }
             // Confirmations for song actions ("Added to queue"), floating just above the bottom chrome.
             ToastHost(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = padding.calculateBottomPadding() + 12.dp))
+          }
           }
         }
     }

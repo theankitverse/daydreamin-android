@@ -42,6 +42,13 @@ class AppPreferences(private val context: Context) {
         val PLAYLISTS_JSON = stringPreferencesKey("playlists_json")
         val PLAYBACK_SNAPSHOT_JSON = stringPreferencesKey("playback_snapshot_json")
         val EQUALIZER_PRESET = stringPreferencesKey("equalizer_preset")
+        val USER_NAME = stringPreferencesKey("user_name")
+        val HAS_AVATAR = booleanPreferencesKey("has_avatar")
+        val ONBOARDED = booleanPreferencesKey("onboarded")
+        val ASKED_NOTIFICATIONS = booleanPreferencesKey("asked_notifications")
+        val AVATAR_STAMP = androidx.datastore.preferences.core.longPreferencesKey("avatar_stamp")
+        val AUTO_BACKUP_URI = stringPreferencesKey("auto_backup_uri")
+        val AUTO_BACKUP_AT = androidx.datastore.preferences.core.longPreferencesKey("auto_backup_at")
     }
 
     val accentName: Flow<String> = context.dataStore.data.map { it[Keys.ACCENT_NAME] ?: "Violet" }
@@ -75,6 +82,39 @@ class AppPreferences(private val context: Context) {
      *  enum directly) so this data layer doesn't need to depend on the player package's types. */
     val equalizerPreset: Flow<String> = context.dataStore.data.map { it[Keys.EQUALIZER_PRESET] ?: "Off" }
     suspend fun setEqualizerPreset(value: String) = edit { it[Keys.EQUALIZER_PRESET] = value }
+
+    /** What the app calls you. Blank until you've told it. */
+    val userName: Flow<String> = context.dataStore.data.map { it[Keys.USER_NAME].orEmpty() }
+    suspend fun setUserName(value: String) = edit { it[Keys.USER_NAME] = value.trim().take(40) }
+
+    /** The picture itself lives at [avatarFile]; this flips (and so re-emits) whenever it changes. */
+    val avatarVersion: Flow<Long> = context.dataStore.data.map { if (it[Keys.HAS_AVATAR] == true) it[Keys.AVATAR_STAMP] ?: 1L else 0L }
+    val avatarFile: java.io.File get() = java.io.File(context.filesDir, "avatar.jpg")
+    suspend fun setAvatar(jpeg: ByteArray?) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            if (jpeg == null) avatarFile.delete() else avatarFile.writeBytes(jpeg)
+        }
+        edit { it[Keys.HAS_AVATAR] = jpeg != null; it[Keys.AVATAR_STAMP] = System.currentTimeMillis() }
+    }
+
+    /** First-run setup finished (or skipped). `null` until the store has been read. */
+    val onboarded: Flow<Boolean> = context.dataStore.data.map { it[Keys.ONBOARDED] == true }
+    suspend fun setOnboarded() = edit { it[Keys.ONBOARDED] = true }
+
+    /** The notification permission is asked for once, ever — never again after an answer. */
+    suspend fun claimNotificationAsk(): Boolean {
+        var first = false
+        context.dataStore.edit { if (it[Keys.ASKED_NOTIFICATIONS] != true) { first = true; it[Keys.ASKED_NOTIFICATIONS] = true } }
+        return first
+    }
+
+    /** Where the automatic backup file lives (a MediaStore or document URI), and when it was last written. */
+    val autoBackupUri: Flow<String?> = context.dataStore.data.map { it[Keys.AUTO_BACKUP_URI] }
+    val autoBackupAt: Flow<Long> = context.dataStore.data.map { it[Keys.AUTO_BACKUP_AT] ?: 0L }
+    suspend fun setAutoBackup(uri: String?, atMs: Long) = edit {
+        if (uri == null) it.remove(Keys.AUTO_BACKUP_URI) else it[Keys.AUTO_BACKUP_URI] = uri
+        it[Keys.AUTO_BACKUP_AT] = atMs
+    }
 
     val likedIds: Flow<Set<String>> = context.dataStore.data.map { it[Keys.LIKED_IDS] ?: emptySet() }
 
@@ -139,7 +179,45 @@ class AppPreferences(private val context: Context) {
     suspend fun clearPlaybackSnapshot() = edit { it.remove(Keys.PLAYBACK_SNAPSHOT_JSON) }
 
     /** Everything the user has built up, read in one consistent snapshot of the store. */
-    suspend fun exportLibrary(): LibraryBackup = readLibrary(context.dataStore.data.first())
+    suspend fun exportLibrary(): LibraryBackup {
+        val prefs = context.dataStore.data.first()
+        val avatar = if (prefs[Keys.HAS_AVATAR] == true) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching { android.util.Base64.encodeToString(avatarFile.readBytes(), android.util.Base64.NO_WRAP) }.getOrNull()
+            }
+        } else null
+        return readLibrary(prefs).copy(
+            profile = ProfileBackup(
+                name = prefs[Keys.USER_NAME]?.takeIf { it.isNotBlank() },
+                accent = prefs[Keys.ACCENT_NAME],
+                equalizer = prefs[Keys.EQUALIZER_PRESET],
+                loudnessBoost = prefs[Keys.AUDIO_NORMALIZATION],
+                offlineOnWifiOnly = prefs[Keys.DOWNLOAD_WIFI_ONLY],
+                avatarJpegBase64 = avatar,
+            ),
+        )
+    }
+
+    /**
+     * Applies a backup's profile — but only onto a device that hasn't been set up with its own
+     * yet (no name), so importing someone's backup never overwrites who you are here.
+     * Returns whether it was applied.
+     */
+    suspend fun applyProfileIfFresh(profile: ProfileBackup?): Boolean {
+        if (profile == null) return false
+        val current = context.dataStore.data.first()
+        if (!current[Keys.USER_NAME].isNullOrBlank()) return false
+        val avatar = profile.avatarJpegBase64?.let { runCatching { android.util.Base64.decode(it, android.util.Base64.DEFAULT) }.getOrNull() }
+        if (avatar != null) setAvatar(avatar)
+        edit { p ->
+            profile.name?.takeIf { it.isNotBlank() }?.let { p[Keys.USER_NAME] = it.take(40) }
+            profile.accent?.let { p[Keys.ACCENT_NAME] = it }
+            profile.equalizer?.let { p[Keys.EQUALIZER_PRESET] = it }
+            profile.loudnessBoost?.let { p[Keys.AUDIO_NORMALIZATION] = it }
+            profile.offlineOnWifiOnly?.let { p[Keys.DOWNLOAD_WIFI_ONLY] = it }
+        }
+        return true
+    }
 
     /**
      * Merges [incoming] into the library in a single DataStore edit — liked ids, liked songs,
