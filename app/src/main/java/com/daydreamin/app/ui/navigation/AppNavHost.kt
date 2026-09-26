@@ -45,6 +45,7 @@ import com.daydreamin.app.ui.components.MiniPlayer
 import com.daydreamin.app.ui.screens.home.HomeScreen
 import com.daydreamin.app.ui.screens.library.LibraryScreen
 import com.daydreamin.app.ui.components.PlayerSheet
+import com.daydreamin.app.ui.screens.library.LibraryLaunch
 import com.daydreamin.app.ui.components.ToastHost
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Alignment
@@ -203,12 +204,21 @@ fun AppNavHost() {
                     )
                 }
                 composable(Dest.PROFILE) {
-                    Box(Modifier.statusBarsPadding()) { ProfileScreen(
+                    // Draws its own glow behind the status bar, like Home and Library.
+                    ProfileScreen(
                         contentPadding = padding,
                         onStatistics = { navController.navigate(Dest.STATISTICS) },
                         onSettings = { navController.navigate(Dest.SETTINGS) },
                         onThemeCustomize = { navController.navigate(Dest.THEME_CUSTOMIZE) },
-                    ) }
+                        onOpenLibrary = { tab ->
+                            LibraryLaunch.tab = tab
+                            navController.navigateTopLevel(Dest.LIBRARY)
+                        },
+                        onOpenPlayer = {
+                            PlayerSheet.requestMorphOpen()
+                            navController.navigate(Dest.NOW_PLAYING)
+                        },
+                    )
                 }
                 // Modal-style destinations — pushed up from the bottom over whatever's behind
                 // them, like a sheet, instead of the flat tab crossfade above.

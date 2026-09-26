@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 /**
  * The three collections the app actually keeps. (The old Artists/Albums tabs were just the liked
@@ -17,6 +19,11 @@ import kotlinx.coroutines.launch
  * "artist" often a channel name — so they were dropped rather than dressed up.)
  */
 enum class LibraryTab(val label: String) { LIKED("Liked"), RECENT("Recent"), PLAYLISTS("Playlists") }
+
+/** Another screen asking Library to open on a particular collection (Profile's stat tiles). Read once, then cleared. */
+object LibraryLaunch {
+    var tab by androidx.compose.runtime.mutableStateOf<LibraryTab?>(null)
+}
 
 class LibraryViewModel : ViewModel() {
     private val prefs = DaydreaminApp.instance.prefs

@@ -130,6 +130,9 @@ fun LibraryScreen(contentPadding: PaddingValues, onOpenPlayer: () -> Unit, onGoH
     val playlists = playlistsOrNull.orEmpty()
     val openPlaylist = playlists.firstOrNull { it.id == openId }
     BackHandler(enabled = openPlaylist != null) { vm.openPlaylist(null) }
+    LaunchedEffect(LibraryLaunch.tab) {
+        LibraryLaunch.tab?.let { vm.onTabChange(it); vm.openPlaylist(null); LibraryLaunch.tab = null }
+    }
     // A playlist that was deleted while open closes itself.
     LaunchedEffect(openId, playlistsOrNull) { if (openId != null && playlistsOrNull != null && openPlaylist == null) vm.openPlaylist(null) }
 
