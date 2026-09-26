@@ -1,0 +1,13 @@
+<resources>
+    <style name="Theme.Daydreamin" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">@color/splash_background</item>
+        <item name="android:navigationBarColor">@color/splash_background</item>
+        <item name="android:windowBackground">@color/splash_background</item>
+    </style>
+
+    <style name="Theme.Daydreamin.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="postSplashScreenTheme">@style/Theme.Daydreamin</item>
+    </style>
+</resources>
