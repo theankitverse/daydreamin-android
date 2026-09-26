@@ -254,7 +254,7 @@ fun AppNavHost() {
                     exitTransition = { fadeOut(tween(150)) },
                     popExitTransition = { slideDownExit() },
                     popEnterTransition = { fadeIn(tween(200)) },
-                ) { Box(Modifier.statusBarsPadding()) { SettingsScreen(onBack = { navController.popBackStack() }) } }
+                ) { SettingsScreen(onBack = { navController.popIfOn(Dest.SETTINGS) }) }
                 composable(
                     Dest.THEME_CUSTOMIZE,
                     enterTransition = { slideUpEnter() },

@@ -20,7 +20,7 @@ object AudioDiskCache {
 
     // Roughly 16+ hours of audio at the bitrates this app resolves — generous headroom for
     // "recently played plus liked songs" without being an unreasonable ask of phone storage.
-    private const val MAX_CACHE_BYTES = 1024L * 1024 * 1024
+    const val MAX_CACHE_BYTES = 1024L * 1024 * 1024
 
     @Volatile private var cache: SimpleCache? = null
 

@@ -11,6 +11,7 @@ import com.daydreamin.app.data.prefs.parseLibraryBackup
 import com.daydreamin.app.data.prefs.toJson
 import com.daydreamin.app.data.youtube.YouTubeExtractorService
 import com.daydreamin.app.player.EqPreset
+import coil.imageLoader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -28,10 +29,10 @@ enum class ExtractorState { UNKNOWN, CHECKING, OK, FAILED }
 class SettingsViewModel : ViewModel() {
     private val prefs = DaydreaminApp.instance.prefs
 
-    val darkMode: StateFlow<Boolean> = prefs.darkMode.stateIn(viewModelScope, SharingStarted.Eagerly, true)
-    val dynamicTheming: StateFlow<Boolean> = prefs.dynamicTheming.stateIn(viewModelScope, SharingStarted.Eagerly, true)
-    val streamingQuality: StateFlow<String> = prefs.streamingQuality.stateIn(viewModelScope, SharingStarted.Eagerly, "Auto")
-    val crossfadeSeconds: StateFlow<Int> = prefs.crossfadeSeconds.stateIn(viewModelScope, SharingStarted.Eagerly, 3)
+    // Dark mode, dynamic theming, streaming quality and the "fade out near track end" seconds
+    // used to be exposed here, but nothing in the app ever read them (the app is always dark, the
+    // extractor always takes the best stream, and there's no fade) — so they're no longer shown.
+    // Their stored values are left alone.
     val audioNormalization: StateFlow<Boolean> = prefs.audioNormalization.stateIn(viewModelScope, SharingStarted.Eagerly, true)
     val downloadWifiOnly: StateFlow<Boolean> = prefs.downloadWifiOnly.stateIn(viewModelScope, SharingStarted.Eagerly, true)
     val equalizerPreset: StateFlow<String> = prefs.equalizerPreset.stateIn(viewModelScope, SharingStarted.Eagerly, EqPreset.OFF.label)
@@ -43,8 +44,38 @@ class SettingsViewModel : ViewModel() {
     fun testExtractor() {
         _extractorState.value = ExtractorState.CHECKING
         viewModelScope.launch {
-            val results = YouTubeExtractorService.search("test", limit = 1)
-            _extractorState.value = if (results.isNotEmpty()) ExtractorState.OK else ExtractorState.FAILED
+            // A real song, not a word like "test": YouTube Music answers generic words with a page
+            // layout that isn't a song list, which made this check report "broken" while search
+            // itself worked fine. Falls back to regular YouTube search, which playback also uses.
+            val probe = "Shape of You Ed Sheeran"
+            val ok = YouTubeExtractorService.search(probe, limit = 1).isNotEmpty() ||
+                YouTubeExtractorService.searchBroad(probe, limit = 1).isNotEmpty()
+            _extractorState.value = if (ok) ExtractorState.OK else ExtractorState.FAILED
+        }
+    }
+
+    /** What's actually on disk: offline audio (with its fixed cap) and cached artwork. */
+    data class Storage(val audioBytes: Long, val audioCapBytes: Long, val artworkBytes: Long)
+
+    private val _storage = MutableStateFlow<Storage?>(null)
+    val storage: StateFlow<Storage?> = _storage
+
+    fun refreshStorage(context: android.content.Context) {
+        viewModelScope.launch {
+            _storage.value = withContext(Dispatchers.IO) {
+                // Measured from the files themselves, so reading it never touches the player's live cache.
+                val audio = java.io.File(context.cacheDir, "audio_cache").walkTopDown().filter { it.isFile }.sumOf { it.length() }
+                Storage(audio, com.daydreamin.app.player.AudioDiskCache.MAX_CACHE_BYTES, context.imageLoader.diskCache?.size ?: 0L)
+            }
+        }
+    }
+
+    /** Artwork only — re-downloads as screens need it. Never touches audio, the library or the queue. */
+    fun clearArtworkCache(context: android.content.Context) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { context.imageLoader.diskCache?.clear() }
+            context.imageLoader.memoryCache?.clear()
+            refreshStorage(context)
         }
     }
 
@@ -102,10 +133,6 @@ class SettingsViewModel : ViewModel() {
         return "Imported ${parts.joinToString(", ")}."
     }
 
-    fun setDarkMode(v: Boolean) = viewModelScope.launch { prefs.setDarkMode(v) }
-    fun setDynamicTheming(v: Boolean) = viewModelScope.launch { prefs.setDynamicTheming(v) }
-    fun setStreamingQuality(v: String) = viewModelScope.launch { prefs.setStreamingQuality(v) }
-    fun setCrossfadeSeconds(v: Int) = viewModelScope.launch { prefs.setCrossfadeSeconds(v) }
     fun setAudioNormalization(v: Boolean) = viewModelScope.launch { prefs.setAudioNormalization(v) }
     fun setDownloadWifiOnly(v: Boolean) = viewModelScope.launch { prefs.setDownloadWifiOnly(v) }
     fun setEqualizerPreset(v: String) = viewModelScope.launch { prefs.setEqualizerPreset(v) }
