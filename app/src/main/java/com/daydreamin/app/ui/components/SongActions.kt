@@ -37,7 +37,7 @@ import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
-import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -191,7 +191,7 @@ class SongMenuAction(val label: String, val icon: ImageVector, val destructive: 
 fun SongMenuButton(song: Song, modifier: Modifier = Modifier, extra: List<SongMenuAction> = emptyList(), tint: Color = Color.White.copy(alpha = 0.55f)) {
     var open by remember { mutableStateOf(false) }
     Box(modifier = modifier.size(44.dp).pressable(onClick = { open = true }), contentAlignment = Alignment.Center) {
-        Icon(Icons.Rounded.MoreVert, contentDescription = "More options for ${song.title}", tint = tint, modifier = Modifier.size(22.dp))
+        Icon(Icons.Rounded.MoreHoriz, contentDescription = "More options for ${song.title}", tint = tint, modifier = Modifier.size(22.dp))
         if (open) SongMenu(song = song, extra = extra, onDismiss = { open = false })
     }
 }

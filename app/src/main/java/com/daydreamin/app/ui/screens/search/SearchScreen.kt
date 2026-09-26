@@ -1,223 +1,547 @@
 package com.daydreamin.app.ui.screens.search
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.CloudOff
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.SearchOff
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.daydreamin.app.DaydreaminApp
+import com.daydreamin.app.data.model.Song
+import com.daydreamin.app.data.youtube.YtPlaylist
 import com.daydreamin.app.player.PlayerController
+import com.daydreamin.app.ui.components.AmbientGlow
 import com.daydreamin.app.ui.components.Artwork
-import com.daydreamin.app.ui.components.EmptyState
-import com.daydreamin.app.ui.components.ShimmerSongRow
-import com.daydreamin.app.ui.components.SongRow
-import com.daydreamin.app.ui.components.StaggeredAppear
-import com.daydreamin.app.ui.theme.SurfaceVariant
-import com.daydreamin.app.ui.theme.TextMuted
-import com.daydreamin.app.ui.theme.TextPrimary
-import com.daydreamin.app.ui.theme.TextSecondary
+import com.daydreamin.app.ui.components.EqualizerBars
+import com.daydreamin.app.ui.components.GlassChip
+import com.daydreamin.app.ui.components.SolidPillButton
+import com.daydreamin.app.ui.components.SongListRow
+import com.daydreamin.app.ui.components.SongMenuButton
+import com.daydreamin.app.ui.components.Toaster
+import com.daydreamin.app.ui.components.pressable
+import com.daydreamin.app.ui.components.shimmer
+import com.daydreamin.app.ui.screens.home.moodCards
+import com.daydreamin.app.ui.theme.ArtworkLight
+import com.daydreamin.app.ui.theme.BgBase
+import com.daydreamin.app.ui.theme.BrandViolet
+import com.daydreamin.app.ui.theme.Glass
+import com.daydreamin.app.ui.theme.Radius
+import com.daydreamin.app.ui.theme.Space
+import com.daydreamin.app.ui.theme.glass
+import com.daydreamin.app.ui.theme.rememberArtworkLight
 import kotlinx.coroutines.launch
 import androidx.lifecycle.viewmodel.compose.viewModel as composeViewModel
 
+private val DefaultLight = ArtworkLight(key = BrandViolet, fill = Color(0xFF3D3A9E))
+
+/** Set by entry points that mean "I want to type" (Home's search button) — the field takes focus once. */
+object SearchFocus {
+    var requested by mutableStateOf(false)
+}
+
+private enum class Phase { IDLE, LOADING, ERROR, EMPTY, RESULTS }
+private data class NowPlaying(val playId: String?, val isPlaying: Boolean)
+
+/**
+ * Search. A glass field at the top; before you type, moods to start from; while searching, the
+ * shape of results shimmering in place; then a lit top result, the songs, and filters for the
+ * artists and playlists the search found. The page is lit by the top result's artwork.
+ */
 @Composable
-fun SearchScreen(contentPadding: PaddingValues) {
+fun SearchScreen(contentPadding: PaddingValues, onOpenPlayer: () -> Unit) {
     val vm: SearchViewModel = composeViewModel()
     val state by vm.state.collectAsState()
-    val playerMeta by PlayerController.meta.collectAsState()
-    val scope = rememberCoroutineScope()
+    val meta = PlayerController.meta.collectAsState()
+    val nowPlaying by remember { derivedStateOf { NowPlaying(meta.value.currentSong?.playId, meta.value.isPlaying) } }
+    val keyboard = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
 
-    Column(modifier = Modifier.fillMaxSize().padding(top = 16.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(SurfaceVariant)
-                    .padding(horizontal = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(Icons.Filled.Search, contentDescription = null, tint = TextMuted, modifier = Modifier.padding(start = 10.dp))
-                TextField(
-                    value = state.query,
-                    onValueChange = vm::onQueryChange,
-                    placeholder = { Text("Song, artist, lyrics, or \"song by artist\"", color = TextMuted) },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
-                        unfocusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
-                        focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                        unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                        cursorColor = MaterialTheme.colorScheme.primary,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary,
-                    ),
-                )
-                if (state.query.isNotEmpty()) {
-                    IconButton(onClick = { vm.onQueryChange("") }) {
-                        Icon(Icons.Filled.Clear, contentDescription = "Clear", tint = TextMuted)
-                    }
-                }
+    val phase = when {
+        state.query.isBlank() -> Phase.IDLE
+        state.error != null && !state.loading -> Phase.ERROR
+        // Keep showing the previous results while a refined query loads — less flicker while typing.
+        state.songs.isNotEmpty() -> Phase.RESULTS
+        state.loading || state.resultsFor != state.query -> Phase.LOADING
+        else -> Phase.EMPTY
+    }
+    val top = state.songs.firstOrNull()?.takeIf { phase == Phase.RESULTS }
+    val light = rememberArtworkLight(top?.cover?.ifBlank { top.artworkUrl }, DefaultLight)
+
+    val play = { song: Song ->
+        // The song that's already playing opens the player — tapping it never restarts it.
+        if (nowPlaying.playId == song.playId) onOpenPlayer() else PlayerController.playSong(song)
+    }
+    // Scrolling results is reading, not typing: put the keyboard away.
+    val hideKeyboardOnScroll = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (source == NestedScrollSource.UserInput && available.y != 0f) { keyboard?.hide(); focusManager.clearFocus() }
+                return Offset.Zero
             }
         }
+    }
 
-        androidx.compose.foundation.layout.Spacer(Modifier.height(14.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            SearchTab.entries.forEach { tab ->
-                val selected = tab == state.tab
-                val bgColor by animateColorAsState(
-                    if (selected) MaterialTheme.colorScheme.primary else SurfaceVariant,
-                    animationSpec = tween(200),
-                    label = "tabBg",
+    Box(Modifier.fillMaxSize().background(BgBase)) {
+        AmbientGlow(light = light, scrollY = { 0f })
+        Column(Modifier.fillMaxSize().statusBarsPadding()) {
+            // The big title steps aside once you're searching, giving the results the room.
+            AnimatedVisibility(
+                visible = phase == Phase.IDLE,
+                enter = fadeIn(tween(220)) + expandVertically(spring(dampingRatio = 0.9f, stiffness = 400f)),
+                exit = fadeOut(tween(120)) + shrinkVertically(spring(dampingRatio = 0.9f, stiffness = 400f)),
+            ) {
+                Text(
+                    "Search",
+                    style = MaterialTheme.typography.displaySmall,
+                    color = Color.White,
+                    modifier = Modifier.padding(start = Space.gutter, top = Space.m, bottom = Space.s),
                 )
-                val fgColor by animateColorAsState(
-                    if (selected) androidx.compose.ui.graphics.Color.White else TextSecondary,
-                    animationSpec = tween(200),
-                    label = "tabFg",
-                )
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(50))
-                        .background(bgColor)
-                        .clickable { vm.onTabChange(tab) }
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                ) {
-                    Text(
-                        tab.name.lowercase().replaceFirstChar { it.uppercase() },
-                        color = fgColor,
-                        style = MaterialTheme.typography.labelLarge,
+            }
+            SearchField(
+                query = state.query,
+                onQueryChange = vm::onQueryChange,
+                onSubmit = { keyboard?.hide(); focusManager.clearFocus() },
+                modifier = Modifier.padding(horizontal = Space.gutter, vertical = Space.xs),
+            )
+            AnimatedContent(
+                targetState = phase,
+                transitionSpec = {
+                    (fadeIn(tween(240, delayMillis = 60)) + slideInVertically(spring(dampingRatio = 0.9f, stiffness = 380f)) { it / 24 }) togetherWith
+                        fadeOut(tween(120))
+                },
+                label = "searchPhase",
+                modifier = Modifier.fillMaxSize(),
+            ) { p ->
+                val bottom = contentPadding.calculateBottomPadding() + Space.l
+                when (p) {
+                    Phase.IDLE -> IdleMoods(bottom, onMood = { vm.onQueryChange(it); keyboard?.hide(); focusManager.clearFocus() }, scroll = hideKeyboardOnScroll)
+                    Phase.LOADING -> ResultsSkeleton()
+                    Phase.ERROR -> Message(
+                        icon = Icons.Rounded.CloudOff,
+                        title = "Couldn’t search",
+                        body = state.error.orEmpty(),
+                        action = "Try again",
+                        onAction = vm::retry,
+                    )
+                    Phase.EMPTY -> Message(
+                        icon = Icons.Rounded.SearchOff,
+                        title = "No matches for “${state.query.trim()}”",
+                        body = "Check the spelling, or try a line you remember from the lyrics.",
+                    )
+                    Phase.RESULTS -> Results(
+                        state = state,
+                        vm = vm,
+                        light = light,
+                        nowPlaying = { nowPlaying },
+                        play = play,
+                        bottom = bottom,
+                        scroll = hideKeyboardOnScroll,
                     )
                 }
             }
         }
+    }
+}
 
-        androidx.compose.foundation.layout.Spacer(Modifier.height(8.dp))
+// ---------------------------------------------------------------- field
 
-        when {
-            state.query.isBlank() -> EmptyState("Search for any song, artist, or mood — or even a line of lyrics.", modifier = Modifier.fillMaxWidth().padding(top = 48.dp))
-            state.tab == SearchTab.PLAYLISTS -> when {
-                state.playlistsLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+/** Glass field; focus brightens its edge and fill a step so you can see where your typing goes. */
+@Composable
+private fun SearchField(query: String, onQueryChange: (String) -> Unit, onSubmit: () -> Unit, modifier: Modifier = Modifier) {
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(SearchFocus.requested) {
+        if (SearchFocus.requested) { SearchFocus.requested = false; focus.requestFocus() }
+    }
+    val edge by animateColorAsState(if (focused) Color.White.copy(alpha = 0.34f) else Color.Transparent, tween(200), label = "fieldEdge")
+    val lift by animateFloatAsState(if (focused) 1f else 0f, tween(200), label = "fieldLift")
+    BasicTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        singleLine = true,
+        interactionSource = interaction,
+        textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White, fontSize = 16.sp),
+        cursorBrush = SolidColor(Color.White),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
+        modifier = modifier.fillMaxWidth().focusRequester(focus),
+        decorationBox = { inner ->
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+                    .glass(Radius.pill, if (focused) Glass.Frosted else Glass.Regular, tint = Color.White.copy(alpha = 0.02f * lift))
+                    .border(1.dp, edge, Radius.pill)
+                    .padding(start = 16.dp, end = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Rounded.Search, contentDescription = null, tint = Color.White.copy(alpha = 0.6f + 0.3f * lift), modifier = Modifier.size(22.dp))
+                Spacer(Modifier.width(12.dp))
+                Box(Modifier.weight(1f)) {
+                    if (query.isEmpty()) {
+                        Text("Songs, artists, or a line from the lyrics", style = MaterialTheme.typography.bodyLarge, color = Color.White.copy(alpha = 0.42f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    inner()
                 }
-                state.playlists.isEmpty() -> EmptyState("No playlists found for \"${state.query}\".", modifier = Modifier.padding(top = 48.dp))
-                else -> LazyColumn(contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp), modifier = Modifier.fillMaxSize()) {
-                    itemsIndexed(state.playlists, key = { _, p -> p.url }) { index, playlist ->
-                        StaggeredAppear(index) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        scope.launch {
-                                            val tracks = DaydreaminApp.instance.repository.playlistTracks(playlist.url).getOrDefault(emptyList())
-                                            if (tracks.isNotEmpty()) PlayerController.playFromList(tracks, 0)
-                                        }
-                                    }
-                                    .padding(vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Artwork(url = playlist.thumbnail, modifier = Modifier.size(52.dp), shape = RoundedCornerShape(10.dp))
-                                Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                                    Text(playlist.title, color = TextPrimary, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text(
-                                        if (playlist.trackCount >= 0) "${playlist.author} · ${playlist.trackCount} songs" else playlist.author,
-                                        color = TextSecondary,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
+                AnimatedVisibility(visible = query.isNotEmpty(), enter = fadeIn() + scaleIn(initialScale = 0.6f), exit = fadeOut() + scaleOut(targetScale = 0.6f)) {
+                    Box(Modifier.size(40.dp).pressable(onClick = { onQueryChange(""); focus.requestFocus() }), contentAlignment = Alignment.Center) {
+                        Box(Modifier.size(24.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Rounded.Close, contentDescription = "Clear search", tint = Color.White, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+            }
+        },
+    )
+}
+
+// ---------------------------------------------------------------- idle
+
+/** Before you type: the same moods as Home, as quick starting points (each runs a real search). */
+@Composable
+private fun IdleMoods(bottom: androidx.compose.ui.unit.Dp, onMood: (String) -> Unit, scroll: NestedScrollConnection) {
+    LazyColumn(Modifier.fillMaxSize().nestedScroll(scroll), contentPadding = PaddingValues(top = Space.l, bottom = bottom)) {
+        item {
+            Column(Modifier.padding(horizontal = Space.gutter)) {
+                Text("Start with a mood", style = MaterialTheme.typography.titleLarge, color = Color.White)
+                Text("Or search for a song, an artist, even a lyric you half remember.", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.55f))
+            }
+            Spacer(Modifier.height(Space.titleToContent))
+        }
+        items(moodCards.chunked(2)) { pair ->
+            Row(Modifier.fillMaxWidth().padding(horizontal = Space.gutter, vertical = 5.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                pair.forEach { mood ->
+                    Row(
+                        Modifier
+                            .weight(1f)
+                            .height(64.dp)
+                            .pressable(onClick = { onMood(mood.query) })
+                            .glass(Radius.cardShape, Glass.Clear)
+                            .background(Brush.horizontalGradient(listOf(Color(mood.accent).copy(alpha = 0.16f), Color.Transparent)))
+                            .padding(start = 14.dp, end = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(Modifier.size(width = 4.dp, height = 24.dp).clip(Radius.pill).background(Color(mood.accent)))
+                        Spacer(Modifier.width(12.dp))
+                        Text(mood.title, style = MaterialTheme.typography.titleSmall, color = Color.White, maxLines = 1)
+                    }
+                }
+                if (pair.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------- results
+
+@Composable
+private fun Results(
+    state: SearchUiState,
+    vm: SearchViewModel,
+    light: ArtworkLight,
+    nowPlaying: () -> NowPlaying,
+    play: (Song) -> Unit,
+    bottom: androidx.compose.ui.unit.Dp,
+    scroll: NestedScrollConnection,
+) {
+    Column(Modifier.fillMaxSize()) {
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = Space.gutter),
+            horizontalArrangement = Arrangement.spacedBy(Space.xs),
+            modifier = Modifier.padding(top = 6.dp, bottom = 4.dp),
+        ) {
+            items(SearchTab.entries) { t -> GlassChip(label = t.label, selected = state.tab == t, onClick = { vm.onTabChange(t) }) }
+        }
+        // A hairline of activity while a refined query loads over the previous results.
+        Box(Modifier.fillMaxWidth().height(2.dp)) {
+            androidx.compose.animation.AnimatedVisibility(visible = state.loading, enter = fadeIn(), exit = fadeOut()) {
+                Box(Modifier.padding(horizontal = Space.gutter).fillMaxWidth().height(2.dp).clip(Radius.pill).shimmer())
+            }
+        }
+        AnimatedContent(
+            targetState = state.tab,
+            transitionSpec = { fadeIn(tween(200, delayMillis = 40)) togetherWith fadeOut(tween(100)) },
+            label = "searchTab",
+            modifier = Modifier.fillMaxSize(),
+        ) { tab ->
+            val listState = rememberLazyListState()
+            // New results for a new query start at the top.
+            LaunchedEffect(state.resultsFor) { listState.scrollToItem(0) }
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize().nestedScroll(scroll),
+                contentPadding = PaddingValues(top = Space.s, bottom = bottom),
+            ) {
+                when (tab) {
+                    SearchTab.SONGS -> {
+                        // Can be empty for a moment: this list stays composed while it animates out
+                        // after a new search comes back with nothing.
+                        val top = state.songs.firstOrNull() ?: return@LazyColumn
+                        item(key = "top-" + top.playId) {
+                            val np = nowPlaying()
+                            TopResult(top, light, isCurrent = np.playId == top.playId, isPlaying = np.isPlaying, onPlay = { play(top) })
+                        }
+                        if (state.songs.size > 1) {
+                            item(key = "songs-title") {
+                                Text("Songs", style = MaterialTheme.typography.titleLarge, color = Color.White, modifier = Modifier.padding(start = Space.gutter, top = Space.l, bottom = Space.xs))
+                            }
+                            itemsIndexed(state.songs.drop(1), key = { _, s -> "s-" + s.playId }) { _, s ->
+                                val np = nowPlaying()
+                                SongListRow(s, isCurrent = np.playId == s.playId, isPlaying = np.isPlaying, onClick = { play(s) }, modifier = Modifier.animateItem())
                             }
                         }
                     }
+                    SearchTab.ARTISTS -> {
+                        val artists = vm.artists(state.songs)
+                        items(artists, key = { "a-" + it.name.lowercase() }) { a ->
+                            ArtistRow(a, onClick = { vm.onQueryChange(a.name); vm.onTabChange(SearchTab.SONGS) })
+                        }
+                    }
+                    SearchTab.PLAYLISTS -> playlistItems(state, vm)
                 }
             }
-            state.loading -> LazyColumn(contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp), modifier = Modifier.fillMaxSize()) {
-                items(6) { ShimmerSongRow() }
-            }
-            state.error != null -> EmptyState(state.error ?: "Search failed", modifier = Modifier.padding(top = 48.dp))
-            state.tab == SearchTab.SONGS && state.songs.isEmpty() -> EmptyState("No results for \"${state.query}\".", modifier = Modifier.padding(top = 48.dp))
-            else -> LazyColumn(contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp), modifier = Modifier.fillMaxSize()) {
-                when (state.tab) {
-                    SearchTab.SONGS -> itemsIndexed(state.songs, key = { _, song -> song.playId }) { index, song ->
-                        StaggeredAppear(index) {
-                            SongRow(
-                                song = song,
-                                isPlaying = playerMeta.currentSong?.playId == song.playId,
-                                // Search results aren't a playlist — near-duplicate versions of
-                                // what you searched for shouldn't become your queue. Real
-                                // recommendations come from the YouTube-related path instead.
-                                onClick = { PlayerController.playSong(song) },
-                            )
-                        }
-                    }
-                    SearchTab.ARTISTS -> items(vm.artists) { (artist, sample) ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { vm.onQueryChange(artist) }
-                                .padding(vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Artwork(url = sample.artworkUrl, modifier = Modifier.size(48.dp), shape = CircleShape)
-                            Text(artist, color = TextPrimary, modifier = Modifier.padding(start = 14.dp), fontWeight = FontWeight.Medium)
-                        }
-                    }
-                    SearchTab.ALBUMS -> items(vm.albums) { (album, sample) ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Artwork(url = sample.artworkUrl, modifier = Modifier.size(48.dp))
-                            Column(Modifier.padding(start = 14.dp)) {
-                                Text(album, color = TextPrimary, fontWeight = FontWeight.Medium)
-                                Text(sample.artist, color = TextSecondary, style = MaterialTheme.typography.bodySmall)
-                            }
-                        }
-                    }
-                    SearchTab.PLAYLISTS -> {} // handled above, outside this branch
+        }
+    }
+}
+
+/**
+ * The best match, set apart: lit by its own artwork (a wash of its key light through glass), a
+ * larger cover, and a direct Play — or Pause, if it's the song already playing.
+ */
+@Composable
+private fun TopResult(song: Song, light: ArtworkLight, isCurrent: Boolean, isPlaying: Boolean, onPlay: () -> Unit) {
+    Row(
+        Modifier
+            .padding(horizontal = Space.gutter)
+            .fillMaxWidth()
+            .pressable(onClick = onPlay)
+            .clip(Radius.panelShape)
+            .background(Brush.linearGradient(listOf(light.key.copy(alpha = 0.24f), light.fill.copy(alpha = 0.08f))))
+            .glass(Radius.panelShape, Glass.Clear)
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Artwork(url = song.artworkUrl, shape = Radius.cardShape, modifier = Modifier.size(96.dp))
+        Column(Modifier.weight(1f).padding(start = 16.dp)) {
+            Text("TOP RESULT", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+            Spacer(Modifier.height(4.dp))
+            Text(song.title, style = MaterialTheme.typography.titleLarge.copy(fontSize = 19.sp), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(song.artist, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.66f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val playingThis = isCurrent && isPlaying
+                SolidPillButton(
+                    label = if (isCurrent) (if (playingThis) "Playing" else "Paused") else "Play",
+                    icon = if (playingThis) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                    onClick = { if (isCurrent) PlayerController.togglePlayPause() else onPlay() },
+                )
+                if (isCurrent) {
+                    Spacer(Modifier.width(10.dp))
+                    EqualizerBars(playing = isPlaying, color = Color.White)
                 }
             }
+        }
+        SongMenuButton(song = song, modifier = Modifier.align(Alignment.Top))
+    }
+}
+
+@Composable
+private fun ArtistRow(a: ArtistHit, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().height(72.dp).pressable(onClick = onClick).padding(horizontal = Space.gutter),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Artwork(url = a.sample.artworkUrl, shape = CircleShape, modifier = Modifier.size(56.dp))
+        Column(Modifier.weight(1f).padding(horizontal = 16.dp)) {
+            Text(a.name, style = MaterialTheme.typography.titleMedium, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                "${a.songCount} ${if (a.songCount == 1) "song" else "songs"} in these results",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.55f),
+            )
+        }
+        Icon(Icons.Rounded.ChevronRight, contentDescription = "Search ${a.name}", tint = Color.White.copy(alpha = 0.35f))
+    }
+}
+
+private fun androidx.compose.foundation.lazy.LazyListScope.playlistItems(state: SearchUiState, vm: SearchViewModel) {
+    when {
+        state.playlistsLoading -> items(6) { SkeletonRow() }
+        state.playlistsError != null -> item {
+            Message(icon = Icons.Rounded.CloudOff, title = "Couldn’t load playlists", body = state.playlistsError, action = "Try again", onAction = vm::retryPlaylists, fill = false)
+        }
+        state.playlists.isEmpty() -> item {
+            Message(icon = Icons.Rounded.SearchOff, title = "No playlists for this one", body = "Songs and artists above may still have what you're after.", fill = false)
+        }
+        else -> items(state.playlists, key = { "p-" + it.url }) { p -> PlaylistRow(p) }
+    }
+}
+
+/** A YouTube playlist: tapping loads its tracks and plays them in order. */
+@Composable
+private fun PlaylistRow(p: YtPlaylist) {
+    val scope = rememberCoroutineScope()
+    var loading by remember { mutableStateOf(false) }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(72.dp)
+            .pressable(onClick = {
+                if (loading) return@pressable
+                loading = true
+                scope.launch {
+                    val tracks = DaydreaminApp.instance.repository.playlistTracks(p.url).getOrDefault(emptyList())
+                    loading = false
+                    if (tracks.isNotEmpty()) {
+                        PlayerController.playFromList(tracks, 0)
+                        Toaster.show("Playing “${p.title}”")
+                    } else {
+                        Toaster.show("Couldn’t open that playlist")
+                    }
+                }
+            })
+            .padding(horizontal = Space.gutter),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Artwork(url = p.thumbnail, shape = Radius.cardShape, modifier = Modifier.size(56.dp))
+            if (loading) {
+                Box(Modifier.size(56.dp).clip(Radius.cardShape).background(Color.Black.copy(alpha = 0.45f)))
+                Box(Modifier.size(22.dp).clip(CircleShape).shimmer())
+            }
+        }
+        Column(Modifier.weight(1f).padding(horizontal = 16.dp)) {
+            Text(p.title, style = MaterialTheme.typography.titleMedium, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                listOfNotNull(p.author.takeIf { it.isNotBlank() }, if (p.trackCount > 0) "${p.trackCount} songs" else null).joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.55f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Icon(Icons.Rounded.PlayArrow, contentDescription = "Play playlist", tint = Color.White.copy(alpha = 0.5f))
+    }
+}
+
+// ---------------------------------------------------------------- states
+
+@Composable
+private fun ResultsSkeleton() {
+    Column(Modifier.fillMaxSize().padding(top = 52.dp)) {
+        Box(Modifier.padding(horizontal = Space.gutter).fillMaxWidth().height(124.dp).clip(Radius.panelShape).shimmer())
+        Spacer(Modifier.height(Space.l))
+        repeat(6) { SkeletonRow() }
+    }
+}
+
+@Composable
+private fun SkeletonRow() {
+    Row(Modifier.fillMaxWidth().height(66.dp).padding(horizontal = Space.gutter), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(50.dp).clip(Radius.thumbShape).shimmer())
+        Column(Modifier.padding(horizontal = 14.dp)) {
+            Box(Modifier.size(width = 170.dp, height = 13.dp).clip(Radius.pill).shimmer())
+            Spacer(Modifier.height(7.dp))
+            Box(Modifier.size(width = 110.dp, height = 11.dp).clip(Radius.pill).shimmer())
+        }
+    }
+}
+
+@Composable
+private fun Message(icon: ImageVector, title: String, body: String, action: String? = null, onAction: (() -> Unit)? = null, fill: Boolean = true) {
+    Column(
+        (if (fill) Modifier.fillMaxSize() else Modifier.fillMaxWidth()).padding(horizontal = 40.dp, vertical = 56.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = if (fill) Arrangement.Top else Arrangement.Center,
+    ) {
+        Box(Modifier.size(64.dp).glass(CircleShape, Glass.Regular), contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, tint = Color.White.copy(alpha = 0.88f), modifier = Modifier.size(28.dp))
+        }
+        Spacer(Modifier.height(18.dp))
+        Text(title, style = MaterialTheme.typography.titleLarge, color = Color.White, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.height(6.dp))
+        Text(body, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.6f), textAlign = TextAlign.Center)
+        if (action != null && onAction != null) {
+            Spacer(Modifier.height(20.dp))
+            SolidPillButton(label = action, icon = Icons.Rounded.Refresh, onClick = onAction)
         }
     }
 }

@@ -56,6 +56,7 @@ import com.daydreamin.app.ui.screens.profile.ProfileScreen
 import com.daydreamin.app.ui.screens.profile.StatisticsScreen
 import com.daydreamin.app.ui.screens.queue.QueueScreen
 import com.daydreamin.app.ui.screens.search.SearchScreen
+import com.daydreamin.app.ui.screens.search.SearchFocus
 import com.daydreamin.app.ui.screens.settings.SettingsScreen
 import com.daydreamin.app.ui.screens.splash.SplashScreen
 import com.daydreamin.app.ui.screens.themecustomize.ThemeCustomizeScreen
@@ -183,9 +184,17 @@ fun AppNavHost() {
                     SplashScreen(onFinished = { navController.navigateTopLevel(Dest.HOME, popSplash = true) })
                 }
                 composable(Dest.HOME) {
-                    HomeScreen(onOpenDrawer = { scope.launch { drawerState.open() } }, onSearchClick = { navController.navigateTopLevel(Dest.SEARCH) }, contentPadding = padding)
+                    HomeScreen(onOpenDrawer = { scope.launch { drawerState.open() } }, onSearchClick = { SearchFocus.requested = true; navController.navigateTopLevel(Dest.SEARCH) }, contentPadding = padding)
                 }
-                composable(Dest.SEARCH) { Box(Modifier.statusBarsPadding()) { SearchScreen(contentPadding = padding) } }
+                composable(Dest.SEARCH) {
+                    SearchScreen(
+                        contentPadding = padding,
+                        onOpenPlayer = {
+                            PlayerSheet.requestMorphOpen()
+                            navController.navigate(Dest.NOW_PLAYING)
+                        },
+                    )
+                }
                 composable(Dest.LIBRARY) {
                     // Draws its own glow behind the status bar, like Home.
                     LibraryScreen(

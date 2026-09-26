@@ -80,7 +80,7 @@ import com.daydreamin.app.ui.components.EqualizerBars
 import com.daydreamin.app.ui.components.NameDialog
 import com.daydreamin.app.ui.components.SolidPillButton
 import com.daydreamin.app.ui.components.SongActions
-import com.daydreamin.app.ui.components.SongMenu
+import com.daydreamin.app.ui.components.SongListRow
 import com.daydreamin.app.ui.components.SongMenuAction
 import com.daydreamin.app.ui.components.Toaster
 import com.daydreamin.app.ui.components.pressable
@@ -226,7 +226,7 @@ private fun LazyListScope.likedTab(
     }
     itemsIndexed(liked, key = { _, s -> "liked-" + s.playId }) { index, s ->
         val np = nowPlaying()
-        LibraryRow(s, isCurrent = np.playId == s.playId, isPlaying = np.isPlaying, onClick = { play(liked, index, s) }, modifier = Modifier.animateItem())
+        SongListRow(s, isCurrent = np.playId == s.playId, isPlaying = np.isPlaying, onClick = { play(liked, index, s) }, modifier = Modifier.animateItem())
     }
 }
 
@@ -264,7 +264,7 @@ private fun LazyListScope.recentTab(
     }
     itemsIndexed(history, key = { _, s -> "recent-" + s.playId }) { index, s ->
         val np = nowPlaying()
-        LibraryRow(s, isCurrent = np.playId == s.playId, isPlaying = np.isPlaying, onClick = { play(index, s) }, modifier = Modifier.animateItem())
+        SongListRow(s, isCurrent = np.playId == s.playId, isPlaying = np.isPlaying, onClick = { play(index, s) }, modifier = Modifier.animateItem())
     }
 }
 
@@ -348,7 +348,7 @@ private fun LazyListScope.playlistDetail(
     }
     itemsIndexed(playlist.songs, key = { _, s -> "pd-" + s.playId }) { index, s ->
         val np = nowPlaying()
-        LibraryRow(
+        SongListRow(
             s,
             isCurrent = np.playId == s.playId,
             isPlaying = np.isPlaying,
@@ -472,44 +472,6 @@ private fun Mosaic(songs: List<Song>, size: Dp, modifier: Modifier = Modifier) {
                 Modifier.matchParentSize().background(Brush.linearGradient(listOf(BrandViolet.copy(alpha = 0.35f), Color(0xFF16161A)))),
                 contentAlignment = Alignment.Center,
             ) { Icon(Icons.Rounded.MusicNote, contentDescription = null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(size * 0.3f)) }
-        }
-    }
-}
-
-/**
- * A song in a collection. Plain (no glass) — only the song that's playing gets a faint glass
- * lane and moving bars. Tap to play (or, if it's the one playing, to open the player);
- * long-press or ⋮ for actions.
- */
-@Composable
-private fun LibraryRow(
-    song: Song,
-    isCurrent: Boolean,
-    isPlaying: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    extra: List<SongMenuAction> = emptyList(),
-) {
-    var menuOpen by remember { mutableStateOf(false) }
-    Row(
-        modifier
-            .fillMaxWidth()
-            .height(RowHeight)
-            .padding(horizontal = 10.dp)
-            .then(if (isCurrent) Modifier.glass(Radius.cardShape, Glass.Clear) else Modifier)
-            .pressable(onLongClick = { menuOpen = true }, onClick = onClick)
-            .padding(start = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Artwork(url = song.cover.ifBlank { song.artworkUrl }, shape = Radius.thumbShape, modifier = Modifier.size(50.dp))
-        Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
-            Text(song.title, style = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.5.sp, fontWeight = FontWeight.Medium), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(song.artist, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.55f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        if (isCurrent) EqualizerBars(playing = isPlaying, color = Color.White, modifier = Modifier.padding(end = 4.dp))
-        Box(Modifier.size(44.dp).pressable(onClick = { menuOpen = true }), contentAlignment = Alignment.Center) {
-            Icon(Icons.Rounded.MoreHoriz, contentDescription = "More options for ${song.title}", tint = Color.White.copy(alpha = 0.55f), modifier = Modifier.size(22.dp))
-            if (menuOpen) SongMenu(song = song, extra = extra, onDismiss = { menuOpen = false })
         }
     }
 }
