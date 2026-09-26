@@ -37,6 +37,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ChevronLeft
@@ -79,6 +80,7 @@ import androidx.compose.ui.window.Dialog
 import com.daydreamin.app.BuildConfig
 import com.daydreamin.app.R
 import com.daydreamin.app.player.EqPreset
+import com.daydreamin.app.ui.components.Creator
 import com.daydreamin.app.ui.components.Toaster
 import com.daydreamin.app.ui.components.pressable
 import com.daydreamin.app.ui.theme.BgBase
@@ -229,6 +231,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             // ---- About
             item { Section("About") }
             item { AboutCard() }
+            item { CreatorRow() }
             item { ExtractorRow(extractor, onCheck = vm::testExtractor) }
         }
 
@@ -419,6 +422,39 @@ private fun AboutCard() {
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White.copy(alpha = 0.7f),
             )
+        }
+    }
+}
+
+/** The maker's credit — the whole row opens his Instagram profile. */
+@Composable
+private fun CreatorRow() {
+    val context = LocalContext.current
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .semantics(mergeDescendants = true) { contentDescription = "Made by ${Creator.NAME}. Open @${Creator.INSTAGRAM_HANDLE} on Instagram" }
+            .pressable(role = Role.Button, onClick = { Creator.openInstagram(context) })
+            .padding(horizontal = Space.gutter, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Monogram in the brand's violet-to-pink, like the logo.
+        Box(
+            Modifier.size(30.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Color(0xFF9B6BFF), Color(0xFFF09AD8)))),
+            contentAlignment = Alignment.Center,
+        ) { Text(Creator.NAME.take(1), style = MaterialTheme.typography.labelLarge, color = Color.White) }
+        Column(Modifier.weight(1f).padding(start = 14.dp)) {
+            Text("Made by ${Creator.NAME}", style = MaterialTheme.typography.titleMedium, color = Color.White)
+            Text("@${Creator.INSTAGRAM_HANDLE} on Instagram", style = MaterialTheme.typography.bodySmall, color = Muted, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        }
+        Spacer(Modifier.width(12.dp))
+        Row(
+            Modifier.glass(Radius.pill, Glass.Clear).padding(start = 14.dp, end = 10.dp, top = 7.dp, bottom = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Follow", style = MaterialTheme.typography.labelLarge, color = Color.White)
+            Spacer(Modifier.width(4.dp))
+            Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(15.dp))
         }
     }
 }

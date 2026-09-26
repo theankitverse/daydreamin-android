@@ -31,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -101,11 +102,19 @@ fun AppDrawerContent(
             )
             bottomItems.forEach { DrawerRow(it) }
 
+            // Credit line — tapping it opens the maker's Instagram.
+            val context = androidx.compose.ui.platform.LocalContext.current
             Text(
-                "Good music. brighter days.",
+                androidx.compose.ui.text.buildAnnotatedString {
+                    append("Made by ${Creator.NAME} \u00B7 ")
+                    withStyle(androidx.compose.ui.text.SpanStyle(color = MaterialTheme.colorScheme.primary)) { append("@${Creator.INSTAGRAM_HANDLE}") }
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = TextSecondary,
-                modifier = Modifier.padding(top = 12.dp),
+                modifier = Modifier
+                    .padding(top = 12.dp)
+                    .clickable { Creator.openInstagram(context) }
+                    .padding(vertical = 6.dp),
             )
         }
     }
