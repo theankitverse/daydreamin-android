@@ -27,4 +27,9 @@ class StreamRecoveryTest {
     @Test fun aDifferentSongStillGetsItsOwnAttempt() {
         assertTrue(shouldRecoverInPlace(PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS, "b", "a"))
     }
+
+    @Test fun onlyUrlLevelStatusesCountAsStale() {
+        for (code in listOf(403, 404, 410)) assertTrue("$code", isStaleStreamHttpStatus(code))
+        for (code in listOf(200, 206, 400, 429, 500, 502, 503)) assertFalse("$code", isStaleStreamHttpStatus(code))
+    }
 }

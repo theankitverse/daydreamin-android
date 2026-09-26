@@ -18,3 +18,6 @@ fun isStaleStreamError(errorCode: Int): Boolean = errorCode == PlaybackException
  */
 fun shouldRecoverInPlace(errorCode: Int, playId: String, alreadyRecoveredPlayId: String?): Boolean =
     isStaleStreamError(errorCode) && playId != alreadyRecoveredPlayId
+
+/** HTTP statuses that mean "this URL is bad" rather than "the server/network is having a moment". */
+fun isStaleStreamHttpStatus(status: Int): Boolean = status == 403 || status == 404 || status == 410

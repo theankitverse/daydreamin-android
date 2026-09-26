@@ -7,10 +7,12 @@ import android.net.Uri
 import android.util.Log
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.HttpDataSource
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.cache.CacheWriter
 import com.daydreamin.app.DaydreaminApp
 import com.daydreamin.app.data.model.Song
+import com.daydreamin.app.data.youtube.YouTubeExtractorService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -68,6 +70,20 @@ object SongPrecacher {
     }
 
     private suspend fun precacheOne(cacheDataSource: CacheDataSource, song: Song, maxBytes: Long?) {
+        try {
+            cacheFromFreshStream(cacheDataSource, song, maxBytes)
+        } catch (e: HttpDataSource.InvalidResponseCodeException) {
+            if (!isStaleStreamHttpStatus(e.responseCode)) throw e
+            // A resolved URL that answers 403/404/410 is intermittently just a bad URL (see
+            // StreamRecovery) — get a fresh one and try once more instead of giving up on the song
+            // until the next pass.
+            Log.w(TAG, "'${song.title}' stream answered ${e.responseCode} — re-resolving once")
+            YouTubeExtractorService.invalidateStream(song.artist, song.title, song.videoId)
+            cacheFromFreshStream(cacheDataSource, song, maxBytes)
+        }
+    }
+
+    private suspend fun cacheFromFreshStream(cacheDataSource: CacheDataSource, song: Song, maxBytes: Long?) {
         val resolved = DaydreaminApp.instance.repository.resolveStream(song).getOrNull() ?: return
         // Must match PlayerController.buildMediaItem's custom cache key exactly, or a song
         // precached here would never actually be hit once the user plays it for real.
