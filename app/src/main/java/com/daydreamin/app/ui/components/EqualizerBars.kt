@@ -44,9 +44,12 @@ fun EqualizerBars(
         val barWidth = size.width / (barCount * 2 - 1)
         bars.forEachIndexed { index, heightFraction ->
             val x = index * barWidth * 2 + barWidth / 2
-            val barHeight = size.height * heightFraction.coerceIn(0.15f, 1f)
+            // Paused, the bars rest at uneven heights (a still equalizer) rather than shrinking to
+            // three dots — dots next to a row's "⋯" button read as a second menu.
+            val resting = floatArrayOf(0.55f, 0.9f, 0.4f, 0.75f)[index % 4]
+            val barHeight = size.height * (if (playing) heightFraction.coerceIn(0.15f, 1f) else resting)
             drawLine(
-                color = color,
+                color = if (playing) color else color.copy(alpha = color.alpha * 0.7f),
                 start = Offset(x, size.height),
                 end = Offset(x, size.height - barHeight),
                 strokeWidth = barWidth,

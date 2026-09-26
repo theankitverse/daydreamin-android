@@ -45,6 +45,9 @@ import com.daydreamin.app.ui.components.MiniPlayer
 import com.daydreamin.app.ui.screens.home.HomeScreen
 import com.daydreamin.app.ui.screens.library.LibraryScreen
 import com.daydreamin.app.ui.components.PlayerSheet
+import com.daydreamin.app.ui.components.ToastHost
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Alignment
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.ui.graphics.graphicsLayer
@@ -158,6 +161,7 @@ fun AppNavHost() {
                 }
             },
         ) { padding ->
+          Box(Modifier.fillMaxSize()) {
             NavHost(
                 navController = navController,
                 startDestination = Dest.SPLASH,
@@ -182,7 +186,17 @@ fun AppNavHost() {
                     HomeScreen(onOpenDrawer = { scope.launch { drawerState.open() } }, onSearchClick = { navController.navigateTopLevel(Dest.SEARCH) }, contentPadding = padding)
                 }
                 composable(Dest.SEARCH) { Box(Modifier.statusBarsPadding()) { SearchScreen(contentPadding = padding) } }
-                composable(Dest.LIBRARY) { Box(Modifier.statusBarsPadding()) { LibraryScreen(contentPadding = padding) } }
+                composable(Dest.LIBRARY) {
+                    // Draws its own glow behind the status bar, like Home.
+                    LibraryScreen(
+                        contentPadding = padding,
+                        onOpenPlayer = {
+                            PlayerSheet.requestMorphOpen()
+                            navController.navigate(Dest.NOW_PLAYING)
+                        },
+                        onGoHome = { navController.navigateTopLevel(Dest.HOME) },
+                    )
+                }
                 composable(Dest.PROFILE) {
                     Box(Modifier.statusBarsPadding()) { ProfileScreen(
                         contentPadding = padding,
@@ -247,6 +261,9 @@ fun AppNavHost() {
                     popEnterTransition = { fadeIn(tween(200)) },
                 ) { Box(Modifier.statusBarsPadding()) { StatisticsScreen(onBack = { navController.popBackStack() }) } }
             }
+            // Confirmations for song actions ("Added to queue"), floating just above the bottom chrome.
+            ToastHost(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = padding.calculateBottomPadding() + 12.dp))
+          }
         }
     }
 }

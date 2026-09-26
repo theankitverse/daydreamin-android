@@ -85,9 +85,12 @@ fun SongRow(
     }
 }
 
+/** The row's "⋮": opens the shared song menu (this used to be a button that did nothing). */
 @Composable
 fun SongRowMenu(song: Song, onClick: (() -> Unit)? = null) {
-    IconButton(onClick = { onClick?.invoke() }) {
-        Icon(Icons.Filled.MoreVert, contentDescription = "More", tint = TextSecondary)
+    if (onClick != null) {
+        IconButton(onClick = onClick) { Icon(Icons.Filled.MoreVert, contentDescription = "More", tint = TextSecondary) }
+    } else {
+        SongMenuButton(song = song, tint = TextSecondary)
     }
 }

@@ -10,38 +10,31 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.util.UUID
 
-enum class LibraryTab { PLAYLISTS, ARTISTS, ALBUMS, LIKED }
+/**
+ * The three collections the app actually keeps. (The old Artists/Albums tabs were just the liked
+ * list regrouped — and with YouTube-sourced songs, "album" is almost always a placeholder and
+ * "artist" often a channel name — so they were dropped rather than dressed up.)
+ */
+enum class LibraryTab(val label: String) { LIKED("Liked"), RECENT("Recent"), PLAYLISTS("Playlists") }
 
 class LibraryViewModel : ViewModel() {
     private val prefs = DaydreaminApp.instance.prefs
 
-    val likedSongs: StateFlow<List<Song>> = prefs.likedSongs.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    val playlists: StateFlow<List<Playlist>> = prefs.playlists.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val likedSongs: StateFlow<List<Song>?> = prefs.likedSongs.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    val history: StateFlow<List<Song>?> = prefs.history.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    val playlists: StateFlow<List<Playlist>?> = prefs.playlists.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     private val _tab = MutableStateFlow(LibraryTab.LIKED)
     val tab: StateFlow<LibraryTab> = _tab
     fun onTabChange(tab: LibraryTab) { _tab.value = tab }
 
-    fun createPlaylist(name: String) {
-        if (name.isBlank()) return
-        viewModelScope.launch {
-            val updated = playlists.value + Playlist(id = UUID.randomUUID().toString(), name = name.trim())
-            prefs.savePlaylists(updated)
-        }
-    }
+    /** The playlist being looked at, if any (the detail view replaces the tab content). */
+    private val _openPlaylistId = MutableStateFlow<String?>(null)
+    val openPlaylistId: StateFlow<String?> = _openPlaylistId
+    fun openPlaylist(id: String?) { _openPlaylistId.value = id }
 
-    fun deletePlaylist(id: String) {
-        viewModelScope.launch { prefs.savePlaylists(playlists.value.filterNot { it.id == id }) }
-    }
-
-    fun addToPlaylist(playlistId: String, song: Song) {
-        viewModelScope.launch {
-            val updated = playlists.value.map {
-                if (it.id == playlistId && it.songs.none { s -> s.playId == song.playId }) it.copy(songs = it.songs + song) else it
-            }
-            prefs.savePlaylists(updated)
-        }
+    fun clearHistory() {
+        viewModelScope.launch { prefs.clearHistory() }
     }
 }
