@@ -199,29 +199,32 @@ fun AppNavHost() {
                 composable(
                     Dest.NOW_PLAYING,
                     enterTransition = { if (PlayerSheet.isMorphPending) EnterTransition.None else slideUpEnter() },
-                    exitTransition = { fadeOut(tween(150)) },
+                    // The Queue sheet slides up *over* the player, so the player stays put beneath it.
+                    exitTransition = { if (targetState.destination.route == Dest.QUEUE) ExitTransition.KeepUntilTransitionsFinished else fadeOut(tween(150)) },
                     popExitTransition = {
                         // KeepUntilTransitionsFinished (not None): stay composed while the artwork flies home.
                         if (targetState.destination.route in Dest.bottomNavRoutes && PlayerSheet.miniArtworkBounds != null) ExitTransition.KeepUntilTransitionsFinished else slideDownExit()
                     },
-                    popEnterTransition = { fadeIn(tween(200)) },
+                    popEnterTransition = { if (initialState.destination.route == Dest.QUEUE) EnterTransition.None else fadeIn(tween(200)) },
                 ) {
                     NowPlayingScreen(
                         visibility = this,
                         closingToMini = {
                             navController.currentBackStackEntry?.destination?.route in Dest.bottomNavRoutes && PlayerSheet.miniArtworkBounds != null
                         },
-                        onBack = { navController.popBackStack() },
+                        onBack = { navController.popIfOn(Dest.NOW_PLAYING) },
                         onQueueClick = { navController.navigate(Dest.QUEUE) },
                     )
                 }
+                // A glass sheet over Now Playing: it animates itself (slide + the room dimming) off
+                // this transition, so the navigation-level effects stay out of the way.
                 composable(
                     Dest.QUEUE,
-                    enterTransition = { slideUpEnter() },
+                    enterTransition = { EnterTransition.None },
                     exitTransition = { fadeOut(tween(150)) },
-                    popExitTransition = { slideDownExit() },
+                    popExitTransition = { ExitTransition.KeepUntilTransitionsFinished },
                     popEnterTransition = { fadeIn(tween(200)) },
-                ) { Box(Modifier.statusBarsPadding()) { QueueScreen(onBack = { navController.popBackStack() }) } }
+                ) { QueueScreen(visibility = this, onBack = { navController.popIfOn(Dest.QUEUE) }) }
                 composable(
                     Dest.SETTINGS,
                     enterTransition = { slideUpEnter() },
@@ -261,6 +264,15 @@ private fun slideDownExit() = slideOutVertically(
     targetOffsetY = { fullHeight -> fullHeight / 3 },
     animationSpec = tween(280, easing = FastOutSlowInEasing),
 ) + fadeOut(tween(220))
+
+/**
+ * Pops [route] only if it's what's actually showing. A sheet can ask to close more than once
+ * (a pull gesture ending plus its fling, say) — a bare popBackStack() would then also close
+ * whatever was underneath it.
+ */
+private fun androidx.navigation.NavController.popIfOn(route: String) {
+    if (currentBackStackEntry?.destination?.route == route) popBackStack()
+}
 
 private fun androidx.navigation.NavController.navigateTopLevel(route: String, popSplash: Boolean = false) {
     navigate(route) {

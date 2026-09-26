@@ -4,6 +4,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -43,8 +44,10 @@ import com.daydreamin.app.ui.theme.glass
  * back, instead of a ripple washing over glass (ripples read as flat Material, not glass).
  * The scale is read inside graphicsLayer, so pressing never recomposes the content.
  */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 fun Modifier.pressable(
     role: Role = Role.Button,
+    onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
 ): Modifier = composed {
     val interaction = remember { MutableInteractionSource() }
@@ -52,7 +55,13 @@ fun Modifier.pressable(
     val scale by animateFloatAsState(if (pressed) Motion.pressedScale else 1f, Motion.press(), label = "press")
     this
         .graphicsLayer { scaleX = scale; scaleY = scale }
-        .clickable(interactionSource = interaction, indication = null, role = role, onClick = onClick)
+        .then(
+            if (onLongClick != null) {
+                Modifier.combinedClickable(interactionSource = interaction, indication = null, role = role, onLongClick = onLongClick, onClick = onClick)
+            } else {
+                Modifier.clickable(interactionSource = interaction, indication = null, role = role, onClick = onClick)
+            },
+        )
 }
 
 /**

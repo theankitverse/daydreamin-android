@@ -222,7 +222,7 @@ fun NowPlayingScreen(
     ) {
         // The room darkens quickly (the screen underneath is gone before the player's own text
         // arrives, so the two never overlap); the player's content fades in over the second half.
-        Atmosphere(song, light, isPlaying = meta.isPlaying, alpha = { (e() * 1.4f).coerceIn(0f, 1f) })
+        PlayerAtmosphere(song, light, alpha = { (e() * 1.4f).coerceIn(0f, 1f) })
 
         // Everything except the artwork fades with the open/close; the artwork flies instead.
         Column(
@@ -416,7 +416,7 @@ private fun Rect.scaledAroundCenter(s: Float): Rect {
  * songs so the whole space changes color like a slow lighting cue.
  */
 @Composable
-private fun Atmosphere(song: Song?, light: ArtworkLight, isPlaying: Boolean, alpha: () -> Float) {
+fun PlayerAtmosphere(song: Song?, light: ArtworkLight, alpha: () -> Float) {
     Box(Modifier.fillMaxSize().graphicsLayer { this.alpha = alpha() }) {
         Crossfade(targetState = song?.artworkUrl, animationSpec = tween(900), label = "atmosphere") { url ->
             ArtworkBackdrop(url = url, blur = 36.dp, tiny = true, modifier = Modifier.fillMaxSize().graphicsLayer { this.alpha = 0.78f })
