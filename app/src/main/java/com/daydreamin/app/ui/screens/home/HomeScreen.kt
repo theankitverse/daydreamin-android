@@ -95,7 +95,16 @@ import com.daydreamin.app.ui.theme.Space
 import com.daydreamin.app.ui.theme.TextPrimary
 import com.daydreamin.app.ui.theme.TextSecondary
 import com.daydreamin.app.ui.theme.glass
-import com.daydreamin.app.ui.theme.rememberArtworkColor
+import com.daydreamin.app.ui.theme.ArtworkLight
+import com.daydreamin.app.ui.theme.rememberArtworkLight
+import com.daydreamin.app.ui.components.ArtworkBackdrop
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.ui.text.font.FontWeight
 import dev.chrisbanes.haze.HazeProgressive
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
@@ -107,7 +116,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel as composeViewModel
 
 private const val DISPLAY_NAME = "Ankit"
 private val TopBarHeight = 60.dp
-private val QuickPickRowHeight = 64.dp
+private val QuickPickRowHeight = 66.dp
+private val SpotlightHeight = 216.dp
+/** Until the lead artwork's own light is known: the brand's violet key with a deep indigo fill. */
+private val DefaultLight = ArtworkLight(key = BrandViolet, fill = Color(0xFF3D3A9E))
 private const val QUICK_PICK_ROWS = 4
 
 /** What a song row/card needs to know about playback — kept tiny so rows only recompose when it actually changes. */
@@ -129,7 +141,7 @@ fun HomeScreen(
     val discover = state.selectedChip == "All"
     val ready = !state.loading && state.error == null
     val lead = if (ready) state.trending.firstOrNull() else null
-    val glow = rememberArtworkColor(lead?.cover?.ifBlank { lead.artworkUrl }, fallback = BrandViolet)
+    val light = rememberArtworkLight(lead?.cover?.ifBlank { lead.artworkUrl }, fallback = DefaultLight)
 
     val listState = rememberLazyListState()
     val scrollY = rememberSaveable(saver = FloatStateSaver) { mutableFloatStateOf(0f) }
@@ -140,7 +152,7 @@ fun HomeScreen(
     Box(modifier = Modifier.fillMaxSize().background(BgBase)) {
         // Everything the top bar blurs — including the glow — lives in this one source.
         Box(modifier = Modifier.fillMaxSize().hazeSource(homeHaze)) {
-            AmbientGlow(color = glow, scrollY = { if (listState.canScrollBackward) scrollY.floatValue else 0f })
+            AmbientGlow(light = light, scrollY = { if (listState.canScrollBackward) scrollY.floatValue else 0f })
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize().nestedScroll(scrollTracker),
@@ -166,7 +178,7 @@ fun HomeScreen(
                     discoverFeed(
                         state = state,
                         lead = lead,
-                        glow = glow,
+                        light = light,
                         history = history,
                         liked = liked,
                         nowPlaying = { nowPlaying },
@@ -194,7 +206,7 @@ fun HomeScreen(
 private fun LazyListScope.discoverFeed(
     state: HomeUiState,
     lead: Song?,
-    glow: Color,
+    light: ArtworkLight,
     history: List<Song>,
     liked: List<Song>,
     nowPlaying: () -> NowPlaying,
@@ -203,17 +215,18 @@ private fun LazyListScope.discoverFeed(
 ) {
     when {
         state.loading -> {
-            item(key = "spotlight-loading") { SpotlightPlaceholder() }
-            item(key = "quick-loading") { QuickPicksPlaceholder() }
+            item(key = "spotlight-loading") { SpotlightPlaceholder(Modifier.animateItem()) }
+            item(key = "quick-loading") { QuickPicksPlaceholder(Modifier.animateItem()) }
         }
-        state.error != null -> item(key = "error") { ErrorPanel(state.error, onRetry) }
+        state.error != null -> item(key = "error") { ErrorPanel(state.error, onRetry, Modifier.animateItem()) }
         else -> {
             if (lead != null) {
                 item(key = "spotlight") {
                     val np = nowPlaying()
                     Spotlight(
                         song = lead,
-                        glow = glow,
+                        light = light,
+                        modifier = Modifier.animateItem(),
                         isCurrent = np.playId == lead.playId,
                         isPlaying = np.isPlaying,
                     )
@@ -222,7 +235,7 @@ private fun LazyListScope.discoverFeed(
             val picks = state.trending.drop(1).take(QUICK_PICK_ROWS * 5)
             if (picks.isNotEmpty()) {
                 item(key = "quick-picks") {
-                    Section(title = "Quick picks", overline = "Start a radio from any song") {
+                    Section(title = "Quick picks", subtitle = "Tap a song to start a radio", modifier = Modifier.animateItem()) {
                         QuickPicksGrid(picks, nowPlaying)
                     }
                 }
@@ -231,14 +244,14 @@ private fun LazyListScope.discoverFeed(
     }
     if (history.size >= 3) {
         item(key = "listen-again") {
-            Section(title = "Listen again", overline = DISPLAY_NAME, modifier = Modifier.animateItem()) {
+            Section(title = "Listen again", modifier = Modifier.animateItem()) {
                 CardRow(history.take(15), cardSize = 128.dp, nowPlaying = nowPlaying) { song, _ -> PlayerController.playSong(song) }
             }
         }
     }
     if (liked.isNotEmpty()) {
         item(key = "likes") {
-            Section(title = "From your likes", overline = "${liked.size} liked ${if (liked.size == 1) "song" else "songs"}", modifier = Modifier.animateItem()) {
+            Section(title = "From your likes", subtitle = "${liked.size} ${if (liked.size == 1) "song" else "songs"}", modifier = Modifier.animateItem()) {
                 // A likes shelf plays like a playlist: the rest of your likes follow the one you tapped.
                 CardRow(liked, cardSize = 156.dp, nowPlaying = nowPlaying) { song, index ->
                     PlayerController.playSong(song, queueContext = liked.drop(index + 1) + liked.take(index))
@@ -247,18 +260,24 @@ private fun LazyListScope.discoverFeed(
         }
     }
     item(key = "moods") {
-        Section(title = "Moods & moments") { MoodGrid(onMood) }
+        Section(title = "Moods & moments", modifier = Modifier.animateItem()) { MoodGrid(onMood) }
     }
 }
 
 private fun LazyListScope.resultsFeed(state: HomeUiState, nowPlaying: () -> NowPlaying, onRetry: () -> Unit) {
     item(key = "results-title") {
-        SectionTitle(title = state.selectedChip, overline = if (state.selectionIsMood) "Mood" else "Genre")
+        val count = if (!state.loading && state.error == null) state.trending.size else null
+        val kind = if (state.selectionIsMood) "Mood" else "Genre"
+        SectionTitle(
+            title = state.selectedChip,
+            subtitle = if (count != null) "$kind · $count ${if (count == 1) "song" else "songs"}" else kind,
+            modifier = Modifier.animateItem(),
+        )
         Spacer(Modifier.height(Space.xs))
     }
     when {
-        state.loading -> items(8, key = { "row-loading-$it" }) { QuickPickRowPlaceholder(Modifier.padding(horizontal = Space.gutter)) }
-        state.error != null -> item(key = "results-error") { ErrorPanel(state.error, onRetry) }
+        state.loading -> items(8, key = { "row-loading-$it" }) { QuickPickRowPlaceholder(Modifier.animateItem().padding(horizontal = Space.gutter)) }
+        state.error != null -> item(key = "results-error") { ErrorPanel(state.error, onRetry, Modifier.animateItem()) }
         state.trending.isEmpty() -> item(key = "results-empty") {
             Text(
                 "Nothing here right now.",
@@ -376,36 +395,38 @@ private fun Avatar(onClick: () -> Unit) {
 }
 
 /**
- * Soft light spilling from the top of the screen in the lead artwork's color. It drifts up
- * and dims as you scroll (read in the draw phase only — scrolling never recomposes it).
+ * Light spilling from the top of the screen, as if the lead artwork were a lamp just above it:
+ * a key light from the upper left and a second, different-hued fill light lower on the right.
+ * Drifts up and dims as you scroll (read in the draw phase only — scrolling never recomposes it).
  */
 @Composable
-private fun AmbientGlow(color: Color, scrollY: () -> Float) {
+private fun AmbientGlow(light: ArtworkLight, scrollY: () -> Float) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(640.dp)
+            .height(680.dp)
             .graphicsLayer {
                 val y = scrollY()
                 translationY = -y * 0.35f
-                alpha = 1f - (y / 1400f).coerceIn(0f, 1f) * 0.65f
+                alpha = 1f - (y / 1400f).coerceIn(0f, 1f) * 0.7f
             }
             .drawBehind {
                 drawRect(
                     Brush.radialGradient(
-                        0f to color.copy(alpha = 0.38f),
-                        0.45f to color.copy(alpha = 0.13f),
+                        0f to light.key.copy(alpha = 0.36f),
+                        0.4f to light.key.copy(alpha = 0.12f),
                         1f to Color.Transparent,
-                        center = Offset(size.width * 0.12f, size.height * 0.02f),
-                        radius = size.width * 1.15f,
+                        center = Offset(size.width * 0.08f, 0f),
+                        radius = size.width * 1.1f,
                     ),
                 )
                 drawRect(
                     Brush.radialGradient(
-                        0f to color.copy(alpha = 0.16f),
+                        0f to light.fill.copy(alpha = 0.26f),
+                        0.5f to light.fill.copy(alpha = 0.08f),
                         1f to Color.Transparent,
-                        center = Offset(size.width * 1.02f, size.height * 0.30f),
-                        radius = size.width * 0.78f,
+                        center = Offset(size.width * 0.98f, size.height * 0.26f),
+                        radius = size.width * 0.85f,
                     ),
                 )
             },
@@ -415,51 +436,76 @@ private fun AmbientGlow(color: Color, scrollY: () -> Float) {
 // ---------------------------------------------------------------- sections
 
 @Composable
-private fun Section(title: String, modifier: Modifier = Modifier, overline: String? = null, content: @Composable () -> Unit) {
+private fun Section(title: String, modifier: Modifier = Modifier, subtitle: String? = null, content: @Composable () -> Unit) {
     Column(modifier = modifier.padding(top = Space.section)) {
-        SectionTitle(title = title, overline = overline)
+        SectionTitle(title = title, subtitle = subtitle)
         Spacer(Modifier.height(Space.titleToContent))
         content()
     }
 }
 
-/** The one featured item on Home: today's #1, lit by its own artwork. */
+/**
+ * The one featured item on Home: today's #1, lit by its own artwork. The card's surface *is* the
+ * cover — decoded tiny and blurred into light — under a scrim that keeps the text side quiet,
+ * then a skin of glass (edge light + sheen) on top. The cover itself floats on the right.
+ */
 @Composable
-private fun Spotlight(song: Song, glow: Color, isCurrent: Boolean, isPlaying: Boolean) {
+private fun Spotlight(song: Song, light: ArtworkLight, isCurrent: Boolean, isPlaying: Boolean, modifier: Modifier = Modifier) {
     val onPlay = { if (isCurrent) PlayerController.togglePlayPause() else PlayerController.playSong(song) }
-    Row(
-        modifier = Modifier
+    Box(
+        modifier = modifier
             .padding(horizontal = Space.gutter)
             .fillMaxWidth()
-            .height(212.dp)
+            .height(SpotlightHeight)
             .pressable(onClick = onPlay)
+            .shadow(elevation = 30.dp, shape = Radius.panelShape, ambientColor = light.key, spotColor = light.key)
             .clip(Radius.panelShape)
-            .background(Brush.linearGradient(listOf(glow.copy(alpha = 0.46f), glow.copy(alpha = 0.12f))))
-            .glass(Radius.panelShape, Glass.Clear)
-            .padding(Space.gutter),
+            .background(Color.Black),
     ) {
-        Column(modifier = Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.SpaceBetween) {
-            Text("NO. 1 TODAY", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.78f))
-            Column {
-                Text(song.title, style = MaterialTheme.typography.titleLarge, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Spacer(Modifier.height(2.dp))
-                Text(song.artist, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.72f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        ArtworkBackdrop(url = song.artworkUrl, modifier = Modifier.matchParentSize(), blur = 34.dp)
+        Box(
+            Modifier
+                .matchParentSize()
+                .background(Brush.horizontalGradient(0f to Color.Black.copy(alpha = 0.66f), 0.55f to Color.Black.copy(alpha = 0.40f), 1f to Color.Black.copy(alpha = 0.18f)))
+                .background(Brush.verticalGradient(0.45f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.30f))),
+        )
+        Box(Modifier.matchParentSize().glass(Radius.panelShape, Glass.Clear))
+        Row(modifier = Modifier.matchParentSize().padding(Space.gutter)) {
+            Column(modifier = Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.SpaceBetween) {
+                Text("NO. 1 TODAY", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.72f))
+                Column {
+                    Text(
+                        song.title,
+                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold, fontSize = 24.sp, lineHeight = 28.sp, letterSpacing = (-0.6).sp),
+                        color = Color.White,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.height(3.dp))
+                    Text(song.artist, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.74f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                val playingThis = isCurrent && isPlaying
+                AnimatedContent(
+                    targetState = playingThis,
+                    transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(120)) using SizeTransform(clip = false) },
+                    label = "spotlightPlay",
+                ) { playing ->
+                    SolidPillButton(
+                        label = if (playing) "Pause" else "Play",
+                        icon = if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                        onClick = onPlay,
+                    )
+                }
             }
-            val playingThis = isCurrent && isPlaying
-            SolidPillButton(
-                label = if (playingThis) "Pause" else "Play",
-                icon = if (playingThis) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                onClick = onPlay,
+            Spacer(Modifier.width(Space.m))
+            Artwork(
+                url = song.artworkUrl,
+                shape = Radius.cardShape,
+                modifier = Modifier
+                    .size(SpotlightHeight - Space.gutter * 2)
+                    .shadow(elevation = 22.dp, shape = Radius.cardShape, ambientColor = Color.Black, spotColor = Color.Black),
             )
         }
-        Spacer(Modifier.width(Space.m))
-        Artwork(
-            url = song.artworkUrl,
-            shape = Radius.cardShape,
-            modifier = Modifier
-                .size(172.dp)
-                .shadow(elevation = 28.dp, shape = Radius.cardShape, ambientColor = glow, spotColor = glow),
-        )
     }
 }
 
@@ -497,11 +543,11 @@ private fun QuickPickRow(song: Song, isCurrent: Boolean, isPlaying: Boolean, onC
         modifier = modifier.fillMaxWidth().height(QuickPickRowHeight).pressable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Artwork(url = song.cover.ifBlank { song.artworkUrl }, shape = Radius.thumbShape, modifier = Modifier.size(50.dp))
-        Column(modifier = Modifier.weight(1f).padding(horizontal = Space.s)) {
+        Artwork(url = song.cover.ifBlank { song.artworkUrl }, shape = Radius.thumbShape, modifier = Modifier.size(52.dp))
+        Column(modifier = Modifier.weight(1f).padding(horizontal = Space.s + 2.dp)) {
             Text(
                 song.title,
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.5.sp, fontWeight = FontWeight.Medium),
                 color = if (isCurrent) MaterialTheme.colorScheme.primary else TextPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -543,7 +589,7 @@ private fun ArtCard(song: Song, size: Dp, isCurrent: Boolean, isPlaying: Boolean
         Spacer(Modifier.height(Space.xs))
         Text(
             song.title,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
             color = if (isCurrent) MaterialTheme.colorScheme.primary else TextPrimary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -569,6 +615,8 @@ private fun MoodGrid(onMood: (MoodCard) -> Unit) {
                     .height(56.dp)
                     .pressable(onClick = { onMood(mood) })
                     .glass(Radius.cardShape, Glass.Clear)
+                    // The mood's color bleeds faintly off its light strip — each tile has an identity without being painted.
+                    .background(Brush.horizontalGradient(listOf(Color(mood.accent).copy(alpha = 0.13f), Color.Transparent)))
                     .padding(start = Space.s + 2.dp, end = Space.s),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -581,9 +629,9 @@ private fun MoodGrid(onMood: (MoodCard) -> Unit) {
 }
 
 @Composable
-private fun ErrorPanel(message: String, onRetry: () -> Unit) {
+private fun ErrorPanel(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .padding(horizontal = Space.gutter)
             .fillMaxWidth()
             .glass(Radius.panelShape, Glass.Clear)
@@ -603,20 +651,20 @@ private fun ErrorPanel(message: String, onRetry: () -> Unit) {
 // ---------------------------------------------------------------- loading placeholders (same geometry as the real thing, so nothing jumps)
 
 @Composable
-private fun SpotlightPlaceholder() {
+private fun SpotlightPlaceholder(modifier: Modifier = Modifier) {
     Box(
-        Modifier
+        modifier
             .padding(horizontal = Space.gutter)
             .fillMaxWidth()
-            .height(212.dp)
+            .height(SpotlightHeight)
             .clip(Radius.panelShape)
             .shimmer(),
     )
 }
 
 @Composable
-private fun QuickPicksPlaceholder() {
-    Column(Modifier.padding(top = Space.section)) {
+private fun QuickPicksPlaceholder(modifier: Modifier = Modifier) {
+    Column(modifier.padding(top = Space.section)) {
         Box(Modifier.padding(horizontal = Space.gutter).size(width = 140.dp, height = 22.dp).clip(Radius.thumbShape).shimmer())
         Spacer(Modifier.height(Space.titleToContent))
         repeat(QUICK_PICK_ROWS) { QuickPickRowPlaceholder(Modifier.padding(horizontal = Space.gutter)) }
@@ -626,7 +674,7 @@ private fun QuickPicksPlaceholder() {
 @Composable
 private fun QuickPickRowPlaceholder(modifier: Modifier = Modifier) {
     Row(modifier = modifier.fillMaxWidth().height(QuickPickRowHeight), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(50.dp).clip(Radius.thumbShape).shimmer())
+        Box(Modifier.size(52.dp).clip(Radius.thumbShape).shimmer())
         Column(Modifier.padding(horizontal = Space.s)) {
             Box(Modifier.size(width = 170.dp, height = 13.dp).clip(Radius.pill).shimmer())
             Spacer(Modifier.height(7.dp))

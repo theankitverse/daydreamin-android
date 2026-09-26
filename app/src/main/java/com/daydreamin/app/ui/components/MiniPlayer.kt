@@ -1,6 +1,16 @@
 package com.daydreamin.app.ui.components
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Brush
+import com.daydreamin.app.ui.theme.Motion
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -64,7 +74,7 @@ fun MiniPlayer(
 ) {
     val tint = rememberArtworkColor(song.cover.ifBlank { song.artworkUrl }, fallback = BrandViolet)
     val blur = remember {
-        HazeStyle(backgroundColor = BgBase, tints = listOf(HazeTint(Color.Black.copy(alpha = 0.38f))), blurRadius = 30.dp, noiseFactor = 0.05f)
+        HazeStyle(backgroundColor = BgBase, tints = listOf(HazeTint(Color.Black.copy(alpha = 0.32f))), blurRadius = 34.dp, noiseFactor = 0.05f)
     }
     Box(
         modifier = modifier
@@ -75,22 +85,28 @@ fun MiniPlayer(
             .shadow(elevation = 18.dp, shape = MiniShape, ambientColor = Color.Black, spotColor = Color.Black)
             .clip(MiniShape)
             .then(if (hazeState != null) Modifier.hazeEffect(hazeState, blur) else Modifier.background(BgBase))
-            .background(tint.copy(alpha = 0.17f))
+            .background(Brush.horizontalGradient(listOf(tint.copy(alpha = 0.20f), tint.copy(alpha = 0.06f))))
             .glass(MiniShape, Glass.Regular),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().height(64.dp).padding(start = Space.xs, end = Space.xxs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Artwork(url = song.artworkUrl, shape = RoundedCornerShape(12.dp), modifier = Modifier.size(48.dp))
-            Column(modifier = Modifier.weight(1f).padding(horizontal = Space.s)) {
-                Text(song.title, style = MaterialTheme.typography.titleSmall, color = TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(song.artist, style = MaterialTheme.typography.bodySmall, color = TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // A new song crossfades in (art and text together) instead of the text just changing.
+            Crossfade(targetState = song, animationSpec = tween(320), label = "miniSong", modifier = Modifier.weight(1f)) { shown ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Artwork(url = shown.artworkUrl, shape = RoundedCornerShape(12.dp), modifier = Modifier.size(48.dp))
+                    Column(modifier = Modifier.weight(1f).padding(horizontal = Space.s)) {
+                        Text(shown.title, style = MaterialTheme.typography.titleSmall, color = TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(shown.artist, style = MaterialTheme.typography.bodySmall, color = TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
             }
             MiniControl(
                 icon = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                 description = if (isPlaying) "Pause" else "Play",
                 onClick = onTogglePlay,
+                morph = true,
             )
             MiniControl(icon = Icons.Rounded.SkipNext, description = "Next", onClick = onNext)
         }
@@ -111,11 +127,23 @@ fun MiniPlayer(
 }
 
 @Composable
-private fun MiniControl(icon: androidx.compose.ui.graphics.vector.ImageVector, description: String, onClick: () -> Unit) {
+private fun MiniControl(icon: androidx.compose.ui.graphics.vector.ImageVector, description: String, onClick: () -> Unit, morph: Boolean = false) {
     Box(
         modifier = Modifier.size(46.dp).clip(Radius.pill).pressable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = description, tint = TextPrimary, modifier = Modifier.size(28.dp))
+        if (morph) {
+            // Play ↔ pause swap with a small scale-and-fade, so the state change is felt, not just seen.
+            AnimatedContent(
+                targetState = icon,
+                transitionSpec = {
+                    (fadeIn(tween(160)) + scaleIn(initialScale = 0.7f, animationSpec = Motion.press())) togetherWith
+                        (fadeOut(tween(120)) + scaleOut(targetScale = 0.7f, animationSpec = tween(120)))
+                },
+                label = "playPause",
+            ) { shown -> Icon(shown, contentDescription = description, tint = TextPrimary, modifier = Modifier.size(28.dp)) }
+        } else {
+            Icon(icon, contentDescription = description, tint = TextPrimary, modifier = Modifier.size(28.dp))
+        }
     }
 }

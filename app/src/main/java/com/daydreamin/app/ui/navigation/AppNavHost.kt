@@ -150,10 +150,12 @@ fun AppNavHost() {
                 navController = navController,
                 startDestination = Dest.SPLASH,
                 modifier = Modifier.hazeSource(hazeState),
-                enterTransition = { fadeIn(tween(260, easing = FastOutSlowInEasing)) },
-                exitTransition = { fadeOut(tween(180)) },
-                popEnterTransition = { fadeIn(tween(260, easing = FastOutSlowInEasing)) },
-                popExitTransition = { fadeOut(tween(180)) },
+                // Fade-through: the outgoing screen clears first, then the incoming one fades in and
+                // settles from a hair smaller — two screens' text never overlaps mid-transition.
+                enterTransition = { fadeThroughEnter() },
+                exitTransition = { fadeOut(tween(90)) },
+                popEnterTransition = { fadeThroughEnter() },
+                popExitTransition = { fadeOut(tween(90)) },
             ) {
                 composable(Dest.SPLASH) {
                     SplashScreen(onFinished = { navController.navigateTopLevel(Dest.HOME, popSplash = true) })
@@ -227,6 +229,10 @@ fun AppNavHost() {
         }
     }
 }
+
+private fun fadeThroughEnter() =
+    fadeIn(tween(210, delayMillis = 90, easing = FastOutSlowInEasing)) +
+        androidx.compose.animation.scaleIn(initialScale = 0.985f, animationSpec = tween(300, delayMillis = 90, easing = FastOutSlowInEasing))
 
 private fun slideUpEnter() = slideInVertically(
     initialOffsetY = { fullHeight -> fullHeight / 3 },

@@ -31,6 +31,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -105,16 +109,28 @@ fun GlassCard(
     ) { content() }
 }
 
+/**
+ * Album art. [edge] draws a hairline just inside the artwork's border — on true black, a dark
+ * cover otherwise has no edge at all and reads as a hole; this is how print and Apple-style
+ * UIs "seat" artwork on dark backgrounds.
+ */
 @Composable
 fun Artwork(
     url: String?,
     modifier: Modifier = Modifier,
     shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(10.dp),
+    edge: Boolean = true,
 ) {
     Box(
         modifier = modifier
             .clip(shape)
-            .background(SurfaceVariant),
+            .background(Color.White.copy(alpha = 0.06f))
+            .then(
+                if (edge) Modifier.drawWithContent {
+                    drawContent()
+                    drawOutline(shape.createOutline(size, layoutDirection, this), Color.White.copy(alpha = 0.10f), style = Stroke(width = 0.8.dp.toPx()))
+                } else Modifier
+            ),
         contentAlignment = Alignment.Center,
     ) {
         if (!url.isNullOrBlank()) {
@@ -174,5 +190,28 @@ fun BrandGlow(modifier: Modifier = Modifier, color: Color) {
                 Brush.radialGradient(listOf(color.copy(alpha = 0.35f), Color.Transparent)),
                 CircleShape,
             ),
+    )
+}
+
+/**
+ * Artwork as light rather than as a picture: decoded tiny (so upscaling alone already softens
+ * it — the whole effect on Android < 12, where blur isn't available) and blurred on top of
+ * that. Cheap enough to sit behind a card that scrolls.
+ */
+@Composable
+fun ArtworkBackdrop(url: String?, modifier: Modifier = Modifier, blur: androidx.compose.ui.unit.Dp = 28.dp) {
+    if (url.isNullOrBlank()) return
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val model = remember(url) {
+        coil.request.ImageRequest.Builder(context).data(artworkModel(url)).size(48).crossfade(400).build()
+    }
+    val zoom = artworkZoom(url)
+    AsyncImage(
+        model = model,
+        contentDescription = null,
+        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+        modifier = modifier
+            .graphicsLayer { scaleX = zoom * 1.15f; scaleY = zoom * 1.15f }
+            .blur(blur, androidx.compose.ui.draw.BlurredEdgeTreatment.Unbounded),
     )
 }

@@ -8,6 +8,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -64,10 +66,10 @@ object Motion {
  * top bar, the mini player, the bottom bar — never on cards sitting on a flat background,
  * where it would cost GPU time and look identical.
  */
-enum class Glass(val fillTop: Float, val fillBottom: Float, val edgeTop: Float, val edgeBottom: Float) {
-    Clear(0.055f, 0.030f, 0.12f, 0.03f),
-    Regular(0.085f, 0.045f, 0.16f, 0.04f),
-    Frosted(0.12f, 0.07f, 0.20f, 0.05f),
+enum class Glass(val fillTop: Float, val fillBottom: Float, val edgeTop: Float, val edgeBottom: Float, val sheen: Float) {
+    Clear(0.045f, 0.020f, 0.13f, 0.025f, 0.035f),
+    Regular(0.075f, 0.035f, 0.17f, 0.035f, 0.05f),
+    Frosted(0.11f, 0.06f, 0.22f, 0.045f, 0.07f),
 }
 
 fun Modifier.glass(shape: Shape, level: Glass = Glass.Regular, tint: Color? = null): Modifier =
@@ -78,6 +80,18 @@ fun Modifier.glass(shape: Shape, level: Glass = Glass.Regular, tint: Color? = nu
             Brush.verticalGradient(listOf(Color.White.copy(alpha = level.fillTop), Color.White.copy(alpha = level.fillBottom))),
             shape,
         )
+        // Reflection: a faint diagonal sheen across the upper-left, as if the glass is catching
+        // a light above and in front of it. Gone by the middle — reflections are local, not a wash.
+        .drawBehind {
+            drawRect(
+                Brush.linearGradient(
+                    0f to Color.White.copy(alpha = level.sheen),
+                    0.45f to Color.Transparent,
+                    start = Offset.Zero,
+                    end = Offset(size.width * 0.9f, size.height * 1.1f),
+                ),
+            )
+        }
         .border(
             width = 0.8.dp,
             brush = Brush.verticalGradient(listOf(Color.White.copy(alpha = level.edgeTop), Color.White.copy(alpha = level.edgeBottom))),

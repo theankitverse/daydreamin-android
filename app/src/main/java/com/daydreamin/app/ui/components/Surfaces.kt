@@ -55,12 +55,16 @@ fun Modifier.pressable(
         .clickable(interactionSource = interaction, indication = null, role = role, onClick = onClick)
 }
 
-/** A section's heading, optionally with a small overline above it (e.g. "BASED ON YOUR LISTENING"). */
+/**
+ * A section's heading. [subtitle] sits under the title in quiet sentence case — context, not a
+ * second headline. (All-caps overlines are reserved for a single featured item, where they label
+ * rather than describe.)
+ */
 @Composable
 fun SectionTitle(
     title: String,
     modifier: Modifier = Modifier,
-    overline: String? = null,
+    subtitle: String? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
     Row(
@@ -69,11 +73,11 @@ fun SectionTitle(
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            if (overline != null) {
-                Text(overline.uppercase(), style = MaterialTheme.typography.labelSmall, color = TextSecondary, maxLines = 1)
-                Box(Modifier.height(4.dp))
-            }
             Text(title, style = MaterialTheme.typography.titleLarge, color = TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (subtitle != null) {
+                Box(Modifier.height(3.dp))
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         }
         trailing?.invoke()
     }
@@ -82,15 +86,15 @@ fun SectionTitle(
 /** Filter chip in glass; the selected one becomes a solid bright pill — unmistakable at a glance. */
 @Composable
 fun GlassChip(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val fill by animateColorAsState(if (selected) Color.White.copy(alpha = 0.94f) else Color.Transparent, Motion.settle(), label = "chipFill")
-    val text by animateColorAsState(if (selected) Color.Black else TextPrimary.copy(alpha = 0.88f), Motion.settle(), label = "chipText")
+    val fill by animateColorAsState(if (selected) Color.White.copy(alpha = 0.95f) else Color.Transparent, Motion.settle(), label = "chipFill")
+    val text by animateColorAsState(if (selected) Color.Black else TextPrimary.copy(alpha = 0.82f), Motion.settle(), label = "chipText")
     Box(
         modifier = modifier
-            .height(36.dp)
+            .height(34.dp)
             .pressable(role = Role.Tab, onClick = onClick)
-            .glass(Radius.pill, Glass.Regular)
+            .glass(Radius.pill, Glass.Clear)
             .background(fill, Radius.pill)
-            .padding(horizontal = Space.m),
+            .padding(horizontal = 15.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(label, style = MaterialTheme.typography.labelLarge, color = text)
