@@ -38,6 +38,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.daydreamin.app.ui.theme.Surface
+import com.daydreamin.app.ui.theme.artworkModel
+import com.daydreamin.app.ui.theme.artworkZoom
+import androidx.compose.runtime.remember
 import com.daydreamin.app.ui.theme.SurfaceVariant
 import com.daydreamin.app.ui.theme.TextMuted
 import com.daydreamin.app.ui.theme.TextPrimary
@@ -115,7 +118,17 @@ fun Artwork(
         contentAlignment = Alignment.Center,
     ) {
         if (!url.isNullOrBlank()) {
-            AsyncImage(model = url, contentDescription = null, modifier = Modifier.fillMaxSize())
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val model = remember(url) {
+                coil.request.ImageRequest.Builder(context).data(artworkModel(url)).crossfade(220).build()
+            }
+            val zoom = artworkZoom(url)
+            AsyncImage(
+                model = model,
+                contentDescription = null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().graphicsLayer { scaleX = zoom; scaleY = zoom },
+            )
         } else {
             Icon(Icons.Filled.MusicNote, contentDescription = null, tint = TextMuted)
         }

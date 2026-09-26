@@ -2,8 +2,9 @@ package com.daydreamin.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Base surfaces — deep navy/black matching the reference design
-val BgBase = Color(0xFF0A0A12)
+// AMOLED-first: the canvas is true black, so every glow and glass surface reads as light on
+// darkness (and pixels that are off cost no power). Depth comes from glass, not grey fills.
+val BgBase = Color(0xFF000000)
 val BgElevated = Color(0xFF12131C)
 val Surface = Color(0xFF171821)
 val SurfaceVariant = Color(0xFF1E202C)

@@ -4,9 +4,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalView
-import androidx.core.view.WindowCompat
 
 /**
  * Daydreamin is dark-themed by design (matches the reference screens); [accent] is the
@@ -32,15 +29,8 @@ fun DaydreaminTheme(
         error = DangerRed,
     )
 
-    val view = LocalView.current
-    if (!view.isInEditMode) {
-        val window = (view.context as? android.app.Activity)?.window
-        if (window != null) {
-            window.statusBarColor = BgBase.toArgb()
-            window.navigationBarColor = BgBase.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
-        }
-    }
+    // System bars are transparent and drawn over (edge-to-edge, set up in MainActivity) — each
+    // screen handles its own insets, so the app's glows can reach behind the status bar.
 
     MaterialTheme(
         colorScheme = colorScheme,

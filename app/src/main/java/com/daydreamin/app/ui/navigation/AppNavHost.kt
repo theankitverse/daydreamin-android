@@ -23,7 +23,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.daydreamin.app.ui.theme.daydreamGlassStyle
+import dev.chrisbanes.haze.HazeProgressive
 import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.HazeStyle
+import dev.chrisbanes.haze.HazeTint
+import com.daydreamin.app.ui.theme.BgBase
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.statusBarsPadding
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -61,10 +67,16 @@ fun AppNavHost() {
     val showChrome = currentRoute in Dest.bottomNavRoutes
     val hazeState = remember { HazeState() }
     val glassStyle = daydreamGlassStyle()
+    val chromeStyle = remember {
+        HazeStyle(backgroundColor = BgBase, tints = listOf(HazeTint(Color.Black.copy(alpha = 0.55f))), blurRadius = 28.dp, noiseFactor = 0.05f)
+    }
 
     PlayerController.ensureConnected(context)
 
     fun closeDrawer() = scope.launch { drawerState.close() }
+
+    // Back closes an open drawer instead of leaving the app from underneath it.
+    androidx.activity.compose.BackHandler(enabled = drawerState.isOpen) { closeDrawer() }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -92,20 +104,37 @@ fun AppNavHost() {
                     // Scoped to this lambda (its own recomposition group) on purpose: the ticking
                     // progress flow should only invalidate the mini player, not the whole screen.
                     val playerMeta by PlayerController.meta.collectAsState()
-                    Column(modifier = Modifier.hazeEffect(state = hazeState, style = glassStyle)) {
+                    val chromeFadePx = with(androidx.compose.ui.platform.LocalDensity.current) { 96.dp.toPx() }
+                    // Progressive: clear at the top edge, fully frosted by the nav bar — so the
+                    // floating mini player (which blurs on its own) sits over a soft fade, not a slab.
+                    Column(
+                        modifier = Modifier.hazeEffect(state = hazeState, style = chromeStyle) {
+                            progressive = HazeProgressive.verticalGradient(
+                                easing = androidx.compose.animation.core.FastOutSlowInEasing,
+                                startY = 0f,
+                                startIntensity = 0f,
+                                endY = chromeFadePx,
+                                endIntensity = 1f,
+                                preferPerformance = true,
+                            )
+                        },
+                    ) {
                         androidx.compose.animation.AnimatedVisibility(
                             visible = playerMeta.currentSong != null,
-                            enter = androidx.compose.animation.slideInVertically(initialOffsetY = { it }, animationSpec = tween(280, easing = FastOutSlowInEasing)) + fadeIn(tween(220)),
+                            enter = androidx.compose.animation.slideInVertically(initialOffsetY = { it }, animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.8f, stiffness = 380f)) + fadeIn(tween(220)),
                             exit = androidx.compose.animation.slideOutVertically(targetOffsetY = { it }, animationSpec = tween(220)) + fadeOut(tween(160)),
                         ) {
                             playerMeta.currentSong?.let { song ->
-                                val playbackProgress by PlayerController.progress.collectAsState()
-                                val ratio = if (playbackProgress.durationMs > 0) playbackProgress.positionMs.toFloat() / playbackProgress.durationMs else 0f
+                                val playbackProgress = PlayerController.progress.collectAsState()
                                 MiniPlayer(
                                     song = song,
                                     isPlaying = playerMeta.isPlaying,
-                                    progress = ratio,
-                                    modifier = Modifier.padding(bottom = 6.dp),
+                                    progress = {
+                                        val p = playbackProgress.value
+                                        if (p.durationMs > 0) p.positionMs.toFloat() / p.durationMs else 0f
+                                    },
+                                    hazeState = hazeState,
+                                    modifier = Modifier.padding(top = 10.dp, bottom = 2.dp),
                                     onTogglePlay = { PlayerController.togglePlayPause() },
                                     onNext = { PlayerController.next() },
                                     onClick = { navController.navigate(Dest.NOW_PLAYING) },
@@ -132,15 +161,15 @@ fun AppNavHost() {
                 composable(Dest.HOME) {
                     HomeScreen(onOpenDrawer = { scope.launch { drawerState.open() } }, onSearchClick = { navController.navigateTopLevel(Dest.SEARCH) }, contentPadding = padding)
                 }
-                composable(Dest.SEARCH) { SearchScreen(contentPadding = padding) }
-                composable(Dest.LIBRARY) { LibraryScreen(contentPadding = padding) }
+                composable(Dest.SEARCH) { Box(Modifier.statusBarsPadding()) { SearchScreen(contentPadding = padding) } }
+                composable(Dest.LIBRARY) { Box(Modifier.statusBarsPadding()) { LibraryScreen(contentPadding = padding) } }
                 composable(Dest.PROFILE) {
-                    ProfileScreen(
+                    Box(Modifier.statusBarsPadding()) { ProfileScreen(
                         contentPadding = padding,
                         onStatistics = { navController.navigate(Dest.STATISTICS) },
                         onSettings = { navController.navigate(Dest.SETTINGS) },
                         onThemeCustomize = { navController.navigate(Dest.THEME_CUSTOMIZE) },
-                    )
+                    ) }
                 }
                 // Modal-style destinations — pushed up from the bottom over whatever's behind
                 // them, like a sheet, instead of the flat tab crossfade above.
@@ -151,11 +180,13 @@ fun AppNavHost() {
                     popExitTransition = { slideDownExit() },
                     popEnterTransition = { fadeIn(tween(200)) },
                 ) {
-                    NowPlayingScreen(
-                        onBack = { navController.popBackStack() },
-                        onQueueClick = { navController.navigate(Dest.QUEUE) },
-                        onLyricsClick = { navController.navigate(Dest.LYRICS) },
-                    )
+                    Box(Modifier.statusBarsPadding()) {
+                        NowPlayingScreen(
+                            onBack = { navController.popBackStack() },
+                            onQueueClick = { navController.navigate(Dest.QUEUE) },
+                            onLyricsClick = { navController.navigate(Dest.LYRICS) },
+                        )
+                    }
                 }
                 composable(
                     Dest.QUEUE,
@@ -163,35 +194,35 @@ fun AppNavHost() {
                     exitTransition = { fadeOut(tween(150)) },
                     popExitTransition = { slideDownExit() },
                     popEnterTransition = { fadeIn(tween(200)) },
-                ) { QueueScreen(onBack = { navController.popBackStack() }) }
+                ) { Box(Modifier.statusBarsPadding()) { QueueScreen(onBack = { navController.popBackStack() }) } }
                 composable(
                     Dest.LYRICS,
                     enterTransition = { slideUpEnter() },
                     exitTransition = { fadeOut(tween(150)) },
                     popExitTransition = { slideDownExit() },
                     popEnterTransition = { fadeIn(tween(200)) },
-                ) { LyricsScreen(onBack = { navController.popBackStack() }) }
+                ) { Box(Modifier.statusBarsPadding()) { LyricsScreen(onBack = { navController.popBackStack() }) } }
                 composable(
                     Dest.SETTINGS,
                     enterTransition = { slideUpEnter() },
                     exitTransition = { fadeOut(tween(150)) },
                     popExitTransition = { slideDownExit() },
                     popEnterTransition = { fadeIn(tween(200)) },
-                ) { SettingsScreen(onBack = { navController.popBackStack() }) }
+                ) { Box(Modifier.statusBarsPadding()) { SettingsScreen(onBack = { navController.popBackStack() }) } }
                 composable(
                     Dest.THEME_CUSTOMIZE,
                     enterTransition = { slideUpEnter() },
                     exitTransition = { fadeOut(tween(150)) },
                     popExitTransition = { slideDownExit() },
                     popEnterTransition = { fadeIn(tween(200)) },
-                ) { ThemeCustomizeScreen(onBack = { navController.popBackStack() }) }
+                ) { Box(Modifier.statusBarsPadding()) { ThemeCustomizeScreen(onBack = { navController.popBackStack() }) } }
                 composable(
                     Dest.STATISTICS,
                     enterTransition = { slideUpEnter() },
                     exitTransition = { fadeOut(tween(150)) },
                     popExitTransition = { slideDownExit() },
                     popEnterTransition = { fadeIn(tween(200)) },
-                ) { StatisticsScreen(onBack = { navController.popBackStack() }) }
+                ) { Box(Modifier.statusBarsPadding()) { StatisticsScreen(onBack = { navController.popBackStack() }) } }
             }
         }
     }

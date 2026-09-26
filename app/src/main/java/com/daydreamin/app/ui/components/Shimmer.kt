@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.daydreamin.app.ui.theme.SurfaceVariant
 import com.daydreamin.app.ui.theme.SurfaceHigh
@@ -38,7 +39,7 @@ fun Modifier.shimmer(): Modifier {
         label = "shimmerTranslate",
     )
     val brush = Brush.linearGradient(
-        colors = listOf(SurfaceVariant, SurfaceHigh, SurfaceVariant),
+        colors = listOf(Color.White.copy(alpha = 0.05f), Color.White.copy(alpha = 0.11f), Color.White.copy(alpha = 0.05f)),
         start = Offset(translate, 0f),
         end = Offset(translate + 400f, 400f),
     )

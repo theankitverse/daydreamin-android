@@ -87,6 +87,8 @@ dependencies {
 
     // Image loading
     implementation("io.coil-kt:coil-compose:2.7.0")
+    // Pulls a representative color out of album artwork for the dynamic glows (Home, mini player).
+    implementation("androidx.palette:palette-ktx:1.0.0")
 
     // Preferences / settings persistence
     implementation("androidx.datastore:datastore-preferences:1.1.1")

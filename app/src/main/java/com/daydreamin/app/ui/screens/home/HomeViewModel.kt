@@ -10,18 +10,26 @@ import com.daydreamin.app.data.youtube.YouTubeExtractorService
 import com.daydreamin.app.player.SongPrecacher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
+import java.io.IOException
 import kotlinx.coroutines.launch
 
 private const val TAG = "StartupTiming"
 
-data class MoodCard(val title: String, val subtitle: String, val query: String, val gradient: List<Long>)
+/** [accent] is the mood's signature color — shown as the light strip on its tile. */
+data class MoodCard(val title: String, val query: String, val accent: Long)
 
 val moodCards = listOf(
-    MoodCard("Chill Vibes", "Relax and unwind", "chill lofi relax", listOf(0xFF3B4E7A, 0xFF1B1F33)),
-    MoodCard("Late Night", "Perfect for now", "late night drive songs", listOf(0xFF2B1F4A, 0xFF120E22)),
-    MoodCard("Study Focus", "Deep work beats", "lofi study focus beats", listOf(0xFF244A3E, 0xFF10201B)),
-    MoodCard("Workout", "Get moving", "gym workout motivational", listOf(0xFF5A2233, 0xFF210D14)),
+    MoodCard("Chill", "chill lofi relax", 0xFF7FB2FF),
+    MoodCard("Late Night", "late night drive songs", 0xFFA78BFA),
+    MoodCard("Focus", "lofi study focus beats", 0xFF5EEAD4),
+    MoodCard("Workout", "gym workout motivational", 0xFFFF7A7A),
+    MoodCard("Romance", "romantic love songs", 0xFFF472B6),
+    MoodCard("Party", "party dance hits", 0xFFFBBF24),
+    MoodCard("Devotional", "devotional bhajan kirtan", 0xFFFDBA74),
+    MoodCard("Feel Good", "feel good happy songs", 0xFF86EFAC),
 )
 
 val genreChips = listOf("All", "Chill", "Hindi", "Lo-fi", "Pop")
@@ -30,6 +38,8 @@ data class HomeUiState(
     val loading: Boolean = true,
     val trending: List<Song> = emptyList(),
     val selectedChip: String = "All",
+    /** Whether [selectedChip] came from a Moods tile rather than a genre chip (a mood and a genre can share a name). */
+    val selectionIsMood: Boolean = false,
     val error: String? = null,
 )
 
@@ -38,6 +48,14 @@ class HomeViewModel : ViewModel() {
 
     private val _state = MutableStateFlow(HomeUiState())
     val state: StateFlow<HomeUiState> = _state
+
+    /** Most recent first — feeds "Listen again". */
+    val history: StateFlow<List<Song>> = DaydreaminApp.instance.prefs.history
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Feeds "From your likes". */
+    val liked: StateFlow<List<Song>> = DaydreaminApp.instance.prefs.likedSongs
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     // Only the very first chart load reflects genuine cold-start timing — later ones (a chip
     // switch, a retry) aren't "app launch to first content" anymore, so they're left unlogged.
@@ -52,17 +70,18 @@ class HomeViewModel : ViewModel() {
     }
 
     fun onChipSelected(chip: String) {
-        _state.value = _state.value.copy(selectedChip = chip)
+        _state.value = _state.value.copy(selectedChip = chip, selectionIsMood = false)
         if (chip == "All") loadChart() else loadForQuery("$chip songs")
     }
 
     fun onMoodSelected(mood: MoodCard) {
-        _state.value = _state.value.copy(selectedChip = mood.title)
+        _state.value = _state.value.copy(selectedChip = mood.title, selectionIsMood = true)
         loadForQuery(mood.query)
     }
 
     fun retry() {
-        if (_state.value.selectedChip == "All") loadChart() else loadForQuery(_state.value.selectedChip)
+        val query = lastQuery
+        if (_state.value.selectedChip == "All" || query == null) loadChart() else loadForQuery(query)
     }
 
     private fun loadChart() {
@@ -79,17 +98,26 @@ class HomeViewModel : ViewModel() {
                     _state.value = _state.value.copy(loading = false, trending = songs)
                     prefetchTop(songs)
                 },
-                onFailure = { e -> _state.value = _state.value.copy(loading = false, error = e.message ?: "Couldn't load trending songs") },
+                onFailure = { e -> _state.value = _state.value.copy(loading = false, error = friendlyError(e)) },
             )
         }
     }
 
+    /** The exact query behind the current results, so Retry repeats what failed (not the chip's label). */
+    private var lastQuery: String? = null
+
     private fun loadForQuery(query: String) {
+        lastQuery = query
         _state.value = _state.value.copy(loading = true, error = null)
         viewModelScope.launch {
             repo.search(query).fold(
-                onSuccess = { songs -> _state.value = _state.value.copy(loading = false, trending = songs); prefetchTop(songs) },
-                onFailure = { e -> _state.value = _state.value.copy(loading = false, error = e.message ?: "Couldn't load songs") },
+                onSuccess = { found ->
+                    // The catalog often lists the same recording on several compilations — one row each is plenty.
+                    val songs = found.distinctBy { it.title.trim().lowercase() to it.artist.trim().lowercase() }
+                    _state.value = _state.value.copy(loading = false, trending = songs)
+                    prefetchTop(songs)
+                },
+                onFailure = { e -> _state.value = _state.value.copy(loading = false, error = friendlyError(e)) },
             )
         }
     }
@@ -111,4 +139,14 @@ class HomeViewModel : ViewModel() {
             }
         }
     }
+}
+
+/** What the user sees when a load fails — never a raw exception message. */
+private fun friendlyError(e: Throwable): String {
+    var cause: Throwable? = e
+    while (cause != null) {
+        if (cause is IOException) return "You're offline. Check your connection and try again."
+        cause = cause.cause
+    }
+    return "Something went wrong while loading. Try again in a moment."
 }
