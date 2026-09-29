@@ -44,7 +44,7 @@ need to do this manually again.
 ## Support
 
 Daydreamin is free, with no ads and no account required. If you'd like to support the project,
-you can [buy me a coffee](https://www.buymeacoffee.com/ankitchaurasiya) — completely optional,
+you can [buy me a coffee](https://www.buymeacoffee.com/theankitverse) — completely optional,
 and it doesn't unlock anything, since there's nothing locked to begin with.
 
 ## A note on how this works
