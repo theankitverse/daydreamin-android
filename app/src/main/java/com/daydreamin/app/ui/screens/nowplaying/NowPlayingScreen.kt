@@ -40,6 +40,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Favorite
@@ -454,6 +455,9 @@ fun PlayerAtmosphere(song: Song?, light: ArtworkLight, alpha: () -> Float) {
 @Composable
 private fun TopBar(onClose: () -> Unit, modifier: Modifier = Modifier) {
     var menuOpen by remember { mutableStateOf(false) }
+    // Lives here, not inside the menu: the menu closes as the name dialog opens over it.
+    var namingFor by remember { mutableStateOf<Song?>(null) }
+    namingFor?.let { song -> com.daydreamin.app.ui.components.NewPlaylistDialog(song, onDismiss = { namingFor = null }, onCreated = { namingFor = null }) }
     Box(modifier = modifier.fillMaxWidth().height(56.dp).padding(horizontal = 16.dp)) {
         // The grabber says "this is a sheet — pull it down".
         Box(
@@ -467,7 +471,7 @@ private fun TopBar(onClose: () -> Unit, modifier: Modifier = Modifier) {
         RoundGlassButton(Icons.Rounded.ExpandMore, "Close", onClose, Modifier.align(Alignment.CenterStart))
         Box(Modifier.align(Alignment.CenterEnd)) {
             RoundGlassButton(Icons.Rounded.MoreHoriz, "More", { menuOpen = true })
-            if (menuOpen) MoreMenu(onDismiss = { menuOpen = false })
+            if (menuOpen) MoreMenu(onDismiss = { menuOpen = false }, onNewPlaylist = { song -> menuOpen = false; namingFor = song })
         }
     }
 }
@@ -624,11 +628,11 @@ private fun ErrorToast(message: String?, modifier: Modifier = Modifier) {
 }
 
 /**
- * The less-used actions — sleep timer and song details — behind "•••", in a small glass panel
- * rather than stock Material dialogs.
+ * The less-used actions — add to a playlist, sleep timer, song details — behind "•••", in a small
+ * glass panel rather than stock Material dialogs.
  */
 @Composable
-private fun MoreMenu(onDismiss: () -> Unit) {
+private fun MoreMenu(onDismiss: () -> Unit, onNewPlaylist: (Song) -> Unit) {
     val meta by PlayerController.meta.collectAsState()
     val sleepRemaining by SleepTimer.remainingSeconds.collectAsState()
     var page by remember { mutableStateOf("root") }
@@ -647,12 +651,22 @@ private fun MoreMenu(onDismiss: () -> Unit) {
         ) {
             when (page) {
                 "root" -> {
+                    if (meta.currentSong != null) {
+                        MenuItem(Icons.AutoMirrored.Rounded.PlaylistAdd, "Add to playlist", null) { page = "playlist" }
+                    }
                     MenuItem(
                         Icons.Rounded.Bedtime,
                         "Sleep timer",
                         sleepRemaining?.let { "Pausing in ${it / 60}:${"%02d".format(it % 60)}" } ?: "Off",
                     ) { page = "sleep" }
                     MenuItem(Icons.Rounded.Info, "Song details", null) { page = "info" }
+                }
+                "playlist" -> {
+                    val song = meta.currentSong
+                    MenuHeader("Add to playlist")
+                    if (song != null) {
+                        com.daydreamin.app.ui.components.PlaylistPickerRows(song, onNewPlaylist = { onNewPlaylist(song) }, onPicked = onDismiss)
+                    }
                 }
                 "sleep" -> {
                     MenuHeader("Pause playback in")

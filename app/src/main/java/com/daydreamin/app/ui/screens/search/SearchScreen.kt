@@ -41,6 +41,8 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Bookmark
+import androidx.compose.material.icons.rounded.BookmarkBorder
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.CloudOff
@@ -92,6 +94,7 @@ import com.daydreamin.app.ui.components.Artwork
 import com.daydreamin.app.ui.components.EqualizerBars
 import com.daydreamin.app.ui.components.GlassChip
 import com.daydreamin.app.ui.components.SolidPillButton
+import com.daydreamin.app.ui.components.SongActions
 import com.daydreamin.app.ui.components.SongListRow
 import com.daydreamin.app.ui.components.SongMenuButton
 import com.daydreamin.app.ui.components.Toaster
@@ -455,11 +458,14 @@ private fun androidx.compose.foundation.lazy.LazyListScope.playlistItems(state: 
     }
 }
 
-/** A YouTube playlist: tapping loads its tracks and plays them in order. */
+/** A YouTube playlist: tapping loads its tracks and plays them in order; the bookmark keeps a copy in your library. */
 @Composable
 private fun PlaylistRow(p: YtPlaylist) {
     val scope = rememberCoroutineScope()
     var loading by remember { mutableStateOf(false) }
+    var saving by remember { mutableStateOf(false) }
+    val library by DaydreaminApp.instance.prefs.playlists.collectAsState(initial = emptyList())
+    val saved = library.any { it.sourceUrl == p.url }
     Row(
         Modifier
             .fillMaxWidth()
@@ -498,7 +504,34 @@ private fun PlaylistRow(p: YtPlaylist) {
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Icon(Icons.Rounded.PlayArrow, contentDescription = "Play playlist", tint = Color.White.copy(alpha = 0.5f))
+        Box(
+            Modifier
+                .size(44.dp)
+                .pressable(onClick = {
+                    when {
+                        saving -> Unit
+                        saved -> Toaster.show("Already in your library")
+                        else -> {
+                            saving = true
+                            scope.launch {
+                                val tracks = DaydreaminApp.instance.repository.playlistTracks(p.url).getOrDefault(emptyList())
+                                saving = false
+                                if (tracks.isEmpty()) Toaster.show("Couldn’t save that playlist")
+                                else SongActions.savePlaylist(p.title, tracks, sourceUrl = p.url, author = p.author, coverUrl = p.thumbnail)
+                            }
+                        }
+                    }
+                }),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (saving) Box(Modifier.size(18.dp).clip(CircleShape).shimmer())
+            else Icon(
+                if (saved) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
+                contentDescription = if (saved) "Saved to your library" else "Save to your library",
+                tint = if (saved) Color.White else Color.White.copy(alpha = 0.6f),
+                modifier = Modifier.size(22.dp),
+            )
+        }
     }
 }
 

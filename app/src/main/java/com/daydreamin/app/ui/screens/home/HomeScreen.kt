@@ -1,8 +1,19 @@
 package com.daydreamin.app.ui.screens.home
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.snapping.SnapPosition
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
@@ -23,7 +34,6 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
@@ -31,13 +41,18 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Bookmark
+import androidx.compose.material.icons.rounded.BookmarkBorder
+import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -46,20 +61,20 @@ import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -70,6 +85,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
@@ -77,19 +93,29 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.daydreamin.app.R
 import com.daydreamin.app.data.model.Song
+import com.daydreamin.app.data.prefs.Playlist
+import com.daydreamin.app.data.recommend.FeedShelf
+import com.daydreamin.app.data.recommend.HomeFeed
 import com.daydreamin.app.player.PlayerController
+import com.daydreamin.app.ui.components.AmbientGlow
 import com.daydreamin.app.ui.components.Artwork
+import com.daydreamin.app.ui.components.ArtworkBackdrop
 import com.daydreamin.app.ui.components.EqualizerBars
-import com.daydreamin.app.ui.components.GlassChip
 import com.daydreamin.app.ui.components.GlassIconButton
+import com.daydreamin.app.ui.components.LikedTile
+import com.daydreamin.app.ui.components.Mosaic
+import com.daydreamin.app.ui.components.NameDialog
+import com.daydreamin.app.ui.components.PlaylistCover
 import com.daydreamin.app.ui.components.SectionTitle
 import com.daydreamin.app.ui.components.SolidPillButton
+import com.daydreamin.app.ui.components.SongActions
+import com.daydreamin.app.ui.components.SongMenu
 import com.daydreamin.app.ui.components.StaggeredAppear
 import com.daydreamin.app.ui.components.pressable
 import com.daydreamin.app.ui.components.shimmer
+import com.daydreamin.app.ui.screens.library.LibraryTab
+import com.daydreamin.app.ui.theme.ArtworkLight
 import com.daydreamin.app.ui.theme.BgBase
-import com.daydreamin.app.ui.theme.BrandPink
-import com.daydreamin.app.ui.theme.BrandPurple
 import com.daydreamin.app.ui.theme.BrandViolet
 import com.daydreamin.app.ui.theme.Glass
 import com.daydreamin.app.ui.theme.Radius
@@ -97,29 +123,23 @@ import com.daydreamin.app.ui.theme.Space
 import com.daydreamin.app.ui.theme.TextPrimary
 import com.daydreamin.app.ui.theme.TextSecondary
 import com.daydreamin.app.ui.theme.glass
-import com.daydreamin.app.ui.theme.ArtworkLight
 import com.daydreamin.app.ui.theme.rememberArtworkLight
-import com.daydreamin.app.ui.components.ArtworkBackdrop
-import com.daydreamin.app.ui.components.AmbientGlow
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
-import androidx.compose.ui.text.font.FontWeight
 import dev.chrisbanes.haze.HazeProgressive
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.HazeTint
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
+import java.text.SimpleDateFormat
 import java.time.LocalTime
+import java.util.Date
+import java.util.Locale
 import androidx.lifecycle.viewmodel.compose.viewModel as composeViewModel
 
 private val TopBarHeight = 60.dp
 private val QuickPickRowHeight = 66.dp
-private val SpotlightHeight = 216.dp
+private val HeroHeight = 212.dp
+private val TileSize = 132.dp
 /** Until the lead artwork's own light is known: the brand's violet key with a deep indigo fill. */
 private val DefaultLight = ArtworkLight(key = BrandViolet, fill = Color(0xFF3D3A9E))
 private const val QUICK_PICK_ROWS = 4
@@ -127,22 +147,40 @@ private const val QUICK_PICK_ROWS = 4
 /** What a song row/card needs to know about playback — kept tiny so rows only recompose when it actually changes. */
 private data class NowPlaying(val playId: String?, val isPlaying: Boolean)
 
+/**
+ * Home, built around you: your mix up top (made from what you play, like and skip — see
+ * [com.daydreamin.app.data.recommend.HomeFeedRepository]), then what you've been playing, your
+ * own collections, and shelves of more like what you love. Before there's any listening to go on,
+ * it leads with the chart instead, and says so.
+ */
 @Composable
 fun HomeScreen(
     onOpenDrawer: () -> Unit,
     onSearchClick: () -> Unit,
+    onOpenLibrary: (tab: LibraryTab?, playlistId: String?) -> Unit,
     contentPadding: PaddingValues,
 ) {
     val vm: HomeViewModel = composeViewModel()
-    val state by vm.state.collectAsState()
+    val feed by vm.feed.collectAsState()
+    val refreshing by vm.refreshing.collectAsState()
+    val hasTaste by vm.hasTaste.collectAsState()
+    val feedFailed by vm.feedFailed.collectAsState()
+    val chart by vm.chart.collectAsState()
+    val browse by vm.browse.collectAsState()
     val history by vm.history.collectAsState()
     val liked by vm.liked.collectAsState()
+    val playlists by vm.playlists.collectAsState()
     val meta = PlayerController.meta.collectAsState()
     val nowPlaying by remember { derivedStateOf { NowPlaying(meta.value.currentSong?.playId, meta.value.isPlaying) } }
+    BackHandler(enabled = browse != null) { vm.closeMood() }
 
-    val discover = state.selectedChip == "All"
-    val ready = !state.loading && state.error == null
-    val lead = if (ready) state.trending.firstOrNull() else null
+    // Personal once there's anything to go on; the chart only before that.
+    val personal = hasTaste != false
+    val lead = when {
+        browse != null -> browse?.songs?.firstOrNull()
+        personal -> feed?.topPicks?.firstOrNull() ?: history.firstOrNull()
+        else -> chart.songs.firstOrNull()
+    }
     val light = rememberArtworkLight(lead?.cover?.ifBlank { lead.artworkUrl }, fallback = DefaultLight)
 
     val listState = rememberLazyListState()
@@ -166,32 +204,46 @@ fun HomeScreen(
                 item(key = "update-banner") {
                     com.daydreamin.app.ui.components.UpdateBanner(modifier = Modifier.padding(bottom = Space.s))
                 }
-                item(key = "greeting") { Greeting() }
-                item(key = "chips") {
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = Space.gutter),
-                        horizontalArrangement = Arrangement.spacedBy(Space.xs),
-                    ) {
-                        items(genreChips) { chip ->
-                            GlassChip(label = chip, selected = state.selectedChip == chip, onClick = { vm.onChipSelected(chip) })
+                val mood = browse
+                if (mood != null) {
+                    moodResults(mood, nowPlaying = { nowPlaying }, onBack = vm::closeMood, onRetry = vm::retryMood)
+                } else {
+                    item(key = "greeting") { Greeting() }
+                    if (personal) {
+                        forYou(
+                            feed = feed,
+                            refreshing = refreshing,
+                            failed = feedFailed,
+                            light = light,
+                            nowPlaying = { nowPlaying },
+                            onRefresh = vm::refreshMix,
+                        )
+                    } else {
+                        startingOut(chart, light, nowPlaying = { nowPlaying }, onRetry = vm::retryChart)
+                    }
+                    if (history.isNotEmpty()) {
+                        item(key = "recent") {
+                            Section(title = "Recently played", modifier = Modifier.animateItem()) {
+                                CardRow(history.take(20), cardSize = TileSize, nowPlaying = { nowPlaying }) { song, _ -> PlayerController.playSong(song) }
+                            }
                         }
                     }
-                    Spacer(Modifier.height(Space.l))
-                }
-
-                if (discover) {
-                    discoverFeed(
-                        state = state,
-                        lead = lead,
-                        light = light,
-                        history = history,
-                        liked = liked,
-                        nowPlaying = { nowPlaying },
-                        onRetry = vm::retry,
-                        onMood = vm::onMoodSelected,
-                    )
-                } else {
-                    resultsFeed(state = state, nowPlaying = { nowPlaying }, onRetry = vm::retry)
+                    if (liked.isNotEmpty() || playlists.isNotEmpty()) {
+                        item(key = "library") {
+                            Section(title = "Your library", modifier = Modifier.animateItem()) {
+                                LibraryShelf(
+                                    liked = liked,
+                                    playlists = playlists,
+                                    onOpenLiked = { onOpenLibrary(LibraryTab.LIKED, null) },
+                                    onOpenPlaylist = { onOpenLibrary(null, it.id) },
+                                )
+                            }
+                        }
+                    }
+                    if (personal) feed?.shelves?.forEach { shelf -> feedShelf(shelf, nowPlaying = { nowPlaying }) }
+                    item(key = "moods") {
+                        Section(title = "Moods & moments", modifier = Modifier.animateItem()) { MoodGrid(vm::openMood) }
+                    }
                 }
             }
         }
@@ -208,90 +260,113 @@ fun HomeScreen(
 
 // ---------------------------------------------------------------- feeds
 
-private fun LazyListScope.discoverFeed(
-    state: HomeUiState,
-    lead: Song?,
+/** Your mix and your top picks — or their placeholders while the first one is being built. */
+private fun LazyListScope.forYou(
+    feed: HomeFeed?,
+    refreshing: Boolean,
+    failed: Boolean,
     light: ArtworkLight,
-    history: List<Song>,
-    liked: List<Song>,
     nowPlaying: () -> NowPlaying,
-    onRetry: () -> Unit,
-    onMood: (MoodCard) -> Unit,
+    onRefresh: () -> Unit,
 ) {
     when {
-        state.loading -> {
-            item(key = "spotlight-loading") { SpotlightPlaceholder(Modifier.animateItem()) }
-            item(key = "quick-loading") { QuickPicksPlaceholder(Modifier.animateItem()) }
-        }
-        state.error != null -> item(key = "error") { ErrorPanel(state.error, onRetry, Modifier.animateItem()) }
-        else -> {
-            if (lead != null) {
-                item(key = "spotlight") {
-                    val np = nowPlaying()
-                    Spotlight(
-                        song = lead,
-                        light = light,
-                        modifier = Modifier.animateItem(),
-                        isCurrent = np.playId == lead.playId,
-                        isPlaying = np.isPlaying,
-                    )
+        feed != null && feed.topPicks.isNotEmpty() -> {
+            item(key = "mix") {
+                val np = nowPlaying()
+                MixHero(feed, light, refreshing = refreshing, nowPlaying = np, onRefresh = onRefresh, modifier = Modifier.animateItem())
+            }
+            item(key = "top-picks") {
+                Section(
+                    title = "Top picks for you",
+                    subtitle = "Picked from what you play and like",
+                    modifier = Modifier.animateItem(),
+                ) {
+                    QuickPicksGrid(feed.topPicks.take(QUICK_PICK_ROWS * 5), nowPlaying) { index, _ ->
+                        PlayerController.playFromList(feed.topPicks, index)
+                    }
                 }
             }
-            val picks = state.trending.drop(1).take(QUICK_PICK_ROWS * 5)
+        }
+        failed && !refreshing -> item(key = "mix-error") {
+            ErrorPanel(
+                title = "Couldn't build your mix",
+                message = "You may be offline. Your library and recent plays are below.",
+                onRetry = onRefresh,
+                modifier = Modifier.animateItem(),
+            )
+        }
+        else -> {
+            item(key = "mix-loading") { HeroPlaceholder(Modifier.animateItem()) }
+            item(key = "picks-loading") { QuickPicksPlaceholder(Modifier.animateItem()) }
+        }
+    }
+}
+
+/** Before there's any listening to learn from: the chart, and a line about what Home becomes. */
+private fun LazyListScope.startingOut(chart: ChartState, light: ArtworkLight, nowPlaying: () -> NowPlaying, onRetry: () -> Unit) {
+    item(key = "taste-hint") { TasteHint(Modifier.animateItem()) }
+    when {
+        chart.loading -> {
+            item(key = "spotlight-loading") { HeroPlaceholder(Modifier.animateItem()) }
+            item(key = "quick-loading") { QuickPicksPlaceholder(Modifier.animateItem()) }
+        }
+        chart.error != null -> item(key = "chart-error") { ErrorPanel("Couldn't load the charts", chart.error, onRetry, Modifier.animateItem()) }
+        else -> {
+            chart.songs.firstOrNull()?.let { top ->
+                item(key = "spotlight") {
+                    val np = nowPlaying()
+                    Spotlight(top, light, isCurrent = np.playId == top.playId, isPlaying = np.isPlaying, modifier = Modifier.animateItem())
+                }
+            }
+            val picks = chart.songs.drop(1).take(QUICK_PICK_ROWS * 5)
             if (picks.isNotEmpty()) {
-                item(key = "quick-picks") {
-                    Section(title = "Quick picks", subtitle = "Tap a song to start a radio", modifier = Modifier.animateItem()) {
-                        QuickPicksGrid(picks, nowPlaying)
+                item(key = "trending") {
+                    Section(title = "Trending now", subtitle = "Tap a song to start a radio", modifier = Modifier.animateItem()) {
+                        QuickPicksGrid(picks, nowPlaying) { _, song -> PlayerController.playSong(song) }
                     }
                 }
             }
         }
     }
-    if (history.size >= 3) {
-        item(key = "listen-again") {
-            Section(title = "Listen again", modifier = Modifier.animateItem()) {
-                CardRow(history.take(15), cardSize = 128.dp, nowPlaying = nowPlaying) { song, _ -> PlayerController.playSong(song) }
+}
+
+/** A row of recommendations; tapping a song plays the rest of the row after it. */
+private fun LazyListScope.feedShelf(shelf: FeedShelf, nowPlaying: () -> NowPlaying) {
+    item(key = "shelf-" + shelf.key) {
+        Section(title = shelf.title, subtitle = shelf.subtitle, modifier = Modifier.animateItem()) {
+            CardRow(shelf.songs, cardSize = TileSize, nowPlaying = nowPlaying) { _, index ->
+                PlayerController.playFromList(shelf.songs, index)
             }
         }
-    }
-    if (liked.isNotEmpty()) {
-        item(key = "likes") {
-            Section(title = "From your likes", subtitle = "${liked.size} ${if (liked.size == 1) "song" else "songs"}", modifier = Modifier.animateItem()) {
-                // A likes shelf plays like a playlist: the rest of your likes follow the one you tapped.
-                CardRow(liked, cardSize = 156.dp, nowPlaying = nowPlaying) { song, index ->
-                    PlayerController.playSong(song, queueContext = liked.drop(index + 1) + liked.take(index))
-                }
-            }
-        }
-    }
-    item(key = "moods") {
-        Section(title = "Moods & moments", modifier = Modifier.animateItem()) { MoodGrid(onMood) }
     }
 }
 
-private fun LazyListScope.resultsFeed(state: HomeUiState, nowPlaying: () -> NowPlaying, onRetry: () -> Unit) {
-    item(key = "results-title") {
-        val count = if (!state.loading && state.error == null) state.trending.size else null
-        val kind = if (state.selectionIsMood) "Mood" else "Genre"
+private fun LazyListScope.moodResults(browse: MoodBrowse, nowPlaying: () -> NowPlaying, onBack: () -> Unit, onRetry: () -> Unit) {
+    item(key = "mood-back") {
+        Row(
+            Modifier.animateItem().padding(start = 10.dp, top = Space.xs).pressable(onClick = onBack).padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Rounded.ChevronLeft, contentDescription = null, tint = Color.White.copy(alpha = 0.75f))
+            Text("Home", style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.75f))
+        }
+    }
+    item(key = "mood-title") {
+        val count = if (!browse.loading && browse.error == null) browse.songs.size else null
         SectionTitle(
-            title = state.selectedChip,
-            subtitle = if (count != null) "$kind · $count ${if (count == 1) "song" else "songs"}" else kind,
-            modifier = Modifier.animateItem(),
+            title = browse.mood.title,
+            subtitle = if (count != null) "Mood · $count ${if (count == 1) "song" else "songs"}" else "Mood",
+            modifier = Modifier.animateItem().padding(top = Space.xs),
         )
         Spacer(Modifier.height(Space.xs))
     }
     when {
-        state.loading -> items(8, key = { "row-loading-$it" }) { QuickPickRowPlaceholder(Modifier.animateItem().padding(horizontal = Space.gutter)) }
-        state.error != null -> item(key = "results-error") { ErrorPanel(state.error, onRetry, Modifier.animateItem()) }
-        state.trending.isEmpty() -> item(key = "results-empty") {
-            Text(
-                "Nothing here right now.",
-                color = TextSecondary,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(Space.gutter),
-            )
+        browse.loading -> items(8, key = { "row-loading-$it" }) { QuickPickRowPlaceholder(Modifier.animateItem().padding(horizontal = Space.gutter)) }
+        browse.error != null -> item(key = "mood-error") { ErrorPanel("Couldn't load this mood", browse.error, onRetry, Modifier.animateItem()) }
+        browse.songs.isEmpty() -> item(key = "mood-empty") {
+            Text("Nothing here right now.", color = TextSecondary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(Space.gutter))
         }
-        else -> itemsIndexed(state.trending, key = { _, song -> "r-" + song.playId }) { index, song ->
+        else -> itemsIndexed(browse.songs, key = { _, song -> "r-" + song.playId }) { index, song ->
             StaggeredAppear(index, modifier = Modifier.padding(horizontal = Space.gutter)) {
                 val np = nowPlaying()
                 QuickPickRow(
@@ -325,7 +400,7 @@ private fun Greeting() {
         },
         style = MaterialTheme.typography.displaySmall,
         color = TextPrimary,
-        modifier = Modifier.padding(start = Space.gutter, end = Space.gutter, top = Space.xs, bottom = Space.m + 2.dp),
+        modifier = Modifier.padding(start = Space.gutter, end = Space.gutter, top = Space.xs, bottom = Space.l),
     )
 }
 
@@ -406,9 +481,156 @@ private fun Section(title: String, modifier: Modifier = Modifier, subtitle: Stri
 }
 
 /**
- * The one featured item on Home: today's #1, lit by its own artwork. The card's surface *is* the
- * cover — decoded tiny and blurred into light — under a scrim that keeps the text side quiet,
- * then a skin of glass (edge light + sheen) on top. The cover itself floats on the right.
+ * Your mix: the featured card on Home. Its surface is the top pick's cover, blurred into light,
+ * under a scrim that keeps the text calm; a mosaic of the mix sits top-right. Play / shuffle /
+ * save along the bottom, and a fresh mix on demand.
+ */
+@Composable
+private fun MixHero(feed: HomeFeed, light: ArtworkLight, refreshing: Boolean, nowPlaying: NowPlaying, onRefresh: () -> Unit, modifier: Modifier = Modifier) {
+    val picks = feed.topPicks
+    val playingFromMix = picks.any { it.playId == nowPlaying.playId }
+    val library by com.daydreamin.app.DaydreaminApp.instance.prefs.playlists.collectAsState(initial = emptyList())
+    val mixUrl = "daydreamin:mix:${feed.generatedAtMs}"
+    val saved = library.any { it.sourceUrl == mixUrl }
+    val onPlay = {
+        if (playingFromMix) PlayerController.togglePlayPause() else PlayerController.playFromList(picks, 0)
+    }
+    Box(
+        modifier = modifier
+            .padding(horizontal = Space.gutter)
+            .fillMaxWidth()
+            .height(HeroHeight)
+            .shadow(elevation = 30.dp, shape = Radius.panelShape, ambientColor = light.key, spotColor = light.key)
+            .clip(Radius.panelShape)
+            .background(Color.Black),
+    ) {
+        ArtworkBackdrop(url = picks.first().artworkUrl, modifier = Modifier.matchParentSize(), blur = 34.dp)
+        Box(
+            Modifier
+                .matchParentSize()
+                .background(Brush.horizontalGradient(0f to Color.Black.copy(alpha = 0.66f), 0.6f to Color.Black.copy(alpha = 0.42f), 1f to Color.Black.copy(alpha = 0.22f)))
+                .background(Brush.verticalGradient(0.4f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.38f))),
+        )
+        Box(Modifier.matchParentSize().glass(Radius.panelShape, Glass.Clear))
+        Column(Modifier.matchParentSize().padding(Space.gutter)) {
+            Row(verticalAlignment = Alignment.Top) {
+                Column(Modifier.weight(1f)) {
+                    Text("MADE FOR YOU", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.72f))
+                    Spacer(Modifier.height(Space.xs))
+                    Text(
+                        "Your Daydream Mix",
+                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold, fontSize = 24.sp, lineHeight = 28.sp, letterSpacing = (-0.6).sp),
+                        color = Color.White,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        basedOnLine(feed.basedOn, picks.size),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.74f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Spacer(Modifier.width(Space.m))
+                Mosaic(
+                    picks.take(4),
+                    size = 104.dp,
+                    modifier = Modifier.shadow(elevation = 18.dp, shape = Radius.cardShape, ambientColor = Color.Black, spotColor = Color.Black),
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val playing = playingFromMix && nowPlaying.isPlaying
+                AnimatedContent(
+                    targetState = playing,
+                    transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(120)) using SizeTransform(clip = false) },
+                    label = "mixPlay",
+                ) { p ->
+                    SolidPillButton(label = if (p) "Pause" else "Play", icon = if (p) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, onClick = onPlay)
+                }
+                Spacer(Modifier.width(Space.xs))
+                HeroButton(Icons.Rounded.Shuffle, "Shuffle play") { PlayerController.playFromList(picks.shuffled(), 0) }
+                Spacer(Modifier.width(Space.xs))
+                HeroButton(if (saved) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder, if (saved) "Saved to your library" else "Save to your library") {
+                    if (saved) com.daydreamin.app.ui.components.Toaster.show("Already in your library")
+                    else SongActions.savePlaylist(
+                        name = "Daydream Mix · " + SimpleDateFormat("d MMM", Locale.getDefault()).format(Date(feed.generatedAtMs)),
+                        songs = picks,
+                        sourceUrl = mixUrl,
+                        author = "Made for you",
+                    )
+                }
+                Spacer(Modifier.weight(1f))
+                RefreshButton(refreshing, onRefresh)
+            }
+        }
+    }
+}
+
+private fun basedOnLine(artists: List<String>, count: Int): String = when (artists.size) {
+    0 -> "$count songs picked for you"
+    1 -> "Based on ${artists[0]} · $count songs"
+    2 -> "Based on ${artists[0]} and ${artists[1]} · $count songs"
+    else -> "Based on ${artists[0]}, ${artists[1]} and more · $count songs"
+}
+
+@Composable
+private fun HeroButton(icon: ImageVector, description: String, onClick: () -> Unit) {
+    Box(
+        Modifier.size(40.dp).pressable(onClick = onClick).glass(Radius.pill, Glass.Regular, tint = Color.Black.copy(alpha = 0.12f)),
+        contentAlignment = Alignment.Center,
+    ) { Icon(icon, contentDescription = description, tint = Color.White, modifier = Modifier.size(20.dp)) }
+}
+
+/** "New mix": spins while one is being built. */
+@Composable
+private fun RefreshButton(refreshing: Boolean, onRefresh: () -> Unit) {
+    val spin = rememberInfiniteTransition(label = "refreshSpin")
+    val angle by spin.animateFloat(0f, 360f, infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Restart), label = "refreshAngle")
+    Box(
+        Modifier.size(40.dp).pressable(onClick = { if (!refreshing) onRefresh() }).glass(Radius.pill, Glass.Regular, tint = Color.Black.copy(alpha = 0.12f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            Icons.Rounded.Refresh,
+            contentDescription = if (refreshing) "Building a new mix" else "New mix",
+            tint = Color.White,
+            modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = if (refreshing) angle else 0f },
+        )
+    }
+}
+
+/** Shown to someone with nothing played yet: what this page will turn into. */
+@Composable
+private fun TasteHint(modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .padding(horizontal = Space.gutter)
+            .padding(bottom = Space.l)
+            .fillMaxWidth()
+            .glass(Radius.panelShape, Glass.Clear)
+            .padding(Space.m),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(40.dp).glass(Radius.pill, Glass.Regular), contentAlignment = Alignment.Center) {
+            Icon(Icons.Rounded.AutoAwesome, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+        }
+        Column(Modifier.padding(start = Space.s)) {
+            Text("Your mix starts here", style = MaterialTheme.typography.titleSmall, color = TextPrimary)
+            Text(
+                "Play or like a few songs you love — Home will start building mixes and picks around them.",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary,
+            )
+        }
+    }
+}
+
+/**
+ * The chart's #1, for someone just starting out: lit by its own artwork, the cover floating on
+ * the right.
  */
 @Composable
 private fun Spotlight(song: Song, light: ArtworkLight, isCurrent: Boolean, isPlaying: Boolean, modifier: Modifier = Modifier) {
@@ -417,7 +639,7 @@ private fun Spotlight(song: Song, light: ArtworkLight, isCurrent: Boolean, isPla
         modifier = modifier
             .padding(horizontal = Space.gutter)
             .fillMaxWidth()
-            .height(SpotlightHeight)
+            .height(216.dp)
             .pressable(onClick = onPlay)
             .shadow(elevation = 30.dp, shape = Radius.panelShape, ambientColor = light.key, spotColor = light.key)
             .clip(Radius.panelShape)
@@ -463,7 +685,7 @@ private fun Spotlight(song: Song, light: ArtworkLight, isCurrent: Boolean, isPla
                 url = song.artworkUrl,
                 shape = Radius.cardShape,
                 modifier = Modifier
-                    .size(SpotlightHeight - Space.gutter * 2)
+                    .size(216.dp - Space.gutter * 2)
                     .shadow(elevation = 22.dp, shape = Radius.cardShape, ambientColor = Color.Black, spotColor = Color.Black),
             )
         }
@@ -472,17 +694,18 @@ private fun Spotlight(song: Song, light: ArtworkLight, isCurrent: Boolean, isPla
 
 /** YouTube Music's signature shelf: songs in columns of four, paging sideways one column at a time. */
 @Composable
-private fun QuickPicksGrid(songs: List<Song>, nowPlaying: () -> NowPlaying) {
+private fun QuickPicksGrid(songs: List<Song>, nowPlaying: () -> NowPlaying, onPlay: (Int, Song) -> Unit) {
     val gridState = rememberLazyGridState()
     // The next column peeks in from the right so it's obvious the shelf scrolls.
     val columnWidth = LocalConfiguration.current.screenWidthDp.dp - Space.gutter * 2 - 28.dp
+    val rows = songs.size.coerceIn(1, QUICK_PICK_ROWS)
     LazyHorizontalGrid(
-        rows = GridCells.Fixed(QUICK_PICK_ROWS),
+        rows = GridCells.Fixed(rows),
         state = gridState,
         flingBehavior = rememberSnapFlingBehavior(gridState, SnapPosition.Start),
         contentPadding = PaddingValues(horizontal = Space.gutter),
         horizontalArrangement = Arrangement.spacedBy(Space.s),
-        modifier = Modifier.fillMaxWidth().height(QuickPickRowHeight * QUICK_PICK_ROWS),
+        modifier = Modifier.fillMaxWidth().height(QuickPickRowHeight * rows),
     ) {
         items(songs.size, key = { songs[it].playId }) { index ->
             val song = songs[index]
@@ -491,7 +714,7 @@ private fun QuickPicksGrid(songs: List<Song>, nowPlaying: () -> NowPlaying) {
                 song = song,
                 isCurrent = np.playId == song.playId,
                 isPlaying = np.isPlaying,
-                onClick = { PlayerController.playSong(song) },
+                onClick = { onPlay(index, song) },
                 modifier = Modifier.width(columnWidth),
             )
         }
@@ -507,7 +730,7 @@ private fun QuickPickRow(song: Song, isCurrent: Boolean, isPlaying: Boolean, onC
         modifier = modifier.fillMaxWidth().height(QuickPickRowHeight).pressable(onLongClick = { menuOpen = true }, onClick = { if (isCurrent) openPlayer() else onClick() }),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (menuOpen) com.daydreamin.app.ui.components.SongMenu(song = song, onDismiss = { menuOpen = false })
+        if (menuOpen) SongMenu(song = song, onDismiss = { menuOpen = false })
         Artwork(url = song.cover.ifBlank { song.artworkUrl }, shape = Radius.thumbShape, modifier = Modifier.size(52.dp))
         Column(modifier = Modifier.weight(1f).padding(horizontal = Space.s + 2.dp)) {
             Text(
@@ -541,7 +764,7 @@ private fun ArtCard(song: Song, size: Dp, isCurrent: Boolean, isPlaying: Boolean
     var menuOpen by remember { mutableStateOf(false) }
     val openPlayer = com.daydreamin.app.ui.components.LocalOpenPlayer.current
     Column(modifier = Modifier.width(size).pressable(onLongClick = { menuOpen = true }, onClick = { if (isCurrent) openPlayer() else onClick() })) {
-        if (menuOpen) com.daydreamin.app.ui.components.SongMenu(song = song, onDismiss = { menuOpen = false })
+        if (menuOpen) SongMenu(song = song, onDismiss = { menuOpen = false })
         Box {
             Artwork(url = song.artworkUrl, shape = Radius.cardShape, modifier = Modifier.size(size))
             if (isCurrent) {
@@ -565,6 +788,43 @@ private fun ArtCard(song: Song, size: Dp, isCurrent: Boolean, isPlaying: Boolean
         Text(song.artist, style = MaterialTheme.typography.bodySmall, color = TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
+
+/** Liked songs first, then your playlists, then a tile to start a new one. */
+@Composable
+private fun LibraryShelf(liked: List<Song>, playlists: List<Playlist>, onOpenLiked: () -> Unit, onOpenPlaylist: (Playlist) -> Unit) {
+    var naming by remember { mutableStateOf(false) }
+    if (naming) NameDialog(title = "New playlist", confirm = "Create", onDismiss = { naming = false }, onConfirm = { SongActions.createPlaylist(it); naming = false })
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = Space.gutter),
+        horizontalArrangement = Arrangement.spacedBy(Space.s + 2.dp),
+    ) {
+        item(key = "liked") {
+            CollectionTile("Liked songs", songCount(liked.size), onClick = onOpenLiked) { LikedTile(TileSize) }
+        }
+        items(playlists, key = { "pl-" + it.id }) { p ->
+            CollectionTile(p.name, songCount(p.songs.size), onClick = { onOpenPlaylist(p) }) { PlaylistCover(p, TileSize) }
+        }
+        item(key = "new") {
+            CollectionTile("New playlist", "Start one", onClick = { naming = true }) {
+                Box(Modifier.size(TileSize).glass(Radius.cardShape, Glass.Regular), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Rounded.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(30.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CollectionTile(title: String, subtitle: String, onClick: () -> Unit, cover: @Composable () -> Unit) {
+    Column(Modifier.width(TileSize).pressable(onClick = onClick)) {
+        cover()
+        Spacer(Modifier.height(Space.xs))
+        Text(title, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium), color = TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = TextSecondary, maxLines = 1)
+    }
+}
+
+private fun songCount(n: Int) = "$n ${if (n == 1) "song" else "songs"}"
 
 @Composable
 private fun MoodGrid(onMood: (MoodCard) -> Unit) {
@@ -597,7 +857,7 @@ private fun MoodGrid(onMood: (MoodCard) -> Unit) {
 }
 
 @Composable
-private fun ErrorPanel(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
+private fun ErrorPanel(title: String, message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .padding(horizontal = Space.gutter)
@@ -608,7 +868,7 @@ private fun ErrorPanel(message: String, onRetry: () -> Unit, modifier: Modifier 
     ) {
         Icon(Icons.Rounded.CloudOff, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(26.dp))
         Spacer(Modifier.height(Space.s))
-        Text("Couldn't load your feed", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+        Text(title, style = MaterialTheme.typography.titleMedium, color = TextPrimary)
         Spacer(Modifier.height(Space.xxs))
         Text(message, style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
         Spacer(Modifier.height(Space.m))
@@ -619,12 +879,12 @@ private fun ErrorPanel(message: String, onRetry: () -> Unit, modifier: Modifier 
 // ---------------------------------------------------------------- loading placeholders (same geometry as the real thing, so nothing jumps)
 
 @Composable
-private fun SpotlightPlaceholder(modifier: Modifier = Modifier) {
+private fun HeroPlaceholder(modifier: Modifier = Modifier) {
     Box(
         modifier
             .padding(horizontal = Space.gutter)
             .fillMaxWidth()
-            .height(SpotlightHeight)
+            .height(HeroHeight)
             .clip(Radius.panelShape)
             .shimmer(),
     )

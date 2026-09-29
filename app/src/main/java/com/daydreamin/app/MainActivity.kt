@@ -41,6 +41,9 @@ class MainActivity : ComponentActivity() {
      */
     private var introIcon by mutableStateOf<LaunchIcon?>(null)
 
+    /** The system splash has actually left the screen — [LaunchIntro]'s clock starts from here. */
+    private var splashGone by mutableStateOf(false)
+
     /**
      * The launcher icon drawn the way the launch screen draws it: the adaptive icon (background +
      * foreground, clipped to this device's icon shape) filling the icon view. Drawn ourselves
@@ -74,15 +77,12 @@ class MainActivity : ComponentActivity() {
         // songs (requested the instant the process started — DaydreaminApp.chartPrefetch).
         val splash = installSplashScreen()
 
-        // Render the icon ourselves immediately, centered, rather than only from the system's exit
-        // callback: that callback fires whenever the OS gets around to it — a cold start under load
-        // can leave it visibly late — and until it fires, [introIcon] was null, so the wordmark
-        // (gated on it) sat there un-animated instead of arriving with the logo. This version is
-        // ready before the very first frame, so the wordmark always starts immediately. If the
-        // callback below does fire promptly, it replaces this with the system's exact icon and
-        // position; Android centers the splash icon by spec, so the swap is never visible.
+        // Render the icon ourselves, centered at the platform's splash-icon size, before the first
+        // frame — so the intro's first frame already has it even when the system never reports
+        // where it drew its own. When it does (below), that exact position replaces this one while
+        // the system splash is still covering the screen.
         val density = resources.displayMetrics.density
-        val fallbackPx = (240 * density).toInt()
+        val fallbackPx = (com.daydreamin.app.ui.screens.intro.SPLASH_ICON_DP * density).toInt()
         val fallbackLeft = (resources.displayMetrics.widthPixels - fallbackPx) / 2
         val fallbackTop = (resources.displayMetrics.heightPixels - fallbackPx) / 2
         renderLauncherIcon(fallbackPx, fallbackPx)?.let { bmp ->
@@ -101,7 +101,12 @@ class MainActivity : ComponentActivity() {
             }
             // Let our copy of the icon draw underneath first (two frames), so there's never a frame
             // between the system screen leaving and the intro's icon appearing.
-            window.decorView.postOnAnimation { window.decorView.postOnAnimation { provider.remove() } }
+            window.decorView.postOnAnimation {
+                window.decorView.postOnAnimation {
+                    provider.remove()
+                    splashGone = true
+                }
+            }
         }
         super.onCreate(savedInstanceState)
         // Transparent, light-icon system bars on every API level (Android 15+ enforces
@@ -117,6 +122,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             val accentName by DaydreaminApp.instance.prefs.accentName.collectAsState(initial = "Violet")
             var showIntro by rememberSaveable { mutableStateOf(coldStart) }
+            // Held back while the intro's letters animate — see LaunchIntro.
+            var contentMounted by rememberSaveable { mutableStateOf(!coldStart) }
             // null until the store has been read — nothing is shown over Home until we know.
             val onboarded by DaydreaminApp.instance.prefs.onboarded.collectAsState(initial = null)
             val scope = rememberCoroutineScope()
@@ -126,20 +133,21 @@ class MainActivity : ComponentActivity() {
             }
             DaydreaminTheme(accent = accentByName(accentName)) {
                 Box(Modifier.fillMaxSize()) {
-                    // Home composes underneath from the first frame, so it's ready the moment the intro
-                    // leaves — except during first-run setup, which must own every touch (and the
-                    // screen reader) until it's done.
-                    if (onboarded == true) AppNavHost()
-                    if (onboarded == false) {
-                        OnboardingScreen(onDone = { scope.launch { DaydreaminApp.instance.prefs.setOnboarded() } })
+                    // Home composes underneath the intro once its letters have landed, so it's drawn
+                    // and ready by the time the intro fades — except during first-run setup, which
+                    // must own every touch (and the screen reader) until it's done.
+                    if (contentMounted) {
+                        if (onboarded == true) AppNavHost()
+                        if (onboarded == false) {
+                            OnboardingScreen(onDone = { scope.launch { DaydreaminApp.instance.prefs.setOnboarded() } })
+                        }
                     }
                     if (showIntro) {
-                        val app = DaydreaminApp.instance
                         LaunchIntro(
                             icon = introIcon,
-                            isReady = { app.chartPrefetch.isCompleted },
-                            processStartAtMs = app.processStartAtMs,
-                            maxWaitMs = MAX_INTRO_WAIT_MS,
+                            splashGone = { splashGone },
+                            isReady = { DaydreaminApp.instance.homeFeedReady() },
+                            onMountContent = { contentMounted = true },
                             onFinished = { showIntro = false },
                         )
                     }
@@ -148,12 +156,3 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-
-/**
- * Longest the intro waits for Home's songs, from process start; after this Home shows its loading
- * shimmer instead. Measured cold start: the chart fetch itself takes well under a second on a
- * normal connection, so this is only ever spent on a slow one — capped well short of 2s (the old
- * value) so a bad connection shows Home's own shimmer sooner rather than leaving the splash on
- * screen; that reads as "the app is responding" instead of "the app is stuck loading."
- */
-private const val MAX_INTRO_WAIT_MS = 1_200L

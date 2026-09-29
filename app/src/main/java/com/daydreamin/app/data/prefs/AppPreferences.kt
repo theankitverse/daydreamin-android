@@ -268,4 +268,11 @@ data class Playlist(
     val id: String,
     val name: String,
     val songs: List<Song> = emptyList(),
-)
+    /** Set when this was saved from somewhere else (a YouTube playlist, your Home mix) rather than made here. */
+    val sourceUrl: String? = null,
+    /** Who made it, for a saved playlist ("YouTube Music", a channel name). */
+    val author: String? = null,
+    val coverUrl: String? = null,
+) {
+    val isSaved: Boolean get() = sourceUrl != null
+}

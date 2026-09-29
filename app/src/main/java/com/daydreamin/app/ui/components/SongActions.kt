@@ -143,6 +143,42 @@ object SongActions {
     fun deletePlaylist(playlistId: String) {
         app.appScope.launch { app.prefs.savePlaylists(app.prefs.playlists.first().filterNot { it.id == playlistId }) }
     }
+
+    fun renamePlaylist(playlistId: String, name: String) {
+        val clean = name.trim()
+        if (clean.isEmpty()) return
+        app.appScope.launch {
+            app.prefs.savePlaylists(app.prefs.playlists.first().map { if (it.id == playlistId) it.copy(name = clean) else it })
+            Toaster.show("Renamed to “$clean”")
+        }
+    }
+
+    /**
+     * Keeps a copy of a playlist from elsewhere (a YouTube playlist, your Home mix) in your library.
+     * Saving the same one twice refreshes its songs instead of making a duplicate.
+     */
+    fun savePlaylist(name: String, songs: List<Song>, sourceUrl: String, author: String? = null, coverUrl: String? = null) {
+        if (songs.isEmpty()) { Toaster.show("Nothing to save"); return }
+        app.appScope.launch {
+            val all = app.prefs.playlists.first()
+            val existing = all.firstOrNull { it.sourceUrl == sourceUrl }
+            if (existing != null) {
+                app.prefs.savePlaylists(all.map { if (it.id == existing.id) it.copy(songs = songs.distinctBy { s -> s.playId }) else it })
+                Toaster.show("Updated “${existing.name}” in your library")
+            } else {
+                val saved = Playlist(
+                    id = UUID.randomUUID().toString(),
+                    name = name.trim().ifBlank { "Saved playlist" },
+                    songs = songs.distinctBy { it.playId },
+                    sourceUrl = sourceUrl,
+                    author = author,
+                    coverUrl = coverUrl,
+                )
+                app.prefs.savePlaylists(all + saved)
+                Toaster.show("Saved “${saved.name}” to your library")
+            }
+        }
+    }
 }
 
 /** One short confirmation at a time ("Added to queue"), shown by [ToastHost]. */
@@ -204,7 +240,6 @@ fun SongMenuButton(song: Song, modifier: Modifier = Modifier, extra: List<SongMe
 fun SongMenu(song: Song, onDismiss: () -> Unit, extra: List<SongMenuAction> = emptyList()) {
     val prefs = DaydreaminApp.instance.prefs
     val likedIds by prefs.likedIds.collectAsState(initial = emptySet())
-    val playlists by prefs.playlists.collectAsState(initial = emptyList())
     var page by remember { mutableStateOf(0) }
     var naming by remember { mutableStateOf(false) }
     val density = LocalDensity.current
@@ -248,29 +283,43 @@ fun SongMenu(song: Song, onDismiss: () -> Unit, extra: List<SongMenuAction> = em
                 } else {
                     MenuRow(Icons.Rounded.ChevronLeft, "Add to playlist", dim = true) { page = 0 }
                     Divider()
-                    MenuRow(Icons.Rounded.Add, "New playlist…") { naming = true }
-                    Column(Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState())) {
-                        playlists.forEach { pl ->
-                            val has = pl.songs.any { it.playId == song.playId }
-                            MenuRow(
-                                if (has) Icons.Rounded.Check else Icons.AutoMirrored.Rounded.QueueMusic,
-                                pl.name,
-                                dim = has,
-                            ) { SongActions.addToPlaylist(pl, song); onDismiss() }
-                        }
-                    }
+                    PlaylistPickerRows(song, onNewPlaylist = { naming = true }, onPicked = onDismiss)
                 }
             }
         }
     }
-    if (naming) {
-        NameDialog(
-            title = "New playlist",
-            confirm = "Create",
-            onDismiss = { naming = false },
-            onConfirm = { name -> SongActions.createPlaylist(name, firstSong = song); naming = false; onDismiss() },
-        )
+    if (naming) NewPlaylistDialog(song, onDismiss = { naming = false }, onCreated = { naming = false; onDismiss() })
+}
+
+/**
+ * "New playlist…", then every playlist you have — ticked where [song] already is. Tapping one
+ * adds the song and calls [onPicked]. Shared by the song menu and Now Playing's menu.
+ */
+@Composable
+fun PlaylistPickerRows(song: Song, onNewPlaylist: () -> Unit, onPicked: () -> Unit) {
+    val playlists by DaydreaminApp.instance.prefs.playlists.collectAsState(initial = emptyList())
+    MenuRow(Icons.Rounded.Add, "New playlist…", onClick = onNewPlaylist)
+    Column(Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState())) {
+        playlists.forEach { pl ->
+            val has = pl.songs.any { it.playId == song.playId }
+            MenuRow(
+                if (has) Icons.Rounded.Check else Icons.AutoMirrored.Rounded.QueueMusic,
+                pl.name,
+                dim = has,
+            ) { SongActions.addToPlaylist(pl, song); onPicked() }
+        }
     }
+}
+
+/** Names a new playlist with [song] already in it. */
+@Composable
+fun NewPlaylistDialog(song: Song, onDismiss: () -> Unit, onCreated: () -> Unit) {
+    NameDialog(
+        title = "New playlist",
+        confirm = "Create",
+        onDismiss = onDismiss,
+        onConfirm = { name -> SongActions.createPlaylist(name, firstSong = song); onCreated() },
+    )
 }
 
 @Composable
@@ -279,7 +328,7 @@ private fun Divider() {
 }
 
 @Composable
-private fun MenuRow(
+internal fun MenuRow(
     icon: ImageVector,
     label: String,
     destructive: Boolean = false,

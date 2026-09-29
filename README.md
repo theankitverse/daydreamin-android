@@ -13,6 +13,12 @@ app](https://github.com/theankitverse/Daydreamin).
 - **On-device everything.** [NewPipeExtractor](https://github.com/TeamNewPipe/NewPipeExtractor)
   resolves playable audio streams directly from YouTube — no server, no account, nothing of ours
   in between.
+- **A Home that learns you.** Your plays, likes and early skips pick a handful of seed songs;
+  YouTube Music's radio mix for each is blended into "Your Daydream Mix", top picks, and shelves
+  like "Because you like …" and "Fresh finds" — all computed on the device, cached between
+  launches, and rebuilt as your listening changes.
+- **Playlists**: make your own, add songs from any ⋯ menu or from Now Playing, and save YouTube
+  playlists (or your mix) to your library.
 - **Search** merges iTunes and YouTube results into one ranked, typo-tolerant list, with lyrics
   (via [LRCLIB](https://lrclib.net/)) synced Apple Music-style.
 - **Gapless playback**, disk caching, stream-URL refresh, retry/backoff, and audio-focus handling

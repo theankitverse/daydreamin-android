@@ -1,6 +1,6 @@
 {
-  "versionCode": 6,
-  "versionName": "1.2.2",
+  "versionCode": 7,
+  "versionName": "1.3.0",
   "url": "https://github.com/theankitverse/daydreamin-android/releases/latest",
-  "notes": "Shortened how long the launch screen waits on a slow connection before handing off to Home."
+  "notes": "A new Home made from what you listen to, playlists everywhere, a launch animation that actually plays on your phone, and a much faster, smoother app overall."
 }

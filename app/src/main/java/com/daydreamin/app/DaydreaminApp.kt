@@ -5,6 +5,8 @@ import android.os.SystemClock
 import android.util.Log
 import com.daydreamin.app.data.model.Song
 import com.daydreamin.app.data.prefs.AppPreferences
+import com.daydreamin.app.data.recommend.HomeFeedRepository
+import com.daydreamin.app.data.taste.TasteProfile
 import com.daydreamin.app.data.repository.MusicRepository
 import com.daydreamin.app.data.youtube.YouTubeExtractorService
 import kotlinx.coroutines.CoroutineScope
@@ -38,9 +40,17 @@ class DaydreaminApp : Application() {
      *  cold-start latency can actually be profiled end to end instead of guessed at piecemeal. */
     val processStartAtMs: Long = SystemClock.elapsedRealtime()
 
+    /** Home's personal recommendations — see [HomeFeedRepository]. */
+    lateinit var homeFeed: HomeFeedRepository
+        private set
+
+    /** Home has something real to show: your cached mix, or (with nothing to personalize from yet) the chart. */
+    fun homeFeedReady(): Boolean = homeFeed.feed.value != null || chartPrefetch.isCompleted
+
     override fun onCreate() {
         super.onCreate()
         instance = this
+        TasteProfile.init(this)
         val prefsStart = SystemClock.elapsedRealtime()
         prefs = AppPreferences(this)
         Log.d(TAG, "AppPreferences() at +${SystemClock.elapsedRealtime() - processStartAtMs}ms (took ${SystemClock.elapsedRealtime() - prefsStart}ms)")
@@ -55,6 +65,10 @@ class DaydreaminApp : Application() {
         // One background check for a newer release — there's no Play Store here to do this
         // automatically. Fire-and-forget: nothing on screen waits on it.
         com.daydreamin.app.data.update.UpdateChecker.start(prefs, appScope)
+
+        // Loads the last personal mix from disk straight away (Home shows it on the first frame),
+        // then rebuilds it in the background if it's stale.
+        homeFeed = HomeFeedRepository(this).also { it.start() }
 
         Log.d(TAG, "DaydreaminApp.onCreate() done at +${SystemClock.elapsedRealtime() - processStartAtMs}ms")
     }

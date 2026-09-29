@@ -188,7 +188,16 @@ fun AppNavHost() {
                 popExitTransition = { fadeOut(tween(90)) },
             ) {
                 composable(Dest.HOME) {
-                    HomeScreen(onOpenDrawer = { scope.launch { drawerState.open() } }, onSearchClick = { SearchFocus.requested = true; navController.navigateTopLevel(Dest.SEARCH) }, contentPadding = padding)
+                    HomeScreen(
+                        onOpenDrawer = { scope.launch { drawerState.open() } },
+                        onSearchClick = { SearchFocus.requested = true; navController.navigateTopLevel(Dest.SEARCH) },
+                        onOpenLibrary = { tab, playlistId ->
+                            LibraryLaunch.tab = tab
+                            LibraryLaunch.playlistId = playlistId
+                            navController.navigateTopLevel(Dest.LIBRARY)
+                        },
+                        contentPadding = padding,
+                    )
                 }
                 composable(Dest.SEARCH) {
                     SearchScreen(

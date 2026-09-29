@@ -13,14 +13,17 @@ android {
         applicationId = "com.daydreamin.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 6
-        versionName = "1.2.2"
+        versionCode = 7
+        versionName = "1.3.0"
     }
 
     buildTypes {
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // Same key as every build already out there (they were all debug builds), so this
+            // installs as an update over them instead of needing an uninstall first.
+            signingConfig = signingConfigs.getByName("debug")
         }
         debug {
             isMinifyEnabled = false

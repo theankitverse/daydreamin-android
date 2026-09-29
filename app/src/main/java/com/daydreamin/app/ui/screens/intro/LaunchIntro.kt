@@ -9,7 +9,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,17 +19,18 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.RenderEffect
-import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
@@ -41,11 +41,11 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** Same color as the system launch screen (res/values/colors.xml splash_background), so the handoff is invisible. */
 private val LaunchBackground = Color(0xFF0A0A12)
@@ -55,16 +55,20 @@ private const val WORD = "DAYDREAMIN"
 
 private const val LETTER_STAGGER_MS = 38L
 private const val LETTER_MS = 500
-/** The wordmark has fully arrived by here — the earliest the intro may leave. */
-private const val INTRO_MIN_MS = LETTER_STAGGER_MS * (WORD.length - 1) + LETTER_MS
+/** The last letter has landed. */
+private const val LETTERS_MS = LETTER_STAGGER_MS * (WORD.length - 1) + LETTER_MS
+/** The earliest the intro may leave: the whole word, readable, with the glint across it. */
+private const val HOLD_MS = 1_050L
+/** On a slow connection, stop waiting for Home's songs here — Home shows its own placeholders. */
+private const val MAX_VISIBLE_MS = 1_800L
+/** Launches with no system splash to hand over (a notification, a link) never report one gone. */
+private const val SPLASH_HANDOFF_TIMEOUT_MS = 250L
 
 private val EaseOutQuint = CubicBezierEasing(0.22f, 1f, 0.36f, 1f)
 
 /**
  * The launch icon as the system drew it, and where. Captured as one value, in one state write,
- * so the bitmap and its position are always observed together — never a frame where one has
- * arrived and the other hasn't (that split is what used to show the logo and the wordmark
- * arriving out of sync, or the wordmark skipping straight to its end state).
+ * so the bitmap and its position are always observed together.
  */
 data class LaunchIcon(val bitmap: ImageBitmap, val bounds: IntRect)
 
@@ -74,16 +78,19 @@ data class LaunchIcon(val bitmap: ImageBitmap, val bounds: IntRect)
  * the wordmark in beneath it: letters rise out of a soft blur one after another in a
  * violet-to-pink ramp, and a single glint of light passes across the word.
  *
- * It leaves once the wordmark has arrived *and* Home's songs are ready ([isReady]) — or after
- * [maxWaitMs] from process start regardless, so a slow network never traps you here — by fading
- * away as the logo drifts forward, revealing Home (already composed underneath).
+ * Timing is measured from the moment it's actually visible ([splashGone]), not from when it was
+ * composed. Composition happens while the system's own splash still covers the screen — on a
+ * real phone that can be most of a second — and a clock started then plays the animation where
+ * nobody can see it. Home isn't built until the letters have landed ([onMountContent]): building
+ * it underneath from the first frame made those first frames 100–200ms each and held the system
+ * splash on screen longer.
  */
 @Composable
 fun LaunchIntro(
     icon: LaunchIcon?,
+    splashGone: () -> Boolean,
     isReady: () -> Boolean,
-    processStartAtMs: Long,
-    maxWaitMs: Long,
+    onMountContent: () -> Unit,
     onFinished: () -> Unit,
 ) {
     val letters = remember { List(WORD.length) { Animatable(0f) } }
@@ -91,9 +98,11 @@ fun LaunchIntro(
     val exit = remember { Animatable(0f) }
 
     LaunchedEffect(Unit) {
-        // Starts on this composable's very first frame — no wait. [icon] is already set by the
-        // time this exists (MainActivity renders it eagerly, before setContent), so the wordmark
-        // and the logo are always on screen together from the instant the system hands over.
+        // Our first frame has to be drawn before the system will let its splash go.
+        withFrameNanos { }
+        withTimeoutOrNull(SPLASH_HANDOFF_TIMEOUT_MS) { snapshotFlow { splashGone() }.first { it } }
+        // And one more, so the first frame anyone can see is the one the animation starts on.
+        withFrameNanos { }
         val start = SystemClock.elapsedRealtime()
         coroutineScope {
             letters.forEachIndexed { i, a ->
@@ -103,15 +112,18 @@ fun LaunchIntro(
                 }
             }
             launch {
-                delay(360)
-                glint.animateTo(1.3f, tween(800, easing = LinearEasing))
+                delay(300)
+                glint.animateTo(1.3f, tween(750, easing = LinearEasing))
             }
-            // Leave when the word is in and Home is ready (or the cap passes).
             launch {
+                delay(LETTERS_MS)
+                onMountContent()
+                // Two frames: the one that composes Home, and the one that draws it.
+                withFrameNanos { }
+                withFrameNanos { }
                 while (true) {
-                    val shownFor = SystemClock.elapsedRealtime() - start
-                    val sinceProcess = SystemClock.elapsedRealtime() - processStartAtMs
-                    if (shownFor >= INTRO_MIN_MS && (isReady() || sinceProcess >= maxWaitMs)) break
+                    val visibleFor = SystemClock.elapsedRealtime() - start
+                    if (visibleFor >= HOLD_MS && (isReady() || visibleFor >= MAX_VISIBLE_MS)) break
                     delay(32)
                 }
                 exit.animateTo(1f, tween(380, easing = EaseOutQuint))
@@ -127,8 +139,8 @@ fun LaunchIntro(
             .graphicsLayer { alpha = 1f - exit.value }
             .background(LaunchBackground),
     ) {
-        // Where the launch screen had the icon; a centered 240dp box if it didn't tell us.
-        val fallbackPx = with(density) { 240.dp.roundToPx() }
+        // Where the launch screen had the icon; the platform's default spot if it didn't tell us.
+        val fallbackPx = with(density) { SPLASH_ICON_DP.dp.roundToPx() }
         val bounds = icon?.bounds ?: IntRect(
             left = (constraints.maxWidth - fallbackPx) / 2,
             top = (constraints.maxHeight - fallbackPx) / 2,
@@ -205,3 +217,6 @@ fun LaunchIntro(
         }
     }
 }
+
+/** The system splash's icon box on Android 12+ (measured: 504px at 2.625x). */
+const val SPLASH_ICON_DP = 192

@@ -181,10 +181,38 @@ class MusicRepository {
 
 fun YtTrack.toSong() = Song(
     id = videoId,
-    title = title,
-    artist = artist,
+    title = cleanVideoTitle(title),
+    artist = cleanChannelName(artist),
     cover = thumbnail,
     coverXl = thumbnail,
     duration = durationSeconds,
     videoId = videoId,
 )
+
+/** Clutter that video titles carry and song titles don't. */
+private val TITLE_TAIL = Regex(
+    """\s*[-–—:]?\s*[(\[]?\s*\b(official\s+)?(full\s+)?(music\s+video|video\s+song|lyric(al)?\s+video|video|audio|m/?v|visuali[sz]er|4k)\b\s*[)\]]?\s*$""",
+    RegexOption.IGNORE_CASE,
+)
+private val BRACKETED_CLUTTER = Regex(
+    """\s*[(\[][^()\[\]]*\b(official|lyric|lyrical|video|audio|visuali[sz]er|full song|hd|4k)\b[^()\[\]]*[)\]]""",
+    RegexOption.IGNORE_CASE,
+)
+
+/** "Kesariya || Official Music Video (4K)" -> "Kesariya". Never empties a title — "Video Games" stays "Video Games". */
+internal fun cleanVideoTitle(raw: String): String {
+    var t = raw.split(" || ", " | ", "｜").first().ifBlank { raw }
+    t = BRACKETED_CLUTTER.replace(t, "")
+    repeat(2) {
+        val m = TITLE_TAIL.find(t)
+        if (m != null && m.range.first > 0) t = t.substring(0, m.range.first)
+    }
+    return t.trim().trimEnd('-', '–', '—', ':', '|').trim().ifBlank { raw.trim() }
+}
+
+/** YouTube's auto-generated artist channels: "Arijit Singh - Topic" -> "Arijit Singh"; "ArijitSinghVEVO" -> "ArijitSingh". */
+internal fun cleanChannelName(raw: String): String = raw
+    .replace(Regex("""\s*-\s*Topic$""", RegexOption.IGNORE_CASE), "")
+    .replace(Regex("""VEVO$"""), "")
+    .trim()
+    .ifBlank { raw }

@@ -13,6 +13,7 @@ import androidx.media3.session.SessionToken
 import com.daydreamin.app.DaydreaminApp
 import com.daydreamin.app.data.model.Song
 import com.daydreamin.app.data.repository.toSong
+import com.daydreamin.app.data.taste.TasteProfile
 import com.daydreamin.app.data.youtube.ResolvedStream
 import com.daydreamin.app.data.youtube.YouTubeExtractorService
 import com.google.common.util.concurrent.MoreExecutors
@@ -42,6 +43,10 @@ private const val TAG = "PlaybackTiming"
  *  and only the first of those skips was ever actually instant before; the rest still paid the
  *  full resolve-then-buffer cost. Two covers a quick double-skip without over-fetching. */
 private const val PREPARE_AHEAD = 2
+
+/** Skipping a song you've heard at least this much of, but less than [EARLY_SKIP_MAX_MS], counts against it in recommendations. */
+private const val EARLY_SKIP_MIN_MS = 1_500L
+private const val EARLY_SKIP_MAX_MS = 30_000L
 
 @Serializable
 enum class RepeatMode { OFF, ALL, ONE }
@@ -424,7 +429,7 @@ object PlayerController {
 
         _meta.update { it.copy(currentSong = song, isBuffering = true, queue = queueContext, error = null) }
         _progress.update { PlaybackProgress(positionMs = 0L, durationMs = 0L) }
-        app.appScope.launch { app.prefs.pushHistory(song) }
+        recordStart(song)
         persistSnapshotSoon()
 
         scope.launch {
@@ -440,6 +445,7 @@ object PlayerController {
             }
             consecutiveResolveFailures = 0
             lastKnownGoodSong = song
+            app.appScope.launch { TasteProfile.rememberVideoId(song, resolved.videoId) }
             controller?.setMediaItem(buildMediaItem(song, resolved))
             releaseSwap() // the old playlist is gone — prepareUpcoming() may work on the new one again
             controller?.prepare()
@@ -694,7 +700,8 @@ object PlayerController {
             )
         }
         _progress.update { PlaybackProgress(positionMs = 0L, durationMs = controller?.duration?.coerceAtLeast(0) ?: 0L) }
-        app.appScope.launch { app.prefs.pushHistory(newCurrent) }
+        recordStart(newCurrent)
+        resolved?.let { r -> app.appScope.launch { TasteProfile.rememberVideoId(newCurrent, r.videoId) } }
         if (preparedAheadPlayIds.isNotEmpty()) preparedAheadPlayIds.removeAt(0)
 
         // Drop whatever's already been played from the player's own list — otherwise it just
@@ -738,7 +745,26 @@ object PlayerController {
         persistSnapshotSoon()
     }
 
+    /** History first, then the play count — in one coroutine, so the two never disagree about order. */
+    private fun recordStart(song: Song) {
+        app.appScope.launch {
+            app.prefs.pushHistory(song)
+            TasteProfile.recordPlay(song)
+        }
+    }
+
+    /** A song you started hearing and skipped within seconds is a "not this" — a buffering song you gave up on isn't. */
+    private fun noteEarlySkip() {
+        val song = _meta.value.currentSong ?: return
+        val position = controller?.currentPosition ?: _progress.value.positionMs
+        val duration = controller?.duration?.takeIf { it > 0 } ?: _progress.value.durationMs
+        if (position in EARLY_SKIP_MIN_MS until EARLY_SKIP_MAX_MS && (duration <= 0 || duration > 60_000)) {
+            app.appScope.launch { TasteProfile.recordSkip(song) }
+        }
+    }
+
     fun next() {
+        noteEarlySkip()
         val c = controller
         if (c != null && preparedAheadPlayIds.isNotEmpty() && c.mediaItemCount > c.currentMediaItemIndex + 1) {
             c.seekToNextMediaItem() // already buffered — instant, onMediaItemTransition syncs state

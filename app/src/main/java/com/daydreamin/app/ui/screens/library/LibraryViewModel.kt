@@ -20,9 +20,10 @@ import androidx.compose.runtime.setValue
  */
 enum class LibraryTab(val label: String) { LIKED("Liked"), RECENT("Recent"), PLAYLISTS("Playlists") }
 
-/** Another screen asking Library to open on a particular collection (Profile's stat tiles). Read once, then cleared. */
+/** Another screen asking Library to open on a particular collection or playlist (Profile's stat tiles, Home's shelves). Read once, then cleared. */
 object LibraryLaunch {
     var tab by androidx.compose.runtime.mutableStateOf<LibraryTab?>(null)
+    var playlistId by androidx.compose.runtime.mutableStateOf<String?>(null)
 }
 
 class LibraryViewModel : ViewModel() {

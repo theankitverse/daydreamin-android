@@ -35,6 +35,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.MoreHoriz
@@ -77,7 +78,10 @@ import com.daydreamin.app.player.PlayerController
 import com.daydreamin.app.ui.components.AmbientGlow
 import com.daydreamin.app.ui.components.Artwork
 import com.daydreamin.app.ui.components.EqualizerBars
+import com.daydreamin.app.ui.components.LikedTile
+import com.daydreamin.app.ui.components.Mosaic
 import com.daydreamin.app.ui.components.NameDialog
+import com.daydreamin.app.ui.components.PlaylistCover
 import com.daydreamin.app.ui.components.SolidPillButton
 import com.daydreamin.app.ui.components.SongActions
 import com.daydreamin.app.ui.components.SongListRow
@@ -130,8 +134,9 @@ fun LibraryScreen(contentPadding: PaddingValues, onOpenPlayer: () -> Unit, onGoH
     val playlists = playlistsOrNull.orEmpty()
     val openPlaylist = playlists.firstOrNull { it.id == openId }
     BackHandler(enabled = openPlaylist != null) { vm.openPlaylist(null) }
-    LaunchedEffect(LibraryLaunch.tab) {
+    LaunchedEffect(LibraryLaunch.tab, LibraryLaunch.playlistId) {
         LibraryLaunch.tab?.let { vm.onTabChange(it); vm.openPlaylist(null); LibraryLaunch.tab = null }
+        LibraryLaunch.playlistId?.let { vm.onTabChange(LibraryTab.PLAYLISTS); vm.openPlaylist(it); LibraryLaunch.playlistId = null }
     }
     // A playlist that was deleted while open closes itself.
     LaunchedEffect(openId, playlistsOrNull) { if (openId != null && playlistsOrNull != null && openPlaylist == null) vm.openPlaylist(null) }
@@ -181,7 +186,7 @@ fun LibraryScreen(contentPadding: PaddingValues, onOpenPlayer: () -> Unit, onGoH
                             // Recently played isn't a playlist: play the song and let radio follow it.
                             if (nowPlaying.playId == song.playId) onOpenPlayer() else PlayerController.playSong(song)
                         }, onGoHome = onGoHome)
-                        LibraryTab.PLAYLISTS -> playlistsTab(playlists, onOpen = { vm.openPlaylist(it.id) })
+                        LibraryTab.PLAYLISTS -> playlistsTab(playlists, liked, onOpen = { vm.openPlaylist(it.id) }, onOpenLiked = { vm.onTabChange(LibraryTab.LIKED) })
                     }
                 }
             }
@@ -271,7 +276,21 @@ private fun LazyListScope.recentTab(
     }
 }
 
-private fun LazyListScope.playlistsTab(playlists: List<Playlist>, onOpen: (Playlist) -> Unit) {
+private fun LazyListScope.playlistsTab(playlists: List<Playlist>, liked: List<Song>, onOpen: (Playlist) -> Unit, onOpenLiked: () -> Unit) {
+    // Liked songs is a playlist too — always first, always there.
+    item(key = "pl-liked") {
+        Row(
+            Modifier.animateItem().fillMaxWidth().height(76.dp).pressable(onClick = onOpenLiked).padding(start = Space.gutter, end = Space.m),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            LikedTile(size = 58.dp)
+            Column(Modifier.weight(1f).padding(horizontal = 16.dp)) {
+                Text("Liked songs", style = MaterialTheme.typography.titleMedium, color = Color.White, maxLines = 1)
+                Text(songCount(liked), style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.55f))
+            }
+            Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = Color.White.copy(alpha = 0.35f))
+        }
+    }
     item(key = "pl-new") {
         var naming by remember { mutableStateOf(false) }
         Row(
@@ -290,7 +309,7 @@ private fun LazyListScope.playlistsTab(playlists: List<Playlist>, onOpen: (Playl
             EmptyCollection(
                 icon = Icons.AutoMirrored.Rounded.QueueMusic,
                 title = "Make it yours",
-                body = "Collect songs for a mood, a trip, a person. Add any song from its ⋮ menu.",
+                body = "Collect songs for a mood, a trip, a person — add any song from its ⋯ menu or from Now Playing. Playlists you find in Search can be saved here too.",
                 modifier = Modifier.animateItem(),
             )
         }
@@ -301,10 +320,16 @@ private fun LazyListScope.playlistsTab(playlists: List<Playlist>, onOpen: (Playl
             Modifier.animateItem().fillMaxWidth().height(76.dp).pressable(onClick = { onOpen(p) }).padding(start = Space.gutter, end = Space.m),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Mosaic(p.songs, size = 58.dp)
+            PlaylistCover(p, size = 58.dp)
             Column(Modifier.weight(1f).padding(horizontal = 16.dp)) {
                 Text(p.name, style = MaterialTheme.typography.titleMedium, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(songCount(p.songs), style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.55f))
+                Text(
+                    listOfNotNull(songCount(p.songs), p.author?.takeIf { p.isSaved && it.isNotBlank() }).joinToString(" · "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.55f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
             Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = Color.White.copy(alpha = 0.35f))
         }
@@ -332,6 +357,8 @@ private fun LazyListScope.playlistDetail(
             title = playlist.name,
             songs = playlist.songs,
             light = light,
+            coverUrl = playlist.coverUrl,
+            byline = playlist.author?.takeIf { playlist.isSaved && it.isNotBlank() },
             onPlay = { PlayerController.playFromList(playlist.songs, 0) },
             onShuffle = { PlayerController.playFromList(playlist.songs.shuffled(), 0) },
             trailing = { PlaylistMenu(playlist, onDeleted = onBack) },
@@ -418,17 +445,17 @@ private fun CollectionHero(
     onPlay: () -> Unit,
     onShuffle: () -> Unit,
     modifier: Modifier = Modifier,
+    coverUrl: String? = null,
+    byline: String? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
     Row(
         modifier.fillMaxWidth().padding(start = Space.gutter, end = Space.m, bottom = Space.l),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Mosaic(
-            songs,
-            size = 136.dp,
-            modifier = Modifier.shadow(28.dp, Radius.cardShape, ambientColor = light.key, spotColor = light.key),
-        )
+        val coverModifier = Modifier.shadow(28.dp, Radius.cardShape, ambientColor = light.key, spotColor = light.key)
+        if (!coverUrl.isNullOrBlank()) Artwork(url = coverUrl, shape = Radius.cardShape, modifier = coverModifier.size(136.dp))
+        else Mosaic(songs, size = 136.dp, modifier = coverModifier)
         Column(Modifier.weight(1f).padding(start = 18.dp)) {
             Text(
                 title,
@@ -437,7 +464,13 @@ private fun CollectionHero(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(collectionSummary(songs), style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.6f))
+            Text(
+                listOfNotNull(byline, collectionSummary(songs)).joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.6f),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
             Spacer(Modifier.height(14.dp))
             if (songs.isNotEmpty()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -459,46 +492,57 @@ private fun CollectionHero(
     }
 }
 
-/** Up to four covers in a 2×2 grid — one cover if that's all there is, a quiet glyph if none. */
-@Composable
-private fun Mosaic(songs: List<Song>, size: Dp, modifier: Modifier = Modifier) {
-    val covers = songs.map { it.artworkUrl }.filter { it.isNotBlank() }.distinct()
-    Box(modifier.size(size).clip(Radius.cardShape).background(Color(0xFF16161A))) {
-        when {
-            covers.size >= 4 -> Column {
-                for (r in 0..1) Row {
-                    for (c in 0..1) Artwork(url = covers[r * 2 + c], shape = androidx.compose.ui.graphics.RectangleShape, edge = false, modifier = Modifier.size(size / 2))
-                }
-            }
-            covers.isNotEmpty() -> Artwork(url = covers.first(), shape = Radius.cardShape, modifier = Modifier.size(size))
-            else -> Box(
-                Modifier.matchParentSize().background(Brush.linearGradient(listOf(BrandViolet.copy(alpha = 0.35f), Color(0xFF16161A)))),
-                contentAlignment = Alignment.Center,
-            ) { Icon(Icons.Rounded.MusicNote, contentDescription = null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(size * 0.3f)) }
-        }
-    }
-}
-
 @Composable
 private fun PlaylistMenu(playlist: Playlist, onDeleted: () -> Unit) {
     var open by remember { mutableStateOf(false) }
+    var renaming by remember { mutableStateOf(false) }
     val density = LocalDensity.current
+    if (renaming) {
+        NameDialog(
+            title = "Rename playlist",
+            confirm = "Save",
+            initial = playlist.name,
+            onDismiss = { renaming = false },
+            onConfirm = { SongActions.renamePlaylist(playlist.id, it); renaming = false },
+        )
+    }
     Box(Modifier.size(40.dp).pressable(onClick = { open = true }).glass(Radius.pill, Glass.Clear), contentAlignment = Alignment.Center) {
         Icon(Icons.Rounded.MoreHoriz, contentDescription = "Playlist options", tint = Color.White, modifier = Modifier.size(20.dp))
         if (open) {
             Popup(alignment = Alignment.TopEnd, offset = with(density) { IntOffset(0, 44.dp.roundToPx()) }, onDismissRequest = { open = false }, properties = PopupProperties(focusable = true)) {
                 Column(Modifier.width(220.dp).glass(androidx.compose.foundation.shape.RoundedCornerShape(20.dp), Glass.Regular, tint = Color(0xF2141418)).padding(vertical = 6.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth().pressable(onClick = { open = false; renaming = true }).padding(horizontal = 18.dp, vertical = 13.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Rounded.Edit, contentDescription = null, tint = Color.White.copy(alpha = 0.9f), modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(14.dp))
+                        Text("Rename", style = MaterialTheme.typography.bodyLarge, color = Color.White)
+                    }
                     var confirming by remember { mutableStateOf(false) }
                     LaunchedEffect(confirming) { if (confirming) { delay(3_000); confirming = false } }
                     Row(
                         Modifier.fillMaxWidth().pressable(onClick = {
-                            if (confirming) { SongActions.deletePlaylist(playlist.id); Toaster.show("Deleted “${playlist.name}”"); open = false; onDeleted() } else confirming = true
+                            if (confirming) {
+                                SongActions.deletePlaylist(playlist.id)
+                                Toaster.show(if (playlist.isSaved) "Removed “${playlist.name}”" else "Deleted “${playlist.name}”")
+                                open = false
+                                onDeleted()
+                            } else confirming = true
                         }).padding(horizontal = 18.dp, vertical = 13.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(Icons.Rounded.DeleteOutline, contentDescription = null, tint = Color(0xFFFF6B61), modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(14.dp))
-                        Text(if (confirming) "Tap again to delete" else "Delete playlist", style = MaterialTheme.typography.bodyLarge, color = Color(0xFFFF6B61))
+                        Text(
+                            when {
+                                confirming -> if (playlist.isSaved) "Tap again to remove" else "Tap again to delete"
+                                playlist.isSaved -> "Remove from library"
+                                else -> "Delete playlist"
+                            },
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = Color(0xFFFF6B61),
+                        )
                     }
                 }
             }
