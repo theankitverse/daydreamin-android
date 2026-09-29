@@ -1,6 +1,6 @@
 {
-  "versionCode": 5,
-  "versionName": "1.2.1",
+  "versionCode": 6,
+  "versionName": "1.2.2",
   "url": "https://github.com/theankitverse/daydreamin-android/releases/latest",
-  "notes": "The launch-screen wordmark now animates in immediately instead of arriving late. Renamed the UPI row to \"Donate via UPI\"."
+  "notes": "Shortened how long the launch screen waits on a slow connection before handing off to Home."
 }

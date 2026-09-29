@@ -149,5 +149,11 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** Longest the intro waits for Home's songs, from process start; after this Home shows its loading shimmer. */
-private const val MAX_INTRO_WAIT_MS = 2_000L
+/**
+ * Longest the intro waits for Home's songs, from process start; after this Home shows its loading
+ * shimmer instead. Measured cold start: the chart fetch itself takes well under a second on a
+ * normal connection, so this is only ever spent on a slow one — capped well short of 2s (the old
+ * value) so a bad connection shows Home's own shimmer sooner rather than leaving the splash on
+ * screen; that reads as "the app is responding" instead of "the app is stuck loading."
+ */
+private const val MAX_INTRO_WAIT_MS = 1_200L
