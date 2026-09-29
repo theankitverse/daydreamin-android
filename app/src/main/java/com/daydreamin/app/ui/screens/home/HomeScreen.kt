@@ -163,6 +163,9 @@ fun HomeScreen(
                     bottom = contentPadding.calculateBottomPadding() + Space.l,
                 ),
             ) {
+                item(key = "update-banner") {
+                    com.daydreamin.app.ui.components.UpdateBanner(modifier = Modifier.padding(bottom = Space.s))
+                }
                 item(key = "greeting") { Greeting() }
                 item(key = "chips") {
                     LazyRow(

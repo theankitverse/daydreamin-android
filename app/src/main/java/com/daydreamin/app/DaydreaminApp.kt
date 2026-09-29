@@ -52,6 +52,10 @@ class DaydreaminApp : Application() {
         // Keeps a copy of the library in Download/Daydreamin so it survives an uninstall.
         com.daydreamin.app.data.prefs.AutoBackup.start(this, prefs, appScope)
 
+        // One background check for a newer release — there's no Play Store here to do this
+        // automatically. Fire-and-forget: nothing on screen waits on it.
+        com.daydreamin.app.data.update.UpdateChecker.start(prefs, appScope)
+
         Log.d(TAG, "DaydreaminApp.onCreate() done at +${SystemClock.elapsedRealtime() - processStartAtMs}ms")
     }
 

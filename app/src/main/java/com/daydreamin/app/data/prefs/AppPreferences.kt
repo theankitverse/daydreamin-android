@@ -49,6 +49,7 @@ class AppPreferences(private val context: Context) {
         val AVATAR_STAMP = androidx.datastore.preferences.core.longPreferencesKey("avatar_stamp")
         val AUTO_BACKUP_URI = stringPreferencesKey("auto_backup_uri")
         val AUTO_BACKUP_AT = androidx.datastore.preferences.core.longPreferencesKey("auto_backup_at")
+        val DISMISSED_UPDATE_VERSION = intPreferencesKey("dismissed_update_version")
     }
 
     val accentName: Flow<String> = context.dataStore.data.map { it[Keys.ACCENT_NAME] ?: "Violet" }
@@ -115,6 +116,10 @@ class AppPreferences(private val context: Context) {
         if (uri == null) it.remove(Keys.AUTO_BACKUP_URI) else it[Keys.AUTO_BACKUP_URI] = uri
         it[Keys.AUTO_BACKUP_AT] = atMs
     }
+
+    /** The versionCode of the update banner you last dismissed on Home — see [com.daydreamin.app.data.update.UpdateChecker]. */
+    val dismissedUpdateVersion: Flow<Int> = context.dataStore.data.map { it[Keys.DISMISSED_UPDATE_VERSION] ?: 0 }
+    suspend fun setDismissedUpdateVersion(code: Int) = edit { it[Keys.DISMISSED_UPDATE_VERSION] = code }
 
     val likedIds: Flow<Set<String>> = context.dataStore.data.map { it[Keys.LIKED_IDS] ?: emptySet() }
 

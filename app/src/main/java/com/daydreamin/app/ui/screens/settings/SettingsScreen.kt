@@ -42,11 +42,13 @@ import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.CloudDone
+import androidx.compose.material.icons.rounded.Coffee
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material.icons.rounded.Sensors
 import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material3.Icon
@@ -58,6 +60,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -96,6 +99,7 @@ import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.HazeTint
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -246,7 +250,9 @@ fun SettingsScreen(onBack: () -> Unit) {
             // ---- About
             item { Section("About") }
             item { AboutCard() }
+            item { SupportRow() }
             item { CreatorRow() }
+            item { UpdateRow() }
             item { ExtractorRow(extractor, onCheck = vm::testExtractor) }
         }
 
@@ -471,6 +477,72 @@ private fun CreatorRow() {
             Spacer(Modifier.width(4.dp))
             Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(15.dp))
         }
+    }
+}
+
+/** The maker's optional, unrelated "buy me a coffee" — the app itself stays free either way. */
+@Composable
+private fun SupportRow() {
+    val context = LocalContext.current
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .semantics(mergeDescendants = true) { contentDescription = "Support this project — Buy Me a Coffee" }
+            .pressable(role = Role.Button, onClick = { com.daydreamin.app.ui.components.Support.open(context) })
+            .padding(horizontal = Space.gutter, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RowIcon(Icons.Rounded.Coffee)
+        Column(Modifier.weight(1f).padding(start = 14.dp)) {
+            Text("Support this project", style = MaterialTheme.typography.titleMedium, color = Color.White)
+            Text("Daydreamin is free. Buy me a coffee if you'd like to help keep it going.", style = MaterialTheme.typography.bodySmall, color = Muted)
+        }
+        Spacer(Modifier.width(12.dp))
+        Row(
+            Modifier.glass(Radius.pill, Glass.Clear).padding(start = 14.dp, end = 10.dp, top = 7.dp, bottom = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Donate", style = MaterialTheme.typography.labelLarge, color = Color.White)
+            Spacer(Modifier.width(4.dp))
+            Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(15.dp))
+        }
+    }
+}
+
+/** The same background check Home's banner reads from, plus a manual "Check now" for whenever you want it. */
+@Composable
+private fun UpdateRow() {
+    val state by com.daydreamin.app.data.update.UpdateChecker.state.collectAsState()
+    val scope = rememberCoroutineScope()
+    val checking = state.status == com.daydreamin.app.data.update.UpdateStatus.CHECKING
+    Row(Modifier.fillMaxWidth().padding(horizontal = Space.gutter, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.align(Alignment.Top)) { RowIcon(Icons.Rounded.NewReleases) }
+        Column(Modifier.weight(1f).padding(start = 14.dp)) {
+            Text("App updates", style = MaterialTheme.typography.titleMedium, color = Color.White)
+            AnimatedContent(targetState = state.status, transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(120)) }, label = "updateCheck") { s ->
+                Text(
+                    when (s) {
+                        com.daydreamin.app.data.update.UpdateStatus.IDLE -> "You're on version ${BuildConfig.VERSION_NAME}."
+                        com.daydreamin.app.data.update.UpdateStatus.CHECKING -> "Checking…"
+                        com.daydreamin.app.data.update.UpdateStatus.UP_TO_DATE -> "You're on the latest version (${BuildConfig.VERSION_NAME})."
+                        com.daydreamin.app.data.update.UpdateStatus.AVAILABLE -> "Version ${state.remote?.versionName} is available — see the banner on Home."
+                        com.daydreamin.app.data.update.UpdateStatus.FAILED -> "Couldn't check — you may be offline."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Muted,
+                )
+            }
+        }
+        Spacer(Modifier.width(12.dp))
+        Text(
+            if (checking) "…" else "Check",
+            style = MaterialTheme.typography.labelLarge,
+            color = Color.White,
+            modifier = Modifier
+                .then(if (!checking) Modifier.pressable(onClick = { scope.launch { com.daydreamin.app.data.update.UpdateChecker.checkNow() } }) else Modifier)
+                .glass(Radius.pill, Glass.Clear)
+                .padding(horizontal = 14.dp, vertical = 7.dp),
+        )
     }
 }
 
