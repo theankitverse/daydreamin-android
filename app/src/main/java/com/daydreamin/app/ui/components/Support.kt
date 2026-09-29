@@ -10,9 +10,7 @@ import android.net.Uri
  * unrelated way to support it if you'd like to. Shown in Settings → About.
  */
 object Support {
-    // TODO(Ankit): set this to your real Buy Me a Coffee username before announcing it widely —
-    // https://www.buymeacoffee.com/ — then this page goes live automatically, nothing else to change.
-    const val BUY_ME_A_COFFEE_USERNAME = "ankitchaurasiya"
+    const val BUY_ME_A_COFFEE_USERNAME = "theankitverse"
     private const val URL = "https://www.buymeacoffee.com/$BUY_ME_A_COFFEE_USERNAME"
 
     fun open(context: Context) {
