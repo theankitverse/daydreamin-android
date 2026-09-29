@@ -2,6 +2,7 @@ package com.daydreamin.app.data.repository
 
 import com.daydreamin.app.data.model.LyricsResponse
 import com.daydreamin.app.data.model.Song
+import com.daydreamin.app.data.remote.AppleChartSong
 import com.daydreamin.app.data.remote.ItunesRssEntry
 import com.daydreamin.app.data.remote.ItunesSearchItem
 import com.daydreamin.app.data.remote.LrcLibEntry
@@ -67,9 +68,29 @@ class MusicRepository {
         YouTubeExtractorService.fetchPlaylistTracks(playlistUrl).map { it.toSong() }
     }
 
-    suspend fun chart(): Result<List<Song>> = safeCall {
-        itunes.chart().feed.entry.map { it.toSong() }
+    /**
+     * What's being streamed most in [country] (Apple Music), falling back to the iTunes Store
+     * chart if that feed is down. The store chart ranks paid downloads, so it's the weaker
+     * signal — ringtones and novelty buys are filtered out of it.
+     */
+    suspend fun popular(country: String): Result<List<Song>> = safeCall {
+        val streamed = runCatching {
+            NetworkModule.appleCharts.mostPlayed(country.lowercase()).feed.results.map { it.toSong() }
+        }.getOrDefault(emptyList())
+        streamed.ifEmpty {
+            itunes.chart(country.lowercase()).feed.entry.map { it.toSong() }
+                .filterNot { s -> NOVELTY.containsMatchIn(s.title) }
+        }
     }
+
+    private fun AppleChartSong.toSong() = Song(
+        id = id,
+        title = name,
+        artist = artistName,
+        cover = artworkUrl100.replace("100x100bb", "200x200bb"),
+        coverXl = artworkUrl100.replace("100x100bb", "600x600bb"),
+        genre = genres.firstOrNull()?.name ?: "Music",
+    )
 
     /**
      * Resolves a playable stream URL for [song] and, as a bonus, YouTube's related tracks for
@@ -181,13 +202,16 @@ class MusicRepository {
 
 fun YtTrack.toSong() = Song(
     id = videoId,
-    title = cleanVideoTitle(title),
+    title = withoutArtistPrefix(cleanVideoTitle(title), cleanChannelName(artist)),
     artist = cleanChannelName(artist),
     cover = thumbnail,
     coverXl = thumbnail,
     duration = durationSeconds,
     videoId = videoId,
 )
+
+/** Things that chart on the iTunes Store but aren't songs anyone wants recommended. */
+private val NOVELTY = Regex("""\b(ringtone|ring tone|alarm|notification sound)\b""", RegexOption.IGNORE_CASE)
 
 /** Clutter that video titles carry and song titles don't. */
 private val TITLE_TAIL = Regex(
@@ -208,6 +232,13 @@ internal fun cleanVideoTitle(raw: String): String {
         if (m != null && m.range.first > 0) t = t.substring(0, m.range.first)
     }
     return t.trim().trimEnd('-', '–', '—', ':', '|').trim().ifBlank { raw.trim() }
+}
+
+/** "Taylor Swift - Anti-Hero" by Taylor Swift -> "Anti-Hero": the artist is already shown under the title. */
+internal fun withoutArtistPrefix(title: String, artist: String): String {
+    if (artist.isBlank()) return title
+    val m = Regex("""^\s*${Regex.escape(artist)}\s*[-–—:|]\s*(.+)$""", RegexOption.IGNORE_CASE).find(title) ?: return title
+    return m.groupValues[1].trim().ifBlank { title }
 }
 
 /** YouTube's auto-generated artist channels: "Arijit Singh - Topic" -> "Arijit Singh"; "ArijitSinghVEVO" -> "ArijitSingh". */

@@ -13,6 +13,10 @@ import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.playlist.PlaylistInfoItem
 import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubeSearchQueryHandlerFactory
+import org.schabi.newpipe.extractor.localization.ContentCountry
+import org.schabi.newpipe.extractor.localization.Localization
+import org.schabi.newpipe.extractor.stream.AudioTrackType
+import org.schabi.newpipe.extractor.stream.DeliveryMethod
 import org.schabi.newpipe.extractor.stream.StreamInfo
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
 
@@ -86,8 +90,30 @@ object YouTubeExtractorService {
 
     private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    fun init() {
-        NewPipe.init(NewPipeDownloader())
+    /**
+     * [country] matters for everything YouTube returns — search ranking, radio mixes, trending.
+     * Without it the extractor defaults to Great Britain, so every result was UK-regioned.
+     */
+    fun init(country: String) {
+        NewPipe.init(
+            NewPipeDownloader(),
+            Localization(java.util.Locale.getDefault().language.ifBlank { "en" }, country),
+            ContentCountry(country),
+        )
+    }
+
+    /** What's trending in music on YouTube in this region right now (YouTube Charts). */
+    suspend fun trendingMusic(limit: Int = 30): List<YtTrack> = withContext(Dispatchers.IO) {
+        runCatching {
+            val kiosk = service.kioskList.getExtractorById("trending_music", null)
+            kiosk.fetchPage()
+            kiosk.initialPage.items
+                .filterIsInstance<StreamInfoItem>()
+                .filter { it.duration in 60..600 } // songs, not shorts or hour-long compilations
+                .take(limit)
+                .mapNotNull { it.toYtTrack() }
+        }.onFailure { Log.w("YtExtract", "trendingMusic failed: ${it.message}") }
+            .getOrDefault(emptyList())
     }
 
     /** Fire-and-forget warm-up for a video we already know we'll likely play soon. */
@@ -226,11 +252,17 @@ object YouTubeExtractorService {
     private fun extractStream(videoId: String): ResolvedStream {
         try {
             val info = StreamInfo.getInfo(service, "https://www.youtube.com/watch?v=$videoId")
-            // Highest bitrate wins; Opus is more efficient than AAC per bit, so it breaks ties
+            // Only plain progressive files, and only the video's original audio: videos dubbed
+            // into several languages (or with an audio-description track) list those as extra
+            // streams, and "highest bitrate" alone could land on one of them.
+            val playable = info.audioStreams.orEmpty()
+                .filter { !it.content.isNullOrBlank() && it.deliveryMethod == DeliveryMethod.PROGRESSIVE_HTTP }
+            val original = playable.filter { it.audioTrackType == null || it.audioTrackType == AudioTrackType.ORIGINAL }
+            // Highest bitrate wins (in practice Opus ~160 kbps, the best YouTube serves without
+            // Premium); Opus is more efficient than AAC per bit, so it breaks ties
             // (and near-ties — a couple kbps apart is noise, not a real quality difference).
-            val audio = info.audioStreams
-                ?.filter { !it.content.isNullOrBlank() }
-                ?.maxWithOrNull(
+            val audio = original.ifEmpty { playable }
+                .maxWithOrNull(
                     compareBy<org.schabi.newpipe.extractor.stream.AudioStream> { it.averageBitrate.coerceAtLeast(0) / 16 }
                         .thenBy { if (it.format?.name?.contains("OPUS", ignoreCase = true) == true) 1 else 0 }
                 )

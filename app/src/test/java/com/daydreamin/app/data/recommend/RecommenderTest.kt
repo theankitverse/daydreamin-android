@@ -19,6 +19,14 @@ class RecommenderTest {
         assertEquals("Who", cleanVideoTitle("Who | Official MV"))
     }
 
+    @Test fun `titles don't repeat the artist shown under them`() {
+        assertEquals("Anti-Hero", com.daydreamin.app.data.repository.withoutArtistPrefix("Taylor Swift - Anti-Hero", "Taylor Swift"))
+        assertEquals("Anti-Hero", com.daydreamin.app.data.repository.withoutArtistPrefix("taylor swift – Anti-Hero", "Taylor Swift"))
+        assertEquals("Kesariya", com.daydreamin.app.data.repository.withoutArtistPrefix("Kesariya", "Arijit Singh"))
+        // Someone else's name in front is a different song ("Drake - Nice For What" by a lyric channel) — left alone.
+        assertEquals("Drake - Nice For What", com.daydreamin.app.data.repository.withoutArtistPrefix("Drake - Nice For What", "Lyrics Hub"))
+    }
+
     @Test fun `channel names read as artists`() {
         assertEquals("Arijit Singh", cleanChannelName("Arijit Singh - Topic"))
         assertEquals("Krishna Das", Recommender.primaryArtist("Krishna Das Music"))

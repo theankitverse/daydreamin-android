@@ -74,7 +74,7 @@ class MainActivity : ComponentActivity() {
         // The system launch screen can only show the still icon, so it hands over as soon as the
         // app can draw: we note exactly where it drew the icon and draw the same icon there
         // ourselves, then LaunchIntro animates the wordmark in beneath it and waits for Home's
-        // songs (requested the instant the process started — DaydreaminApp.chartPrefetch).
+        // songs (being fetched since the process started — DaydreaminApp.homeFeed).
         val splash = installSplashScreen()
 
         // Render the icon ourselves, centered at the platform's splash-icon size, before the first

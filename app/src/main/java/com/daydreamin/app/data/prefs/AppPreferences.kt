@@ -73,7 +73,8 @@ class AppPreferences(private val context: Context) {
     val crossfadeSeconds: Flow<Int> = context.dataStore.data.map { it[Keys.CROSSFADE_SECONDS] ?: 3 }
     suspend fun setCrossfadeSeconds(value: Int) = edit { it[Keys.CROSSFADE_SECONDS] = value }
 
-    val audioNormalization: Flow<Boolean> = context.dataStore.data.map { it[Keys.AUDIO_NORMALIZATION] ?: true }
+    /** Off unless you turn it on: most of what plays is mastered loud already, and boosting it costs clarity. */
+    val audioNormalization: Flow<Boolean> = context.dataStore.data.map { it[Keys.AUDIO_NORMALIZATION] ?: false }
     suspend fun setAudioNormalization(value: Boolean) = edit { it[Keys.AUDIO_NORMALIZATION] = value }
 
     val downloadWifiOnly: Flow<Boolean> = context.dataStore.data.map { it[Keys.DOWNLOAD_WIFI_ONLY] ?: true }

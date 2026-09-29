@@ -4,6 +4,7 @@ import android.media.audiofx.Equalizer
 import android.util.Log
 
 private const val TAG = "AudioEqualizer"
+private const val EQ_BOOST_MB = 450
 
 /** Presets applied as real band-gain curves via [android.media.audiofx.Equalizer], not the
  *  platform's own built-in presets — those vary by OEM/device (different band counts, center
@@ -45,9 +46,9 @@ fun applyPreset(equalizer: Equalizer, preset: EqPreset) {
         return
     }
     val range = equalizer.bandLevelRange
-    // 65% of the effect engine's own max gain — clearly audible without leaning into clipping
-    // or the harsh, over-processed sound a full-strength boost tends to produce.
-    val boostMb = (range[1] * 0.65).toInt().toShort()
+    // +4.5 dB: clearly audible, and small enough to stay inside the headroom playback leaves
+    // (the old 65%-of-max was ~+10 dB on most devices, which clipped on loud tracks).
+    val boostMb = minOf(range[1].toInt(), EQ_BOOST_MB).toShort()
     val numBands = equalizer.numberOfBands
     for (band in 0 until numBands) {
         val freqHz = equalizer.getCenterFreq(band.toShort()) / 1000

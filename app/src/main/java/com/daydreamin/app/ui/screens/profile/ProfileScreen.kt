@@ -69,6 +69,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.daydreamin.app.DaydreaminApp
 import com.daydreamin.app.data.model.Song
+import com.daydreamin.app.data.recommend.Recommender
 import com.daydreamin.app.player.PlayerController
 import com.daydreamin.app.ui.components.AmbientGlow
 import com.daydreamin.app.ui.components.Artwork
@@ -96,11 +97,14 @@ private data class TopArtist(val name: String, val songs: List<Song>)
 private fun topArtist(history: List<Song>): TopArtist? =
     history
         .filter { it.artist.isNotBlank() && !it.artist.equals("Unknown", ignoreCase = true) }
-        .groupBy { it.artist.trim().lowercase() }
+        // Grouped the way recommendations are: "Arijit Singh - Topic" and "Arijit Singh" are one
+        // artist, and a record label's channel (T-Series, Saregama…) isn't an artist at all.
+        .groupBy { Recommender.artistKey(it.artist) }
+        .filterKeys { it.isNotBlank() && !Recommender.isLabel(it) }
         .values
         .maxByOrNull { it.size }
         ?.takeIf { it.size >= 2 }
-        ?.let { TopArtist(it.first().artist.trim(), it) }
+        ?.let { TopArtist(Recommender.primaryArtist(it.first().artist), it) }
 
 /**
  * You, as a listener: your collection at a glance, the artist you've been playing most lately,

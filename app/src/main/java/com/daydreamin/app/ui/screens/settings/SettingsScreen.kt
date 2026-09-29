@@ -173,7 +173,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                 ToggleRow(
                     icon = Icons.AutoMirrored.Rounded.VolumeUp,
                     title = "Loudness boost",
-                    body = "Lifts overall volume by about 6 dB without clipping. It doesn’t even out loudness between songs — YouTube doesn’t provide the data for that.",
+                    body = "Lifts quieter songs by about 3 dB. Most music is mastered loud already, so leave this off for the cleanest sound.",
                     checked = normalization,
                     onChange = vm::setAudioNormalization,
                 )

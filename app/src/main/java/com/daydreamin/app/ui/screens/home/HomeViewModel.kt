@@ -14,6 +14,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -34,9 +36,6 @@ val moodCards = listOf(
     MoodCard("Devotional", "devotional bhajan kirtan", 0xFFFDBA74),
     MoodCard("Feel Good", "feel good happy songs", 0xFF86EFAC),
 )
-
-/** The chart — only shown before there's enough listening to personalize from. */
-data class ChartState(val loading: Boolean = true, val songs: List<Song> = emptyList(), val error: String? = null)
 
 /** A mood tile's songs, shown in place of the feed until you go back. */
 data class MoodBrowse(val mood: MoodCard, val loading: Boolean = true, val songs: List<Song> = emptyList(), val error: String? = null)
@@ -60,27 +59,23 @@ class HomeViewModel : ViewModel() {
     val playlists: StateFlow<List<Playlist>> = app.prefs.playlists
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    private val _chart = MutableStateFlow(ChartState())
-    val chart: StateFlow<ChartState> = _chart
-
     private val _browse = MutableStateFlow<MoodBrowse?>(null)
     val browse: StateFlow<MoodBrowse?> = _browse
 
-    // The first chart load reuses DaydreaminApp's chartPrefetch (in flight since process start).
-    private var isFirstLoad = true
     private var moodJob: Job? = null
 
     init {
         Log.d(TAG, "HomeViewModel created at +${SystemClock.elapsedRealtime() - app.processStartAtMs}ms since process start")
-        loadChart()
+        // Chart songs come without a YouTube video yet; warm up the likeliest taps so they start instantly.
+        viewModelScope.launch {
+            feed.filterNotNull().distinctUntilChangedBy { it.generatedAtMs }.collect { f -> if (f.isPopular) prefetchTop(f.topPicks) }
+        }
     }
 
-    /** "New mix" — rebuilds your recommendations now. Runs in the app's scope so leaving Home doesn't cancel it. */
+    /** "New mix" / retry — rebuilds Home now. Runs in the app's scope so leaving Home doesn't cancel it. */
     fun refreshMix() {
         app.appScope.launch { app.homeFeed.refresh() }
     }
-
-    fun retryChart() = loadChart()
 
     fun openMood(mood: MoodCard) {
         _browse.value = MoodBrowse(mood)
@@ -94,24 +89,6 @@ class HomeViewModel : ViewModel() {
 
     fun retryMood() {
         _browse.value?.mood?.let { loadMood(it) }
-    }
-
-    private fun loadChart() {
-        _chart.value = _chart.value.copy(loading = true, error = null)
-        val usingPrefetch = isFirstLoad
-        isFirstLoad = false
-        viewModelScope.launch {
-            val result = if (usingPrefetch) app.chartPrefetch.await() else repo.chart()
-            result.fold(
-                onSuccess = { songs ->
-                    if (usingPrefetch) Log.d(TAG, "trending list ready at +${SystemClock.elapsedRealtime() - app.processStartAtMs}ms since process start (${songs.size} songs)")
-                    _chart.value = ChartState(loading = false, songs = songs)
-                    // Only worth warming up when the chart is what Home actually leads with.
-                    if (hasTaste.value == false) prefetchTop(songs)
-                },
-                onFailure = { e -> _chart.value = ChartState(loading = false, error = friendlyError(e)) },
-            )
-        }
     }
 
     private fun loadMood(mood: MoodCard) {

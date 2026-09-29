@@ -31,7 +31,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -91,11 +95,31 @@ fun MiniPlayer(
     val blur = remember {
         HazeStyle(backgroundColor = BgBase, tints = listOf(HazeTint(Color.Black.copy(alpha = 0.32f))), blurRadius = 34.dp, noiseFactor = 0.05f)
     }
+    val open by androidx.compose.runtime.rememberUpdatedState(onClick)
     Box(
         modifier = modifier
             .padding(horizontal = 10.dp)
             .fillMaxWidth()
             .height(64.dp)
+            // Pushing the mini player up opens Now Playing, same as a tap — the mirror of pulling the
+            // player down to close it. Fires once per gesture, as soon as it's clearly meant.
+            .pointerInput(Unit) {
+                val openPx = 32.dp.toPx()
+                val flingPx = 800.dp.toPx()
+                val tracker = VelocityTracker()
+                var pulled = 0f
+                var opened = false
+                detectVerticalDragGestures(
+                    onDragStart = { tracker.resetTracking(); pulled = 0f; opened = false },
+                    onVerticalDrag = { change, dy ->
+                        change.consume()
+                        pulled += dy
+                        tracker.addPosition(change.uptimeMillis, Offset(0f, pulled))
+                        if (!opened && pulled < -openPx) { opened = true; open() }
+                    },
+                    onDragEnd = { if (!opened && tracker.calculateVelocity().y < -flingPx) { opened = true; open() } },
+                )
+            }
             .pressable(onClick = onClick)
             .shadow(elevation = 18.dp, shape = MiniShape, ambientColor = Color.Black, spotColor = Color.Black)
             .clip(MiniShape)

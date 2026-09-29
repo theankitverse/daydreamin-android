@@ -87,13 +87,18 @@ import java.util.Locale
  */
 @Composable
 fun rememberSmoothPosition(progress: State<PlaybackProgress>, isPlaying: Boolean): State<Long> {
-    val smooth = remember { mutableLongStateOf(progress.value.positionMs) }
-    val anchor = remember { longArrayOf(progress.value.positionMs, SystemClock.elapsedRealtime()) }
-    val reported = progress.value.positionMs
-    LaunchedEffect(reported) {
-        anchor[0] = reported
-        anchor[1] = SystemClock.elapsedRealtime()
-        if (!isPlaying) smooth.longValue = reported
+    // The reports are watched from an effect, never read during composition: a read here would
+    // recompose the whole calling screen on every tick — twice a second, mid-gesture included.
+    val initial = remember { androidx.compose.runtime.snapshots.Snapshot.withoutReadObservation { progress.value.positionMs } }
+    val smooth = remember { mutableLongStateOf(initial) }
+    val anchor = remember { longArrayOf(initial, SystemClock.elapsedRealtime()) }
+    val playing by androidx.compose.runtime.rememberUpdatedState(isPlaying)
+    LaunchedEffect(progress) {
+        androidx.compose.runtime.snapshotFlow { progress.value.positionMs }.collect { reported ->
+            anchor[0] = reported
+            anchor[1] = SystemClock.elapsedRealtime()
+            if (!playing) smooth.longValue = reported
+        }
     }
     LaunchedEffect(isPlaying) {
         if (!isPlaying) { smooth.longValue = anchor[0]; return@LaunchedEffect }

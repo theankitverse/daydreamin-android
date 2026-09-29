@@ -76,6 +76,7 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -141,11 +142,13 @@ fun NowPlayingScreen(
     val lyrics by lyricsVm.state.collectAsState()
     val song = meta.currentSong
     val position = rememberSmoothPosition(progressState, meta.isPlaying)
+    // Only the duration is needed here, and it changes once a song — not on every position tick.
+    val durationMs by remember { androidx.compose.runtime.derivedStateOf { progressState.value.durationMs } }
     // Between tapping a song and the player having it (the stream being found), the player reports
     // neither playing nor buffering — but no duration is known yet, which is the tell.
     // Capped at 20s, so a song that never loads can't leave a spinner running forever.
     val gaveUpWaiting by androidx.compose.runtime.produceState(false, song?.playId) { value = false; delay(20_000); value = true }
-    val loading = meta.isBuffering || (song != null && !gaveUpWaiting && !meta.isPlaying && progressState.value.durationMs <= 0L)
+    val loading = meta.isBuffering || (song != null && !gaveUpWaiting && !meta.isPlaying && durationMs <= 0L)
     val light = rememberArtworkLight(song?.cover?.ifBlank { song.artworkUrl }, DefaultLight)
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -187,21 +190,38 @@ fun NowPlayingScreen(
     // and always lands in event order; only the settle-back spring below needs a coroutine, once.
     var dragY by remember { mutableFloatStateOf(0f) }
     val dismissPx = with(density) { 140.dp.toPx() }
-    val dismiss = {
-        scope.launch { animate(dragY, 0f, animationSpec = spring(dampingRatio = 0.9f, stiffness = 300f)) { v, _ -> dragY = v } }
-        onBack()
+    val flingPx = with(density) { 1_000.dp.toPx() } // px/s: a flick this fast decides on its own, however short
+    // Closing leaves the pull where the finger let go: the sheet collapses into the mini player
+    // from there (the flight is measured in this screen's moved coordinates, so it still lands
+    // exactly). Springing the pull back to 0 at the same time made the player jump up as it closed.
+    val dismiss = { onBack() }
+    val settle = remember { arrayOfNulls<kotlinx.coroutines.Job>(1) }
+    val settleBack = { velocity: Float ->
+        settle[0] = scope.launch { animate(dragY, 0f, initialVelocity = velocity, animationSpec = spring(dampingRatio = 0.8f, stiffness = 400f)) { v, _ -> dragY = v.coerceAtLeast(0f) } }
     }
     val dragToDismiss = Modifier.pointerInput(Unit) {
+        val tracker = VelocityTracker()
+        var pulled = 0f // uncoerced, so an upward flick past the top still reads as upward
         detectVerticalDragGestures(
+            // Catching the sheet mid-settle takes it from where it is, instead of fighting the spring.
+            onDragStart = { settle[0]?.cancel(); tracker.resetTracking(); pulled = dragY },
             onVerticalDrag = { change, dy ->
                 change.consume()
-                dragY = (dragY + dy).coerceAtLeast(0f)
+                pulled += dy
+                // Fed the finger's travel, not change.position — that's local to a sheet moving with the finger.
+                tracker.addPosition(change.uptimeMillis, Offset(0f, pulled))
+                dragY = pulled.coerceAtLeast(0f)
             },
             onDragEnd = {
-                if (dragY > dismissPx) dismiss()
-                else scope.launch { animate(dragY, 0f, animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f)) { v, _ -> dragY = v } }
+                val velocity = tracker.calculateVelocity().y
+                val close = when {
+                    velocity > flingPx -> true
+                    velocity < -flingPx -> false
+                    else -> dragY > dismissPx
+                }
+                if (close) dismiss() else settleBack(velocity)
             },
-            onDragCancel = { scope.launch { animate(dragY, 0f, animationSpec = spring(dampingRatio = 0.9f, stiffness = 300f)) { v, _ -> dragY = v } } },
+            onDragCancel = { settleBack(0f) },
         )
     }
 
@@ -310,7 +330,7 @@ fun NowPlayingScreen(
             Column(modifier = Modifier.padding(horizontal = Gutter).padding(bottom = 10.dp)) {
                 Scrubber(
                     position = { position.value },
-                    durationMs = progressState.value.durationMs,
+                    durationMs = durationMs,
                     accent = light.key,
                     onSeek = PlayerController::seekTo,
                 )

@@ -14,8 +14,9 @@ interface ITunesApi {
         @Query("country") country: String = "IN",
     ): ItunesSearchResponse
 
-    @GET("in/rss/topsongs/limit=25/json")
-    suspend fun chart(): ItunesRssResponse
+    /** The iTunes Store's paid-download chart — only a fallback now; see [AppleChartsApi]. */
+    @GET("{country}/rss/topsongs/limit=50/json")
+    suspend fun chart(@retrofit2.http.Path("country") country: String): ItunesRssResponse
 }
 
 @Serializable

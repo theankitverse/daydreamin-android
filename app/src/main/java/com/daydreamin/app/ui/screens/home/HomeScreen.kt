@@ -165,7 +165,6 @@ fun HomeScreen(
     val refreshing by vm.refreshing.collectAsState()
     val hasTaste by vm.hasTaste.collectAsState()
     val feedFailed by vm.feedFailed.collectAsState()
-    val chart by vm.chart.collectAsState()
     val browse by vm.browse.collectAsState()
     val history by vm.history.collectAsState()
     val liked by vm.liked.collectAsState()
@@ -174,13 +173,7 @@ fun HomeScreen(
     val nowPlaying by remember { derivedStateOf { NowPlaying(meta.value.currentSong?.playId, meta.value.isPlaying) } }
     BackHandler(enabled = browse != null) { vm.closeMood() }
 
-    // Personal once there's anything to go on; the chart only before that.
-    val personal = hasTaste != false
-    val lead = when {
-        browse != null -> browse?.songs?.firstOrNull()
-        personal -> feed?.topPicks?.firstOrNull() ?: history.firstOrNull()
-        else -> chart.songs.firstOrNull()
-    }
+    val lead = if (browse != null) browse?.songs?.firstOrNull() else feed?.heroMix?.firstOrNull() ?: history.firstOrNull()
     val light = rememberArtworkLight(lead?.cover?.ifBlank { lead.artworkUrl }, fallback = DefaultLight)
 
     val listState = rememberLazyListState()
@@ -209,18 +202,17 @@ fun HomeScreen(
                     moodResults(mood, nowPlaying = { nowPlaying }, onBack = vm::closeMood, onRetry = vm::retryMood)
                 } else {
                     item(key = "greeting") { Greeting() }
-                    if (personal) {
-                        forYou(
-                            feed = feed,
-                            refreshing = refreshing,
-                            failed = feedFailed,
-                            light = light,
-                            nowPlaying = { nowPlaying },
-                            onRefresh = vm::refreshMix,
-                        )
-                    } else {
-                        startingOut(chart, light, nowPlaying = { nowPlaying }, onRetry = vm::retryChart)
+                    if (feed?.isPopular == true || (feed == null && hasTaste == false)) {
+                        item(key = "taste-hint") { TasteHint(Modifier.animateItem()) }
                     }
+                    forYou(
+                        feed = feed,
+                        refreshing = refreshing,
+                        failed = feedFailed,
+                        light = light,
+                        nowPlaying = { nowPlaying },
+                        onRefresh = vm::refreshMix,
+                    )
                     if (history.isNotEmpty()) {
                         item(key = "recent") {
                             Section(title = "Recently played", modifier = Modifier.animateItem()) {
@@ -240,7 +232,7 @@ fun HomeScreen(
                             }
                         }
                     }
-                    if (personal) feed?.shelves?.forEach { shelf -> feedShelf(shelf, nowPlaying = { nowPlaying }) }
+                    feed?.shelves?.forEach { shelf -> feedShelf(shelf, nowPlaying = { nowPlaying }) }
                     item(key = "moods") {
                         Section(title = "Moods & moments", modifier = Modifier.animateItem()) { MoodGrid(vm::openMood) }
                     }
@@ -260,7 +252,7 @@ fun HomeScreen(
 
 // ---------------------------------------------------------------- feeds
 
-/** Your mix and your top picks — or their placeholders while the first one is being built. */
+/** The mix and the list under it — yours, or what's popular where you are — or placeholders while the first one is built. */
 private fun LazyListScope.forYou(
     feed: HomeFeed?,
     refreshing: Boolean,
@@ -277,8 +269,12 @@ private fun LazyListScope.forYou(
             }
             item(key = "top-picks") {
                 Section(
-                    title = "Top picks for you",
-                    subtitle = "Picked from what you play and like",
+                    title = if (feed.isPopular) "Top songs in ${regionName(feed.region)}" else "Top picks for you",
+                    subtitle = when {
+                        feed.isPopular -> "Most played right now"
+                        feed.toppedUp -> "From what you've played so far, plus what's popular"
+                        else -> "Picked from what you play and like"
+                    },
                     modifier = Modifier.animateItem(),
                 ) {
                     QuickPicksGrid(feed.topPicks.take(QUICK_PICK_ROWS * 5), nowPlaying) { index, _ ->
@@ -289,7 +285,7 @@ private fun LazyListScope.forYou(
         }
         failed && !refreshing -> item(key = "mix-error") {
             ErrorPanel(
-                title = "Couldn't build your mix",
+                title = "Couldn't load Home",
                 message = "You may be offline. Your library and recent plays are below.",
                 onRetry = onRefresh,
                 modifier = Modifier.animateItem(),
@@ -302,33 +298,7 @@ private fun LazyListScope.forYou(
     }
 }
 
-/** Before there's any listening to learn from: the chart, and a line about what Home becomes. */
-private fun LazyListScope.startingOut(chart: ChartState, light: ArtworkLight, nowPlaying: () -> NowPlaying, onRetry: () -> Unit) {
-    item(key = "taste-hint") { TasteHint(Modifier.animateItem()) }
-    when {
-        chart.loading -> {
-            item(key = "spotlight-loading") { HeroPlaceholder(Modifier.animateItem()) }
-            item(key = "quick-loading") { QuickPicksPlaceholder(Modifier.animateItem()) }
-        }
-        chart.error != null -> item(key = "chart-error") { ErrorPanel("Couldn't load the charts", chart.error, onRetry, Modifier.animateItem()) }
-        else -> {
-            chart.songs.firstOrNull()?.let { top ->
-                item(key = "spotlight") {
-                    val np = nowPlaying()
-                    Spotlight(top, light, isCurrent = np.playId == top.playId, isPlaying = np.isPlaying, modifier = Modifier.animateItem())
-                }
-            }
-            val picks = chart.songs.drop(1).take(QUICK_PICK_ROWS * 5)
-            if (picks.isNotEmpty()) {
-                item(key = "trending") {
-                    Section(title = "Trending now", subtitle = "Tap a song to start a radio", modifier = Modifier.animateItem()) {
-                        QuickPicksGrid(picks, nowPlaying) { _, song -> PlayerController.playSong(song) }
-                    }
-                }
-            }
-        }
-    }
-}
+private fun regionName(region: String?): String = region?.let { com.daydreamin.app.data.recommend.PopularFeed.regionName(it) } ?: "your country"
 
 /** A row of recommendations; tapping a song plays the rest of the row after it. */
 private fun LazyListScope.feedShelf(shelf: FeedShelf, nowPlaying: () -> NowPlaying) {
@@ -487,7 +457,7 @@ private fun Section(title: String, modifier: Modifier = Modifier, subtitle: Stri
  */
 @Composable
 private fun MixHero(feed: HomeFeed, light: ArtworkLight, refreshing: Boolean, nowPlaying: NowPlaying, onRefresh: () -> Unit, modifier: Modifier = Modifier) {
-    val picks = feed.topPicks
+    val picks = feed.heroMix
     val playingFromMix = picks.any { it.playId == nowPlaying.playId }
     val library by com.daydreamin.app.DaydreaminApp.instance.prefs.playlists.collectAsState(initial = emptyList())
     val mixUrl = "daydreamin:mix:${feed.generatedAtMs}"
@@ -515,10 +485,10 @@ private fun MixHero(feed: HomeFeed, light: ArtworkLight, refreshing: Boolean, no
         Column(Modifier.matchParentSize().padding(Space.gutter)) {
             Row(verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f)) {
-                    Text("MADE FOR YOU", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.72f))
+                    Text(if (feed.isPopular) "POPULAR RIGHT NOW" else "MADE FOR YOU", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.72f))
                     Spacer(Modifier.height(Space.xs))
                     Text(
-                        "Your Daydream Mix",
+                        if (feed.isPopular) "Hits in ${regionName(feed.region)}" else "Your Daydream Mix",
                         style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold, fontSize = 24.sp, lineHeight = 28.sp, letterSpacing = (-0.6).sp),
                         color = Color.White,
                         maxLines = 2,
@@ -526,7 +496,7 @@ private fun MixHero(feed: HomeFeed, light: ArtworkLight, refreshing: Boolean, no
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        basedOnLine(feed.basedOn, picks.size),
+                        if (feed.isPopular) "Most played and trending there right now · ${picks.size} songs" else basedOnLine(feed.basedOn, picks.size),
                         style = MaterialTheme.typography.bodySmall,
                         color = Color.White.copy(alpha = 0.74f),
                         maxLines = 2,
@@ -535,7 +505,7 @@ private fun MixHero(feed: HomeFeed, light: ArtworkLight, refreshing: Boolean, no
                 }
                 Spacer(Modifier.width(Space.m))
                 Mosaic(
-                    picks.take(4),
+                    picks.distinctBy { it.artworkUrl }.take(4),
                     size = 104.dp,
                     modifier = Modifier.shadow(elevation = 18.dp, shape = Radius.cardShape, ambientColor = Color.Black, spotColor = Color.Black),
                 )
@@ -556,10 +526,10 @@ private fun MixHero(feed: HomeFeed, light: ArtworkLight, refreshing: Boolean, no
                 HeroButton(if (saved) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder, if (saved) "Saved to your library" else "Save to your library") {
                     if (saved) com.daydreamin.app.ui.components.Toaster.show("Already in your library")
                     else SongActions.savePlaylist(
-                        name = "Daydream Mix · " + SimpleDateFormat("d MMM", Locale.getDefault()).format(Date(feed.generatedAtMs)),
+                        name = (if (feed.isPopular) "Hits in ${regionName(feed.region)} · " else "Daydream Mix · ") + SimpleDateFormat("d MMM", Locale.getDefault()).format(Date(feed.generatedAtMs)),
                         songs = picks,
                         sourceUrl = mixUrl,
-                        author = "Made for you",
+                        author = if (feed.isPopular) "Charts" else "Made for you",
                     )
                 }
                 Spacer(Modifier.weight(1f))
@@ -623,70 +593,6 @@ private fun TasteHint(modifier: Modifier = Modifier) {
                 "Play or like a few songs you love — Home will start building mixes and picks around them.",
                 style = MaterialTheme.typography.bodySmall,
                 color = TextSecondary,
-            )
-        }
-    }
-}
-
-/**
- * The chart's #1, for someone just starting out: lit by its own artwork, the cover floating on
- * the right.
- */
-@Composable
-private fun Spotlight(song: Song, light: ArtworkLight, isCurrent: Boolean, isPlaying: Boolean, modifier: Modifier = Modifier) {
-    val onPlay = { if (isCurrent) PlayerController.togglePlayPause() else PlayerController.playSong(song) }
-    Box(
-        modifier = modifier
-            .padding(horizontal = Space.gutter)
-            .fillMaxWidth()
-            .height(216.dp)
-            .pressable(onClick = onPlay)
-            .shadow(elevation = 30.dp, shape = Radius.panelShape, ambientColor = light.key, spotColor = light.key)
-            .clip(Radius.panelShape)
-            .background(Color.Black),
-    ) {
-        ArtworkBackdrop(url = song.artworkUrl, modifier = Modifier.matchParentSize(), blur = 34.dp)
-        Box(
-            Modifier
-                .matchParentSize()
-                .background(Brush.horizontalGradient(0f to Color.Black.copy(alpha = 0.66f), 0.55f to Color.Black.copy(alpha = 0.40f), 1f to Color.Black.copy(alpha = 0.18f)))
-                .background(Brush.verticalGradient(0.45f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.30f))),
-        )
-        Box(Modifier.matchParentSize().glass(Radius.panelShape, Glass.Clear))
-        Row(modifier = Modifier.matchParentSize().padding(Space.gutter)) {
-            Column(modifier = Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.SpaceBetween) {
-                Text("NO. 1 TODAY", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.72f))
-                Column {
-                    Text(
-                        song.title,
-                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold, fontSize = 24.sp, lineHeight = 28.sp, letterSpacing = (-0.6).sp),
-                        color = Color.White,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Spacer(Modifier.height(3.dp))
-                    Text(song.artist, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.74f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                val playingThis = isCurrent && isPlaying
-                AnimatedContent(
-                    targetState = playingThis,
-                    transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(120)) using SizeTransform(clip = false) },
-                    label = "spotlightPlay",
-                ) { playing ->
-                    SolidPillButton(
-                        label = if (playing) "Pause" else "Play",
-                        icon = if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                        onClick = onPlay,
-                    )
-                }
-            }
-            Spacer(Modifier.width(Space.m))
-            Artwork(
-                url = song.artworkUrl,
-                shape = Radius.cardShape,
-                modifier = Modifier
-                    .size(216.dp - Space.gutter * 2)
-                    .shadow(elevation = 22.dp, shape = Radius.cardShape, ambientColor = Color.Black, spotColor = Color.Black),
             )
         }
     }

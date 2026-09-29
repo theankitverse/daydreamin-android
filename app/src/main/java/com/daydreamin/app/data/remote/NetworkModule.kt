@@ -49,4 +49,5 @@ object NetworkModule {
 
     val itunes: ITunesApi by lazy { retrofit("https://itunes.apple.com/").create(ITunesApi::class.java) }
     val lrcLib: LrcLibApi by lazy { retrofit("https://lrclib.net/").create(LrcLibApi::class.java) }
+    val appleCharts: AppleChartsApi by lazy { retrofit("https://rss.marketingtools.apple.com/").create(AppleChartsApi::class.java) }
 }

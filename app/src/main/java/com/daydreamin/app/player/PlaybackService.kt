@@ -9,7 +9,13 @@ import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.cache.CacheDataSource
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.analytics.AnalyticsListener
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.Renderer
+import androidx.media3.exoplayer.audio.AudioRendererEventListener
+import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -22,8 +28,15 @@ import kotlinx.coroutines.launch
 
 private const val TAG = "PlaybackService"
 
-/** A modest, audible loudness boost — not true per-track ReplayGain-style normalization (that needs pre-analyzed loudness data YouTube doesn't give us), but a real DSP effect, not a fake toggle. */
-private const val LOUDNESS_TARGET_GAIN_MB = 600 // +6dB
+/**
+ * The optional loudness boost. Kept small: most tracks on YouTube are mastered loud already
+ * (-6 to -9 LUFS is typical), and every dB added past that is a dB the effect's limiter has to
+ * squash back down — at +6 dB that was audible distortion.
+ */
+private const val LOUDNESS_TARGET_GAIN_MB = 300 // +3dB
+
+/** -4.5 dB, matching the equalizer presets' boost (see AudioEqualizer). */
+private const val EQ_HEADROOM_VOLUME = 0.6f
 
 /**
  * Hosts the ExoPlayer instance + MediaSession. Once this is running as a foreground
@@ -33,9 +46,10 @@ private const val LOUDNESS_TARGET_GAIN_MB = 600 // +6dB
 class PlaybackService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
+    private var player: ExoPlayer? = null
     private var loudnessEnhancer: LoudnessEnhancer? = null
     private var equalizer: Equalizer? = null
-    @Volatile private var normalizationEnabled = true
+    @Volatile private var normalizationEnabled = false
     @Volatile private var eqPreset: EqPreset = EqPreset.OFF
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
@@ -67,24 +81,36 @@ class PlaybackService : MediaSessionService() {
         // headphone unplug *and* a Bluetooth device disconnect, not just wired. No extra
         // BroadcastReceiver needed for any of that; logged below for visibility, not because
         // we're implementing the behavior ourselves.
-        val player = ExoPlayer.Builder(this)
+        // Audio goes through HeadroomAudioRenderer: it gives Android's Opus decoder room for the
+        // over-full-scale peaks loud masters carry, which it would otherwise hard-clip.
+        val renderers = object : DefaultRenderersFactory(this) {
+            override fun buildAudioRenderers(
+                context: android.content.Context,
+                extensionRendererMode: Int,
+                mediaCodecSelector: MediaCodecSelector,
+                enableDecoderFallback: Boolean,
+                audioSink: AudioSink,
+                eventHandler: android.os.Handler,
+                eventListener: AudioRendererEventListener,
+                out: java.util.ArrayList<Renderer>,
+            ) {
+                out.add(HeadroomAudioRenderer(context, codecAdapterFactory, mediaCodecSelector, enableDecoderFallback, eventHandler, eventListener, audioSink))
+            }
+        }
+        val player = ExoPlayer.Builder(this, renderers)
             .setAudioAttributes(audioAttributes, /* handleAudioFocus = */ true)
             .setHandleAudioBecomingNoisy(true)
             .setMediaSourceFactory(DefaultMediaSourceFactory(cacheDataSourceFactory))
             .build()
+        this.player = player
 
-        // Now that transitions between songs are gapless (instant, no natural pause to mask
-        // anything), the beat of near-silence YouTube rips often have at the start/end of a
-        // track becomes noticeable as a soft "dead air" moment right at the cut. ExoPlayer's
-        // built-in silence skipper trims exactly that — leading, trailing, and any mid-track
-        // silence below a fixed amplitude threshold — using fade-in/fade-out ramps around each
-        // skip (not a hard cut) and deliberately leaves a touch of residual quiet audio rather
-        // than absolute silence, so it never reads as a jump. A true overlapping crossfade
-        // would need a second concurrent player instance to mix into the first — a real
-        // architecture change that risks the gapless pre-buffering mechanism just built and
-        // verified — so this is the right-sized fix for the actual symptom (dead air at the
-        // boundary), not a reach for the fancier-sounding one.
-        player.setSkipSilenceEnabled(true)
+        // No silence skipping: its defaults cut 80% out of anything quieter than -30 dBFS for
+        // 100ms — quiet intros, rests, the breath before a chorus — which played as small jumps.
+        player.addAnalyticsListener(object : AnalyticsListener {
+            override fun onAudioUnderrun(eventTime: AnalyticsListener.EventTime, bufferSize: Int, bufferSizeMs: Long, elapsedSinceLastFeedMs: Long) {
+                Log.w(TAG, "audio underrun at ${player.currentPosition}ms (buffer ${bufferSizeMs}ms, ${elapsedSinceLastFeedMs}ms since last feed)")
+            }
+        })
 
         // onAudioSessionIdChanged only fires when the id *changes* — but ExoPlayer assigns its
         // session id during construction, before this listener exists, so relying on the
@@ -138,6 +164,9 @@ class PlaybackService : MediaSessionService() {
             DaydreaminApp.instance.prefs.equalizerPreset.collect { presetName ->
                 eqPreset = EqPreset.fromLabel(presetName)
                 equalizer?.let { applyPreset(it, eqPreset) }
+                // The equalizer boosts after the player's volume is applied, so a boost needs the
+                // same amount of room made below it, or boosted bands clip on loud tracks.
+                player?.volume = if (eqPreset == EqPreset.OFF) 1f else EQ_HEADROOM_VOLUME
             }
         }
 

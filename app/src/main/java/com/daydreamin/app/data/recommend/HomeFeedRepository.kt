@@ -2,6 +2,7 @@ package com.daydreamin.app.data.recommend
 
 import android.util.Log
 import com.daydreamin.app.DaydreaminApp
+import com.daydreamin.app.data.Region
 import com.daydreamin.app.data.model.Song
 import com.daydreamin.app.data.repository.toSong
 import com.daydreamin.app.data.taste.TasteProfile
@@ -35,7 +36,7 @@ data class FeedShelf(
     val songs: List<Song>,
 )
 
-/** Everything personal on Home, built from your taste and kept on disk between launches. */
+/** What Home shows — your mix, or (before there's any listening to go on) what's popular where you are. Kept on disk between launches. */
 @Serializable
 data class HomeFeed(
     val generatedAtMs: Long,
@@ -44,7 +45,22 @@ data class HomeFeed(
     val basedOn: List<String>,
     val topPicks: List<Song>,
     val shelves: List<FeedShelf> = emptyList(),
-)
+    val kind: String = KIND_PERSONAL,
+    /** The country a popular feed was built for (ISO code). */
+    val region: String? = null,
+    /** What the hero plays, when it's more than [topPicks] (a popular feed blends several charts). */
+    val mix: List<Song> = emptyList(),
+    /** A personal mix too short on its own, filled out with popular songs after yours. */
+    val toppedUp: Boolean = false,
+) {
+    val isPopular: Boolean get() = kind == KIND_POPULAR
+    val heroMix: List<Song> get() = mix.ifEmpty { topPicks }
+
+    companion object {
+        const val KIND_PERSONAL = "personal"
+        const val KIND_POPULAR = "popular"
+    }
+}
 
 /**
  * Home's recommendations, entirely on-device. From your plays, likes and skips
@@ -81,23 +97,25 @@ class HomeFeedRepository(private val app: DaydreaminApp) {
         app.appScope.launch {
             _feed.value = readCache()
             refreshIfNeeded()
-            // Keep up with a listening session: rebuild after every few new plays.
+            // Keep up with a listening session: rebuild after every few new plays — sooner the
+            // first time, so someone new sees Home start to follow them after a couple of songs.
             TasteProfile.playsThisSession.collect { plays ->
-                if (plays - playsAtLastBuild >= REBUILD_AFTER_PLAYS) refresh()
+                val since = plays - playsAtLastBuild
+                if (since >= REBUILD_AFTER_PLAYS || (_feed.value?.isPopular == true && since >= FIRST_PERSONAL_AFTER_PLAYS)) refresh()
             }
         }
     }
 
-    /** Rebuilds only if the feed is missing, old, or no longer matches what you've been playing. */
+    /** Rebuilds only if the feed is missing, old, the wrong kind, or no longer matches what you've been playing. */
     suspend fun refreshIfNeeded() {
-        val scores = currentScores()
-        val seeds = Recommender.seeds(scores)
+        val seeds = Recommender.seeds(currentScores())
         _hasTaste.value = seeds.isNotEmpty()
-        if (seeds.isEmpty()) return
         val current = _feed.value
         val stale = current == null ||
             System.currentTimeMillis() - current.generatedAtMs > MAX_AGE_MS ||
-            seeds.map { it.song.playId }.count { it !in current.seedIds } >= 2
+            current.isPopular != seeds.isEmpty() ||
+            (current.isPopular && current.region != Region.country) ||
+            (!current.isPopular && seeds.map { it.song.playId }.count { it !in current.seedIds } >= 2)
         if (stale) refresh()
     }
 
@@ -114,7 +132,7 @@ class HomeFeedRepository(private val app: DaydreaminApp) {
                 writeCache(built)
                 built.topPicks.take(2).forEach { s -> s.videoId?.let(YouTubeExtractorService::prefetch) }
             } else if (_feed.value == null) {
-                _failed.value = _hasTaste.value == true
+                _failed.value = true
             }
             return built != null
         } finally {
@@ -137,27 +155,42 @@ class HomeFeedRepository(private val app: DaydreaminApp) {
         val scores = Recommender.songScores(history, liked, stats)
         val seeds = Recommender.seeds(scores)
         _hasTaste.value = seeds.isNotEmpty()
-        if (seeds.isEmpty()) return@withContext null
+        val skipped = stats.values.filter { it.mostlySkipped }.map { Recommender.titleKey(it.song.title) }.toSet()
+
+        // Nothing to go on yet: what's popular where you are, from the live charts.
+        if (seeds.isEmpty()) {
+            return@withContext PopularFeed.compose(popularSources(), skipped, Region.country)
+                ?.also { Log.d(TAG, "built popular feed for ${it.region}: ${it.topPicks.size} top songs, ${it.shelves.size} shelves") }
+        }
 
         // New songs, mostly: keep out what you just heard and what's already in your likes
         // (those have their own shelf), and anything you keep skipping.
         val recent = history.take(40).map { Recommender.titleKey(it.title) }
         val likedKeys = liked.map { Recommender.titleKey(it.title) }
-        val skipped = stats.values.filter { it.mostlySkipped }.map { Recommender.titleKey(it.song.title) }
         val exclude = (recent + likedKeys + skipped).toSet()
 
+        // A mix grown from one or two songs is narrow; until there's more to go on, the charts
+        // fill in below it.
+        val thin = seeds.size < THIN_SEEDS
         val gate = Semaphore(3)
-        val mixes = coroutineScope {
-            seeds.map { seed -> async { gate.withPermit { seed to mixFor(seed, exclude) } } }.awaitAll()
-        }.filter { it.second.isNotEmpty() }
+        val (mixes, popular) = coroutineScope {
+            val popular = if (thin) async { popularSources() } else null
+            val mixes = seeds.map { seed -> async { gate.withPermit { seed to mixFor(seed, exclude) } } }.awaitAll()
+            mixes.filter { it.second.isNotEmpty() } to popular?.await()
+        }
         if (mixes.isEmpty()) {
             Log.w(TAG, "no radio mixes came back for ${seeds.size} seeds")
-            return@withContext null
+            return@withContext popular?.let { PopularFeed.compose(it, skipped, Region.country) }
         }
 
         val affinity = Recommender.artistAffinity(scores)
         val ranked = Recommender.rank(mixes, affinity, exclude)
-        val topPicks = ranked.capPerArtist(3).take(30)
+        // One or two seeds can give a tiny mix (a new album's radio is mostly that artist, and the
+        // per-artist cap trims it hard); topped up from the charts, yours first, it stays a real list.
+        val personalPicks = ranked.capPerArtist(3).take(30)
+        val topPicks = if (popular != null && personalPicks.size < MIN_PICKS) {
+            PopularFeed.topUp(personalPicks, popular, exclude, target = 30)
+        } else personalPicks
         val featured = topPicks.take(12).map { Recommender.titleKey(it.title) }.toSet()
 
         val shelves = buildList {
@@ -174,6 +207,7 @@ class HomeFeedRepository(private val app: DaydreaminApp) {
                 .capPerArtist(1)
                 .take(15)
             if (fresh.size >= 5) add(FeedShelf("fresh", "Fresh finds", "Artists you haven't played yet", fresh))
+            popular?.let { addAll(PopularFeed.supportingShelves(it, exclude + featured, Region.country)) }
         }
 
         HomeFeed(
@@ -182,7 +216,17 @@ class HomeFeedRepository(private val app: DaydreaminApp) {
             basedOn = seeds.map { Recommender.primaryArtist(it.song.artist) }.filter { it.isNotBlank() }.distinct().take(3),
             topPicks = topPicks,
             shelves = shelves,
-        ).also { Log.d(TAG, "built: ${it.topPicks.size} picks, ${it.shelves.size} shelves from ${seeds.size} seeds (${mixes.size} mixes)") }
+            toppedUp = topPicks.size > personalPicks.size,
+        ).also { Log.d(TAG, "built: ${it.topPicks.size} picks (${personalPicks.size} personal), ${it.shelves.size} shelves from ${seeds.size} seeds (${mixes.size} mixes)") }
+    }
+
+    /** The live charts for your region, fetched together; any one of them failing just leaves it empty. */
+    private suspend fun popularSources(): PopularSources = coroutineScope {
+        val region = Region.country
+        val regional = async { app.repository.popular(region).getOrDefault(emptyList()) }
+        val trending = async { YouTubeExtractorService.trendingMusic().map { it.toSong() } }
+        val global = async { if (region == "US") emptyList() else app.repository.popular("US").getOrDefault(emptyList()) }
+        PopularSources(regional.await(), trending.await(), global.await())
     }
 
     /** The seed's YouTube Music radio. Finds its video first if we've never played it (an imported like, say). */
@@ -229,6 +273,11 @@ class HomeFeedRepository(private val app: DaydreaminApp) {
     private companion object {
         const val MAX_AGE_MS = 6 * 60 * 60 * 1000L
         const val REBUILD_AFTER_PLAYS = 6
+        const val FIRST_PERSONAL_AFTER_PLAYS = 2
+        /** Fewer seeds than this and the personal mix gets the charts' shelves below it too. */
+        const val THIN_SEEDS = 3
+        /** A personal mix shorter than this gets topped up from the charts. */
+        const val MIN_PICKS = 15
         const val BUILD_TIMEOUT_MS = 30_000L
     }
 }

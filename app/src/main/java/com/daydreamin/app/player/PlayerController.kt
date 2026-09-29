@@ -48,6 +48,9 @@ private const val PREPARE_AHEAD = 2
 private const val EARLY_SKIP_MIN_MS = 1_500L
 private const val EARLY_SKIP_MAX_MS = 30_000L
 
+/** A song's radio shorter than this (after the per-artist cap) gets extended — see autoFillQueueFor. */
+private const val MIN_RADIO_LENGTH = 15
+
 @Serializable
 enum class RepeatMode { OFF, ALL, ONE }
 
@@ -577,9 +580,17 @@ object PlayerController {
             )
             .build()
 
-    /** Resolves [song]'s radio mix (blended with a few different-artist liked-song mixes for
-     *  variety) and lands it as "Up Next", replacing the transient related-tracks list. Runs in
-     *  the background so it never blocks playback starting. */
+    /**
+     * Lands [song]'s YouTube Music radio as "Up Next", replacing the transient related-tracks
+     * list. Everything queued grows out of this one song — the session is about what you just
+     * chose to play. (This used to weave in radios of random liked songs by other artists, so a
+     * few songs in, the queue drifted to your usual listening regardless of what you'd started.)
+     *
+     * A radio can be narrow — one artist's catalog, a collab's two artists — and the per-artist
+     * cap then trims it short. In that case it's extended with the radios of a couple of its own
+     * tracks by other artists: more variety, still seeded by this song. Runs in the background so
+     * it never blocks playback starting.
+     */
     private suspend fun autoFillQueueFor(song: Song, resolved: ResolvedStream) {
         val recentTitles = app.prefs.history.first().take(15)
             .map { YouTubeExtractorService.normalizeTitleForDedup(it.title) }
@@ -590,38 +601,34 @@ object PlayerController {
             .map { it.toSong() }
             .filterNot { it.playId == song.playId }
 
-        // Blend in radios from a few DIFFERENT-artist liked songs — real variety, and what
-        // actually rescues a collab track (like a KR$NA x Seedhe Maut song) whose own radio
-        // mix otherwise stays narrowly within those same one or two artists. A single blend
-        // seed wasn't enough to counter that.
-        val blendSeeds = app.prefs.likedSongs.first()
-            .filterNot { it.playId == song.playId }
-            .filterNot { it.artist.trim().equals(song.artist.trim(), ignoreCase = true) }
-            .distinctBy { it.artist.trim().lowercase() }
-            .shuffled()
-            .take(3)
-
-        val secondaryMixes = coroutineScope {
-            blendSeeds.map { seed ->
-                async {
-                    val seedVideoId = seed.videoId
-                        ?: runCatching { YouTubeExtractorService.resolveForSong(seed.artist, seed.title).videoId }.getOrNull()
-                    seedVideoId?.let {
-                        YouTubeExtractorService.fetchRadioMix(it, seed.title, seed.artist, recentTitles)
-                            .map { t -> t.toSong() }
-                            .filterNot { s -> s.playId == song.playId }
-                    }.orEmpty()
-                }
-            }.awaitAll()
-        }
-
-        // No more than a few tracks per artist in the final queue, no matter how narrow the
-        // underlying mixes were — this is the actual fix for "up next is just the same one or
-        // two artists", applied uniformly to every song.
-        val radioTracks = interleaveMany(primaryMix, secondaryMixes)
+        // No more than a few tracks per artist, no matter how narrow the radio was.
+        var radioTracks = primaryMix
             .distinctBy { YouTubeExtractorService.normalizeTitleForDedup(it.title) }
             .capPerArtist(max = 3)
 
+        if (radioTracks.size < MIN_RADIO_LENGTH) {
+            val songArtist = song.artist.trim().lowercase()
+            val extenders = radioTracks
+                .filter { !it.videoId.isNullOrBlank() && it.artist.trim().lowercase() != songArtist }
+                .distinctBy { it.artist.trim().lowercase() }
+                .take(2)
+            val known = recentTitles + primaryMix.map { YouTubeExtractorService.normalizeTitleForDedup(it.title) }
+            val extensions = coroutineScope {
+                extenders.map { t ->
+                    async {
+                        runCatching { YouTubeExtractorService.fetchRadioMix(t.videoId!!, t.title, t.artist, known) }
+                            .getOrDefault(emptyList())
+                            .map { it.toSong() }
+                            .filterNot { it.playId == song.playId }
+                    }
+                }.awaitAll()
+            }
+            radioTracks = interleaveMany(radioTracks, extensions)
+                .distinctBy { YouTubeExtractorService.normalizeTitleForDedup(it.title) }
+                .capPerArtist(max = 3)
+        }
+
+        Log.d(TAG, "up next for '${song.title}': ${radioTracks.size} tracks from its radio (${primaryMix.size} before per-artist cap)")
         if (radioTracks.isNotEmpty() && _meta.value.currentSong?.playId == song.playId) {
             _meta.update { it.copy(queue = radioTracks) }
             prepareUpcoming()
@@ -681,7 +688,10 @@ object PlayerController {
     private fun onGaplessAdvance(mediaItem: MediaItem?) {
         val previousSong = _meta.value.currentSong
         val newCurrent = _meta.value.queue.firstOrNull() ?: return
-        if (mediaItem?.mediaId != newCurrent.playId) return
+        if (mediaItem?.mediaId != newCurrent.playId) {
+            Log.w(TAG, "player advanced to '${mediaItem?.mediaId}' but the queue's next is '${newCurrent.playId}' — the shown queue no longer matches playback")
+            return
+        }
         Log.d(TAG, "gapless advance to '${newCurrent.title}' (pre-buffered, no resolve/buffer wait)")
         lastKnownGoodSong = newCurrent
 
@@ -871,7 +881,7 @@ object PlayerController {
         _meta.update { it.copy(error = null) }
     }
 
-    /** Weaves each list in [secondaries] into [primary] every third slot instead of just appending them, so the blend doesn't read as "one song's radio, then a random tacked-on chunk". */
+    /** Weaves each list in [secondaries] into [primary] every third slot instead of just appending them, so an extended radio doesn't read as "one song's radio, then a tacked-on chunk". */
     private fun interleaveMany(primary: List<Song>, secondaries: List<List<Song>>): List<Song> {
         if (secondaries.all { it.isEmpty() }) return primary
         val leftovers = secondaries.map { ArrayDeque(it) }
