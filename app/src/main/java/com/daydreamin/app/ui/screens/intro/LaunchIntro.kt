@@ -46,9 +46,6 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.coroutines.flow.first
-import androidx.compose.runtime.snapshotFlow
 
 /** Same color as the system launch screen (res/values/colors.xml splash_background), so the handoff is invisible. */
 private val LaunchBackground = Color(0xFF0A0A12)
@@ -94,10 +91,9 @@ fun LaunchIntro(
     val exit = remember { Animatable(0f) }
 
     LaunchedEffect(Unit) {
-        // Start on the handoff itself: before it, the system launch screen still covers all this.
-        // (Fallback in case the system screen never reports — the intro still plays.) Gated on the
-        // single [icon] value so the logo and the wordmark always start on the same frame.
-        withTimeoutOrNull(700) { snapshotFlow { icon }.first { it != null } }
+        // Starts on this composable's very first frame — no wait. [icon] is already set by the
+        // time this exists (MainActivity renders it eagerly, before setContent), so the wordmark
+        // and the logo are always on screen together from the instant the system hands over.
         val start = SystemClock.elapsedRealtime()
         coroutineScope {
             letters.forEachIndexed { i, a ->

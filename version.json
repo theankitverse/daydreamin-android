@@ -1,6 +1,6 @@
 {
-  "versionCode": 4,
-  "versionName": "1.2.0",
+  "versionCode": 5,
+  "versionName": "1.2.1",
   "url": "https://github.com/theankitverse/daydreamin-android/releases/latest",
-  "notes": "Added UPI as a way to support the project. Fixed a launch-screen glitch, and smoothed out scrolling and the Now Playing / Queue swipe gestures."
+  "notes": "The launch-screen wordmark now animates in immediately instead of arriving late. Renamed the UPI row to \"Donate via UPI\"."
 }

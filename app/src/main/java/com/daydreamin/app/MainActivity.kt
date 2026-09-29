@@ -73,10 +73,26 @@ class MainActivity : ComponentActivity() {
         // ourselves, then LaunchIntro animates the wordmark in beneath it and waits for Home's
         // songs (requested the instant the process started — DaydreaminApp.chartPrefetch).
         val splash = installSplashScreen()
+
+        // Render the icon ourselves immediately, centered, rather than only from the system's exit
+        // callback: that callback fires whenever the OS gets around to it — a cold start under load
+        // can leave it visibly late — and until it fires, [introIcon] was null, so the wordmark
+        // (gated on it) sat there un-animated instead of arriving with the logo. This version is
+        // ready before the very first frame, so the wordmark always starts immediately. If the
+        // callback below does fire promptly, it replaces this with the system's exact icon and
+        // position; Android centers the splash icon by spec, so the swap is never visible.
+        val density = resources.displayMetrics.density
+        val fallbackPx = (240 * density).toInt()
+        val fallbackLeft = (resources.displayMetrics.widthPixels - fallbackPx) / 2
+        val fallbackTop = (resources.displayMetrics.heightPixels - fallbackPx) / 2
+        renderLauncherIcon(fallbackPx, fallbackPx)?.let { bmp ->
+            introIcon = LaunchIcon(bmp, IntRect(fallbackLeft, fallbackTop, fallbackLeft + fallbackPx, fallbackTop + fallbackPx))
+        }
+
         splash.setOnExitAnimationListener { provider ->
             // Launches not started from the home screen (a notification, a link, `am start`) can get a
-            // plain launch screen with no icon at all — and then iconView throws. The intro then
-            // simply draws the icon in its default spot.
+            // plain launch screen with no icon at all — and then iconView throws. The eager render
+            // above already covers that case.
             val iconView = runCatching { provider.iconView }.getOrNull()
             if (iconView != null && iconView.width > 0 && iconView.height > 0) {
                 val at = IntArray(2).also { iconView.getLocationInWindow(it) }

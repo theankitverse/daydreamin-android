@@ -520,14 +520,14 @@ private fun UpiRow() {
     Row(
         Modifier
             .fillMaxWidth()
-            .semantics(mergeDescendants = true) { contentDescription = "Pay via UPI — ${com.daydreamin.app.ui.components.Support.UPI_ID}" }
+            .semantics(mergeDescendants = true) { contentDescription = "Donate via UPI — ${com.daydreamin.app.ui.components.Support.UPI_ID}" }
             .pressable(role = Role.Button, onClick = { com.daydreamin.app.ui.components.Support.openUpi(context) })
             .padding(horizontal = Space.gutter, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RowIcon(Icons.Rounded.CurrencyRupee)
         Column(Modifier.weight(1f).padding(start = 14.dp)) {
-            Text("Pay via UPI", style = MaterialTheme.typography.titleMedium, color = Color.White)
+            Text("Donate via UPI", style = MaterialTheme.typography.titleMedium, color = Color.White)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(com.daydreamin.app.ui.components.Support.UPI_ID, style = MaterialTheme.typography.bodySmall, color = Muted, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                 Spacer(Modifier.width(6.dp))
@@ -544,7 +544,7 @@ private fun UpiRow() {
             Modifier.glass(Radius.pill, Glass.Clear).padding(start = 14.dp, end = 10.dp, top = 7.dp, bottom = 7.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Pay", style = MaterialTheme.typography.labelLarge, color = Color.White)
+            Text("Donate", style = MaterialTheme.typography.labelLarge, color = Color.White)
             Spacer(Modifier.width(4.dp))
             Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(15.dp))
         }
