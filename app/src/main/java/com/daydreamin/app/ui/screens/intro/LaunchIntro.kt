@@ -64,10 +64,18 @@ private const val INTRO_MIN_MS = LETTER_STAGGER_MS * (WORD.length - 1) + LETTER_
 private val EaseOutQuint = CubicBezierEasing(0.22f, 1f, 0.36f, 1f)
 
 /**
+ * The launch icon as the system drew it, and where. Captured as one value, in one state write,
+ * so the bitmap and its position are always observed together — never a frame where one has
+ * arrived and the other hasn't (that split is what used to show the logo and the wordmark
+ * arriving out of sync, or the wordmark skipping straight to its end state).
+ */
+data class LaunchIcon(val bitmap: ImageBitmap, val bounds: IntRect)
+
+/**
  * The launch screen, continued. The system launch screen can only show a still icon, so at the
- * moment it hands over, this draws the very same icon in the very same place ([logo] at
- * [logoBounds]) and brings the wordmark in beneath it: letters rise out of a soft blur one after
- * another in a violet-to-pink ramp, and a single glint of light passes across the word.
+ * moment it hands over, this draws the very same icon in the very same place ([icon]) and brings
+ * the wordmark in beneath it: letters rise out of a soft blur one after another in a
+ * violet-to-pink ramp, and a single glint of light passes across the word.
  *
  * It leaves once the wordmark has arrived *and* Home's songs are ready ([isReady]) — or after
  * [maxWaitMs] from process start regardless, so a slow network never traps you here — by fading
@@ -75,8 +83,7 @@ private val EaseOutQuint = CubicBezierEasing(0.22f, 1f, 0.36f, 1f)
  */
 @Composable
 fun LaunchIntro(
-    logo: ImageBitmap?,
-    logoBounds: IntRect?,
+    icon: LaunchIcon?,
     isReady: () -> Boolean,
     processStartAtMs: Long,
     maxWaitMs: Long,
@@ -88,8 +95,9 @@ fun LaunchIntro(
 
     LaunchedEffect(Unit) {
         // Start on the handoff itself: before it, the system launch screen still covers all this.
-        // (Fallback in case the system screen never reports — the intro still plays.)
-        withTimeoutOrNull(700) { snapshotFlow { logoBounds }.first { it != null } }
+        // (Fallback in case the system screen never reports — the intro still plays.) Gated on the
+        // single [icon] value so the logo and the wordmark always start on the same frame.
+        withTimeoutOrNull(700) { snapshotFlow { icon }.first { it != null } }
         val start = SystemClock.elapsedRealtime()
         coroutineScope {
             letters.forEachIndexed { i, a ->
@@ -125,15 +133,15 @@ fun LaunchIntro(
     ) {
         // Where the launch screen had the icon; a centered 240dp box if it didn't tell us.
         val fallbackPx = with(density) { 240.dp.roundToPx() }
-        val bounds = logoBounds ?: IntRect(
+        val bounds = icon?.bounds ?: IntRect(
             left = (constraints.maxWidth - fallbackPx) / 2,
             top = (constraints.maxHeight - fallbackPx) / 2,
             right = (constraints.maxWidth + fallbackPx) / 2,
             bottom = (constraints.maxHeight + fallbackPx) / 2,
         )
-        if (logo != null) {
+        if (icon != null) {
             Image(
-                bitmap = logo,
+                bitmap = icon.bitmap,
                 contentDescription = null,
                 modifier = Modifier
                     .offset { IntOffset(bounds.left, bounds.top) }

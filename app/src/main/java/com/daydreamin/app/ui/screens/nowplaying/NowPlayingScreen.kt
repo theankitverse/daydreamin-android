@@ -7,6 +7,7 @@ import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -53,6 +54,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -178,23 +180,27 @@ fun NowPlayingScreen(
     DisposableEffect(Unit) { onDispose { PlayerSheet.expansion = 0f } }
 
     // ---- drag down to dismiss
-    val dragY = remember { Animatable(0f) }
+    // A plain float, not an Animatable driven through scope.launch { snapTo(...) } per drag event:
+    // that spawns a new coroutine for every pointer move (dozens per gesture), all racing to write
+    // the same Animatable — the visible symptom is a jittery pull. Direct assignment is synchronous
+    // and always lands in event order; only the settle-back spring below needs a coroutine, once.
+    var dragY by remember { mutableFloatStateOf(0f) }
     val dismissPx = with(density) { 140.dp.toPx() }
     val dismiss = {
-        scope.launch { dragY.animateTo(0f, spring(dampingRatio = 0.9f, stiffness = 300f)) }
+        scope.launch { animate(dragY, 0f, animationSpec = spring(dampingRatio = 0.9f, stiffness = 300f)) { v, _ -> dragY = v } }
         onBack()
     }
     val dragToDismiss = Modifier.pointerInput(Unit) {
         detectVerticalDragGestures(
             onVerticalDrag = { change, dy ->
                 change.consume()
-                scope.launch { dragY.snapTo((dragY.value + dy).coerceAtLeast(0f)) }
+                dragY = (dragY + dy).coerceAtLeast(0f)
             },
             onDragEnd = {
-                if (dragY.value > dismissPx) dismiss()
-                else scope.launch { dragY.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = 400f)) }
+                if (dragY > dismissPx) dismiss()
+                else scope.launch { animate(dragY, 0f, animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f)) { v, _ -> dragY = v } }
             },
-            onDragCancel = { scope.launch { dragY.animateTo(0f) } },
+            onDragCancel = { scope.launch { animate(dragY, 0f, animationSpec = spring(dampingRatio = 0.9f, stiffness = 300f)) { v, _ -> dragY = v } } },
         )
     }
 
@@ -216,7 +222,7 @@ fun NowPlayingScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .graphicsLayer { translationY = dragY.value }
+            .graphicsLayer { translationY = dragY }
             .onGloballyPositioned { stageCoords = it }
             .drawBehind { drawRect(Color.Black.copy(alpha = (e() * 1.7f).coerceIn(0f, 1f))) },
     ) {

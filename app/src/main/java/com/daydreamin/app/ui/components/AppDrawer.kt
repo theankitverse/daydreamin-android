@@ -41,6 +41,7 @@ import com.daydreamin.app.DaydreaminApp
 import com.daydreamin.app.ui.theme.Glass
 import com.daydreamin.app.ui.theme.Radius
 import com.daydreamin.app.ui.theme.glass
+import dev.chrisbanes.haze.HazeInputScale
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.hazeEffect
@@ -68,7 +69,7 @@ fun AppDrawerContent(
     val name by DaydreaminApp.instance.prefs.userName.collectAsState(initial = "")
     ModalDrawerSheet(
         drawerContainerColor = Color.Transparent,
-        modifier = Modifier.hazeEffect(state = hazeState, style = glassStyle),
+        modifier = Modifier.hazeEffect(state = hazeState, style = glassStyle) { inputScale = HazeInputScale.Auto },
     ) {
         Column(Modifier.fillMaxHeight().statusBarsPadding().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 20.dp)) {
             Row(

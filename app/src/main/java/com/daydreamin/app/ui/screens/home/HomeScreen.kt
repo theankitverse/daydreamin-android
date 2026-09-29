@@ -353,6 +353,7 @@ private fun HomeTopBar(haze: HazeState, statusTop: Dp, scrollY: () -> Float, onS
             .fillMaxWidth()
             .height(statusTop + TopBarHeight + 16.dp)
             .hazeEffect(haze, style) {
+                inputScale = dev.chrisbanes.haze.HazeInputScale.Auto
                 progressive = HazeProgressive.verticalGradient(
                     startY = solidUntilPx,
                     startIntensity = 1f,

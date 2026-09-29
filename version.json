@@ -1,6 +1,6 @@
 {
-  "versionCode": 3,
-  "versionName": "1.1.1",
+  "versionCode": 4,
+  "versionName": "1.2.0",
   "url": "https://github.com/theankitverse/daydreamin-android/releases/latest",
-  "notes": "Fixed the Buy Me a Coffee link in Settings."
+  "notes": "Added UPI as a way to support the project. Fixed a launch-screen glitch, and smoothed out scrolling and the Now Playing / Queue swipe gestures."
 }

@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.IntRect
+import com.daydreamin.app.ui.screens.intro.LaunchIcon
 import com.daydreamin.app.ui.screens.intro.LaunchIntro
 import com.daydreamin.app.ui.screens.onboarding.OnboardingScreen
 import androidx.compose.runtime.LaunchedEffect
@@ -33,9 +34,12 @@ import com.daydreamin.app.ui.theme.accentByName
 
 class MainActivity : ComponentActivity() {
 
-    /** The launch icon as the system drew it, and where — handed from the system launch screen to [LaunchIntro]. */
-    private var introLogo by mutableStateOf<ImageBitmap?>(null)
-    private var introLogoBounds by mutableStateOf<IntRect?>(null)
+    /**
+     * The launch icon as the system drew it, and where — handed from the system launch screen to
+     * [LaunchIntro]. Set in one write (never the bitmap and the bounds separately): [LaunchIntro]
+     * waits on this single value, so the logo and its wordmark animation always start together.
+     */
+    private var introIcon by mutableStateOf<LaunchIcon?>(null)
 
     /**
      * The launcher icon drawn the way the launch screen draws it: the adaptive icon (background +
@@ -73,11 +77,11 @@ class MainActivity : ComponentActivity() {
             // Launches not started from the home screen (a notification, a link, `am start`) can get a
             // plain launch screen with no icon at all — and then iconView throws. The intro then
             // simply draws the icon in its default spot.
-            val icon = runCatching { provider.iconView }.getOrNull()
-            if (icon != null && icon.width > 0 && icon.height > 0) {
-                val at = IntArray(2).also { icon.getLocationInWindow(it) }
-                introLogoBounds = IntRect(at[0], at[1], at[0] + icon.width, at[1] + icon.height)
-                introLogo = renderLauncherIcon(icon.width, icon.height)
+            val iconView = runCatching { provider.iconView }.getOrNull()
+            if (iconView != null && iconView.width > 0 && iconView.height > 0) {
+                val at = IntArray(2).also { iconView.getLocationInWindow(it) }
+                val bounds = IntRect(at[0], at[1], at[0] + iconView.width, at[1] + iconView.height)
+                renderLauncherIcon(iconView.width, iconView.height)?.let { bmp -> introIcon = LaunchIcon(bmp, bounds) }
             }
             // Let our copy of the icon draw underneath first (two frames), so there's never a frame
             // between the system screen leaving and the intro's icon appearing.
@@ -116,8 +120,7 @@ class MainActivity : ComponentActivity() {
                     if (showIntro) {
                         val app = DaydreaminApp.instance
                         LaunchIntro(
-                            logo = introLogo,
-                            logoBounds = introLogoBounds,
+                            icon = introIcon,
                             isReady = { app.chartPrefetch.isCompleted },
                             processStartAtMs = app.processStartAtMs,
                             maxWaitMs = MAX_INTRO_WAIT_MS,

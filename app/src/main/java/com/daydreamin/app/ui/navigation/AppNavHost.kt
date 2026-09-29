@@ -121,6 +121,7 @@ fun AppNavHost() {
                             // Fades away as Now Playing opens and back as it closes into the mini player.
                             .graphicsLayer { alpha = 1f - PlayerSheet.expansion }
                             .hazeEffect(state = hazeState, style = chromeStyle) {
+                            inputScale = dev.chrisbanes.haze.HazeInputScale.Auto
                             progressive = HazeProgressive.verticalGradient(
                                 easing = androidx.compose.animation.core.FastOutSlowInEasing,
                                 startY = 0f,

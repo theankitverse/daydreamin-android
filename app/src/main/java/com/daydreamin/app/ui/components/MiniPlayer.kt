@@ -53,6 +53,7 @@ import com.daydreamin.app.ui.theme.TextPrimary
 import com.daydreamin.app.ui.theme.TextSecondary
 import com.daydreamin.app.ui.theme.glass
 import com.daydreamin.app.ui.theme.rememberArtworkColor
+import dev.chrisbanes.haze.HazeInputScale
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.HazeTint
@@ -98,7 +99,7 @@ fun MiniPlayer(
             .pressable(onClick = onClick)
             .shadow(elevation = 18.dp, shape = MiniShape, ambientColor = Color.Black, spotColor = Color.Black)
             .clip(MiniShape)
-            .then(if (hazeState != null) Modifier.hazeEffect(hazeState, blur) else Modifier.background(BgBase))
+            .then(if (hazeState != null) Modifier.hazeEffect(hazeState, blur) { inputScale = HazeInputScale.Auto } else Modifier.background(BgBase))
             .background(Brush.horizontalGradient(listOf(tint.copy(alpha = 0.20f), tint.copy(alpha = 0.06f))))
             .glass(MiniShape, Glass.Regular),
     ) {

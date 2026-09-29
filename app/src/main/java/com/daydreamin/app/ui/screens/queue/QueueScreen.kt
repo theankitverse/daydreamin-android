@@ -5,6 +5,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -154,10 +155,14 @@ fun QueueScreen(visibility: AnimatedVisibilityScope, onBack: () -> Unit) {
         transitionSpec = { spring(dampingRatio = 0.88f, stiffness = 340f, visibilityThreshold = 0.001f) },
         label = "sheet",
     ) { if (it == EnterExitState.Visible) 0f else 1f }
-    val pull = remember { Animatable(0f) }
+    // A plain float, not an Animatable driven through scope.launch { snapTo(...) } per event: the
+    // latter spawns a new coroutine for every scroll/drag delta (dozens per gesture), and those
+    // race on the same Animatable — the visible symptom is a jittery pull. Only the settle-back
+    // spring below needs a coroutine, and only once per gesture end.
+    var pull by remember { mutableFloatStateOf(0f) }
     val dismissPx = with(density) { 130.dp.toPx() }
     fun release() {
-        if (pull.value > dismissPx) onBack() else scope.launch { pull.animateTo(0f, spring(dampingRatio = 0.72f, stiffness = 420f)) }
+        if (pull > dismissPx) onBack() else scope.launch { animate(pull, 0f, animationSpec = spring(dampingRatio = 0.72f, stiffness = 420f)) { v, _ -> pull = v } }
     }
 
     // ---- local mirror of the queue, so rows can move under the finger before the engine hears about it
@@ -215,9 +220,9 @@ fun QueueScreen(visibility: AnimatedVisibilityScope, onBack: () -> Unit) {
     val sheetPull = remember {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                if (pull.value > 0f && available.y < 0f && reorder.key == null) {
-                    val used = maxOf(available.y, -pull.value)
-                    scope.launch { pull.snapTo(pull.value + used) }
+                if (pull > 0f && available.y < 0f && reorder.key == null) {
+                    val used = maxOf(available.y, -pull)
+                    pull += used
                     return Offset(0f, used)
                 }
                 return Offset.Zero
@@ -225,14 +230,14 @@ fun QueueScreen(visibility: AnimatedVisibilityScope, onBack: () -> Unit) {
 
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
                 if (available.y > 0f && source == NestedScrollSource.UserInput && reorder.key == null) {
-                    scope.launch { pull.snapTo(pull.value + available.y * 0.9f) }
+                    pull += available.y * 0.9f
                     return Offset(0f, available.y)
                 }
                 return Offset.Zero
             }
 
             override suspend fun onPreFling(available: Velocity): Velocity {
-                if (pull.value > 0f) { release(); return available }
+                if (pull > 0f) { release(); return available }
                 return Velocity.Zero
             }
         }
@@ -251,7 +256,7 @@ fun QueueScreen(visibility: AnimatedVisibilityScope, onBack: () -> Unit) {
                 .fillMaxSize()
                 .statusBarsPadding()
                 .padding(top = 10.dp)
-                .graphicsLayer { translationY = pull.value + hidden.value * screenPx }
+                .graphicsLayer { translationY = pull + hidden.value * screenPx }
                 .glass(SheetShape, Glass.Clear, tint = Color(0xE00B0B0D)),
         ) {
             Box(Modifier.fillMaxSize().hazeSource(headerHaze)) {
@@ -357,12 +362,13 @@ fun QueueScreen(visibility: AnimatedVisibilityScope, onBack: () -> Unit) {
                     .fillMaxWidth()
                     .height(HeaderHeight)
                     .hazeEffect(headerHaze, headerStyle) {
+                        inputScale = dev.chrisbanes.haze.HazeInputScale.Auto
                         progressive = HazeProgressive.verticalGradient(startIntensity = 1f, endIntensity = 0f, startY = with(density) { 60.dp.toPx() }, endY = with(density) { HeaderHeight.toPx() }, preferPerformance = true)
                         alpha = scrolled
                     }
                     .pointerInput(Unit) {
                         detectVerticalDragGestures(
-                            onVerticalDrag = { change, dy -> change.consume(); scope.launch { pull.snapTo((pull.value + dy).coerceAtLeast(0f)) } },
+                            onVerticalDrag = { change, dy -> change.consume(); pull = (pull + dy).coerceAtLeast(0f) },
                             onDragEnd = ::release,
                             onDragCancel = ::release,
                         )
@@ -474,7 +480,9 @@ private fun QueueRow(
 ) {
     val scope = rememberCoroutineScope()
     val lift by animateFloatAsState(if (dragged) 1f else 0f, spring(dampingRatio = 0.6f, stiffness = 500f), label = "lift")
-    val swipe = remember(song.playId) { Animatable(0f) }
+    // A plain float rather than an Animatable driven through scope.launch { snapTo(...) } per drag
+    // event — see the sheet-pull note above for why that pattern jitters.
+    var swipeX by remember(song.playId) { mutableFloatStateOf(0f) }
     var menuOpen by remember { mutableStateOf(false) }
     var rowWidth by remember { mutableFloatStateOf(1f) }
     val density = LocalDensity.current
@@ -494,7 +502,7 @@ private fun QueueRow(
             },
     ) {
         // Revealed as the row slides left: a soft red wash, then the remove glyph.
-        val reveal = { (-swipe.value / (rowWidth * 0.35f)).coerceIn(0f, 1f) }
+        val reveal = { (-swipeX / (rowWidth * 0.35f)).coerceIn(0f, 1f) }
         Box(
             Modifier
                 .matchParentSize()
@@ -515,7 +523,7 @@ private fun QueueRow(
                 // Clipped at the row's resting bounds, so a swiped-away row slides out of its own
                 // lane instead of drawing over the screen edge.
                 .clip(Radius.cardShape)
-                .graphicsLayer { translationX = swipe.value; rowWidth = size.width.coerceAtLeast(1f) }
+                .graphicsLayer { translationX = swipeX; rowWidth = size.width.coerceAtLeast(1f) }
                 .clip(Radius.cardShape)
                 // The lifted row is the only one on glass — it's the thing in your hand.
                 .then(if (lift > 0.01f) Modifier.graphicsLayer { alpha = 1f }.glass(Radius.cardShape, Glass.Frosted, tint = Color(0xFF1A1A1F).copy(alpha = 0.92f * lift)) else Modifier)
@@ -523,19 +531,19 @@ private fun QueueRow(
                     detectHorizontalDragGestures(
                         onHorizontalDrag = { change, dx ->
                             change.consume()
-                            scope.launch { swipe.snapTo((swipe.value + dx).coerceIn(-size.width.toFloat(), 0f)) }
+                            swipeX = (swipeX + dx).coerceIn(-size.width.toFloat(), 0f)
                         },
                         onDragEnd = {
                             scope.launch {
-                                if (swipe.value < -size.width * 0.35f) {
-                                    swipe.animateTo(-size.width.toFloat(), tween(180))
+                                if (swipeX < -size.width * 0.35f) {
+                                    animate(swipeX, -size.width.toFloat(), animationSpec = tween(180)) { v, _ -> swipeX = v }
                                     onRemove()
                                 } else {
-                                    swipe.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = 500f))
+                                    animate(swipeX, 0f, animationSpec = spring(dampingRatio = 0.7f, stiffness = 500f)) { v, _ -> swipeX = v }
                                 }
                             }
                         },
-                        onDragCancel = { scope.launch { swipe.animateTo(0f) } },
+                        onDragCancel = { scope.launch { animate(swipeX, 0f, animationSpec = spring(dampingRatio = 0.7f, stiffness = 500f)) { v, _ -> swipeX = v } } },
                     )
                 }
                 .pressable(onLongClick = { menuOpen = true }, onClick = onClick)

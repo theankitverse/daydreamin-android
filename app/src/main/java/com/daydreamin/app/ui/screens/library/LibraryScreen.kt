@@ -580,6 +580,7 @@ private fun TopBar(haze: HazeState, statusTop: Dp, scrollY: () -> Float, title: 
             .fillMaxWidth()
             .height(statusTop + TopBarHeight + 16.dp)
             .hazeEffect(haze, style) {
+                inputScale = dev.chrisbanes.haze.HazeInputScale.Auto
                 progressive = HazeProgressive.verticalGradient(startY = solidUntil, startIntensity = 1f, endY = fadeEnd, endIntensity = 0f, preferPerformance = true)
                 alpha = (scrollY() / fadeDistance).coerceIn(0f, 1f)
             },
