@@ -2,6 +2,7 @@ package com.daydreamin.app.data.update
 
 import com.daydreamin.app.BuildConfig
 import com.daydreamin.app.data.prefs.AppPreferences
+import com.daydreamin.app.data.remote.LegacyTls.withLegacyRoots
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -51,6 +52,7 @@ object UpdateChecker {
     private val client = OkHttpClient.Builder()
         .connectTimeout(6, TimeUnit.SECONDS)
         .readTimeout(6, TimeUnit.SECONDS)
+        .withLegacyRoots()
         .build()
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -79,7 +81,7 @@ object UpdateChecker {
                         val body = response.body?.string() ?: throw IOException("empty response")
                         json.decodeFromString<RemoteVersion>(body)
                     }
-                }.getOrNull()
+                }.onFailure { android.util.Log.w("UpdateChecker", "update check failed", it) }.getOrNull()
             }
         }
         _state.value = when {

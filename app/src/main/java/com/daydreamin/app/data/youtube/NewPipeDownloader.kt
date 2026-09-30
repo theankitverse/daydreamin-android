@@ -1,5 +1,6 @@
 package com.daydreamin.app.data.youtube
 
+import com.daydreamin.app.data.remote.LegacyTls.withLegacyRoots
 import okhttp3.OkHttpClient
 import okhttp3.Request as OkRequest
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -17,6 +18,7 @@ class NewPipeDownloader(
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
+        .withLegacyRoots()
         .build(),
 ) : Downloader() {
 

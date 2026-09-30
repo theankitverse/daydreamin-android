@@ -615,7 +615,7 @@ private fun RowPlaceholder() {
 @Composable
 private fun TopBar(haze: HazeState, statusTop: Dp, scrollY: () -> Float, title: String) {
     val density = LocalDensity.current
-    val style = remember { HazeStyle(backgroundColor = BgBase, tints = listOf(HazeTint(Color.Black.copy(alpha = 0.58f))), blurRadius = 30.dp, noiseFactor = 0.04f) }
+    val style = remember { HazeStyle(backgroundColor = BgBase, tints = listOf(HazeTint(Color.Black.copy(alpha = 0.58f))), blurRadius = 30.dp, noiseFactor = 0.04f, fallbackTint = com.daydreamin.app.ui.theme.GlassFallback) }
     val solidUntil = with(density) { (statusTop + TopBarHeight - 6.dp).toPx() }
     val fadeEnd = with(density) { (statusTop + TopBarHeight + 16.dp).toPx() }
     val fadeDistance = with(density) { 72.dp.toPx() }

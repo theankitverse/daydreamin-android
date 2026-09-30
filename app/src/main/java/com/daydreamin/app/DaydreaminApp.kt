@@ -18,7 +18,15 @@ import kotlinx.coroutines.async
 
 private const val TAG = "StartupTiming"
 
-class DaydreaminApp : Application() {
+class DaydreaminApp : Application(), coil.ImageLoaderFactory {
+
+    /** Coil's defaults, plus the extra trusted roots on Android 7.0 and older (album art from Apple needs them). */
+    override fun newImageLoader(): coil.ImageLoader = coil.ImageLoader.Builder(this).apply {
+        if (com.daydreamin.app.data.remote.LegacyTls.isNeeded) {
+            okHttpClient { with(com.daydreamin.app.data.remote.LegacyTls) { okhttp3.OkHttpClient.Builder().withLegacyRoots().build() } }
+        }
+    }.build()
+
 
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     lateinit var prefs: AppPreferences

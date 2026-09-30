@@ -1,6 +1,6 @@
 {
-  "versionCode": 7,
-  "versionName": "1.3.0",
+  "versionCode": 9,
+  "versionName": "1.4.1",
   "url": "https://github.com/theankitverse/daydreamin-android/releases/latest",
-  "notes": "A new Home made from what you listen to, playlists everywhere, a launch animation that actually plays on your phone, and a much faster, smoother app overall."
+  "notes": "Installs on older and 32-bit phones (Android 5.0 and up), and update checks work again. Also includes 1.4.0: cleaner audio, a Home for new listeners, Up Next that follows your song, and smoother Now Playing gestures."
 }

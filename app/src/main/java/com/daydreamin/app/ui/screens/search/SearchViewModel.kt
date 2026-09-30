@@ -122,6 +122,8 @@ private fun friendlyError(e: Throwable): String =
 
 private fun isOnline(): Boolean {
     val cm = DaydreaminApp.instance.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager ?: return true
+    @Suppress("DEPRECATION")
+    if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M) return cm.activeNetworkInfo?.isConnected == true
     val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
     return caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
 }

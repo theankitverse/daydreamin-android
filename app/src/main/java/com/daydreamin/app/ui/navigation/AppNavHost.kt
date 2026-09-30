@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
@@ -78,7 +79,7 @@ fun AppNavHost() {
     val hazeState = remember { HazeState() }
     val glassStyle = daydreamGlassStyle()
     val chromeStyle = remember {
-        HazeStyle(backgroundColor = BgBase, tints = listOf(HazeTint(Color.Black.copy(alpha = 0.55f))), blurRadius = 28.dp, noiseFactor = 0.05f)
+        HazeStyle(backgroundColor = BgBase, tints = listOf(HazeTint(Color.Black.copy(alpha = 0.55f))), blurRadius = 28.dp, noiseFactor = 0.05f, fallbackTint = com.daydreamin.app.ui.theme.GlassFallback)
     }
 
     PlayerController.ensureConnected(context)
@@ -120,17 +121,25 @@ fun AppNavHost() {
                         modifier = Modifier
                             // Fades away as Now Playing opens and back as it closes into the mini player.
                             .graphicsLayer { alpha = 1f - PlayerSheet.expansion }
-                            .hazeEffect(state = hazeState, style = chromeStyle) {
-                            inputScale = dev.chrisbanes.haze.HazeInputScale.Auto
-                            progressive = HazeProgressive.verticalGradient(
-                                easing = androidx.compose.animation.core.FastOutSlowInEasing,
-                                startY = 0f,
-                                startIntensity = 0f,
-                                endY = chromeFadePx,
-                                endIntensity = 1f,
-                                preferPerformance = true,
-                            )
-                        },
+                            .then(
+                                if (dev.chrisbanes.haze.HazeDefaults.blurEnabled()) {
+                                    Modifier.hazeEffect(state = hazeState, style = chromeStyle) {
+                                        inputScale = dev.chrisbanes.haze.HazeInputScale.Auto
+                                        progressive = HazeProgressive.verticalGradient(
+                                            easing = androidx.compose.animation.core.FastOutSlowInEasing,
+                                            startY = 0f,
+                                            startIntensity = 0f,
+                                            endY = chromeFadePx,
+                                            endIntensity = 1f,
+                                            preferPerformance = true,
+                                        )
+                                    }
+                                } else {
+                                    // No blur below Android 12L: the same clear-to-solid fade, painted plainly —
+                                    // a see-through tint left song titles readable behind the tab labels.
+                                    Modifier.background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, BgBase), startY = 0f, endY = chromeFadePx))
+                                },
+                            ),
                     ) {
                         androidx.compose.animation.AnimatedVisibility(
                             visible = playerMeta.currentSong != null,

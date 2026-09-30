@@ -391,6 +391,7 @@ private fun HomeTopBar(haze: HazeState, statusTop: Dp, scrollY: () -> Float, onS
             tints = listOf(HazeTint(Color.Black.copy(alpha = 0.58f))),
             blurRadius = 30.dp,
             noiseFactor = 0.04f,
+            fallbackTint = com.daydreamin.app.ui.theme.GlassFallback,
         )
     }
     Box(

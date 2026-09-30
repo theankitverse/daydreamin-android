@@ -212,7 +212,7 @@ fun QueueScreen(visibility: AnimatedVisibilityScope, onBack: () -> Unit) {
 
     val headerHaze = remember { HazeState() }
     val headerStyle = remember {
-        HazeStyle(backgroundColor = Color(0xFF0B0B0D), tints = listOf(HazeTint(Color.Black.copy(alpha = 0.45f))), blurRadius = 24.dp, noiseFactor = 0.04f)
+        HazeStyle(backgroundColor = Color(0xFF0B0B0D), tints = listOf(HazeTint(Color.Black.copy(alpha = 0.45f))), blurRadius = 24.dp, noiseFactor = 0.04f, fallbackTint = com.daydreamin.app.ui.theme.GlassFallback)
     }
     val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 

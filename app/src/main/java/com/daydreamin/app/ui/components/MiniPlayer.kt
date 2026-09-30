@@ -93,7 +93,7 @@ fun MiniPlayer(
         }
     }
     val blur = remember {
-        HazeStyle(backgroundColor = BgBase, tints = listOf(HazeTint(Color.Black.copy(alpha = 0.32f))), blurRadius = 34.dp, noiseFactor = 0.05f)
+        HazeStyle(backgroundColor = BgBase, tints = listOf(HazeTint(Color.Black.copy(alpha = 0.32f))), blurRadius = 34.dp, noiseFactor = 0.05f, fallbackTint = com.daydreamin.app.ui.theme.GlassFallback)
     }
     val open by androidx.compose.runtime.rememberUpdatedState(onClick)
     Box(

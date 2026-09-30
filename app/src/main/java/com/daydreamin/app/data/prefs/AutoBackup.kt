@@ -78,6 +78,7 @@ object AutoBackup {
         return true
     }
 
+    @androidx.annotation.RequiresApi(Build.VERSION_CODES.Q) // only reached when isSupported
     private fun createInDownloads(context: Context): Uri? {
         val values = ContentValues().apply {
             put(MediaStore.Downloads.DISPLAY_NAME, AUTO_BACKUP_FILE)

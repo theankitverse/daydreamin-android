@@ -11,10 +11,12 @@ android {
 
     defaultConfig {
         applicationId = "com.daydreamin.app"
-        minSdk = 26
+        // Android 5.0: older and 32-bit phones run 5.x–7.x, and an APK whose minimum is above the
+        // phone's version doesn't install at all ("There was a problem parsing the package").
+        minSdk = 21
         targetSdk = 35
-        versionCode = 8
-        versionName = "1.4.0"
+        versionCode = 9
+        versionName = "1.4.1"
     }
 
     buildTypes {
@@ -33,6 +35,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // java.time and newer java.util.concurrent calls (ours and NewPipe's) on Android 5–7.
+        isCoreLibraryDesugaringEnabled = true
     }
     kotlinOptions {
         jvmTarget = "17"
@@ -51,6 +55,7 @@ android {
 }
 
 dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.1.2")
     val composeBom = platform("androidx.compose:compose-bom:2024.09.02")
     implementation(composeBom)
     androidTestImplementation(composeBom)
