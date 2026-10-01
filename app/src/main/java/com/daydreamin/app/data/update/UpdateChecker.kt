@@ -29,6 +29,10 @@ data class RemoteVersion(
     val versionName: String,
     val url: String,
     val notes: String? = null,
+    /** The release's APK itself, for updating in-app; older version.json files without it fall back to [url]. */
+    val apkUrl: String? = null,
+    val apkSize: Long? = null,
+    val sha256: String? = null,
 )
 
 enum class UpdateStatus { IDLE, CHECKING, UP_TO_DATE, AVAILABLE, FAILED }
@@ -47,7 +51,7 @@ data class UpdateState(val status: UpdateStatus, val remote: RemoteVersion? = nu
  */
 object UpdateChecker {
     // Raw file from the Android project's own repo — see /version.json there, updated on each release.
-    private const val VERSION_URL = "https://raw.githubusercontent.com/theankitverse/daydreamin-android/main/version.json"
+    private val VERSION_URL = BuildConfig.UPDATE_URL
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(6, TimeUnit.SECONDS)

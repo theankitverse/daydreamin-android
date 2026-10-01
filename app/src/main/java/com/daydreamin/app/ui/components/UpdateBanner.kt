@@ -1,7 +1,5 @@
 package com.daydreamin.app.ui.components
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.expandVertically
@@ -39,7 +37,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.daydreamin.app.DaydreaminApp
+import com.daydreamin.app.data.update.InstallState
 import com.daydreamin.app.data.update.UpdateChecker
+import com.daydreamin.app.data.update.UpdateInstaller
 import com.daydreamin.app.data.update.UpdateStatus
 import com.daydreamin.app.ui.theme.Glass
 import com.daydreamin.app.ui.theme.Radius
@@ -65,7 +66,16 @@ fun UpdateBanner(modifier: Modifier = Modifier) {
     LaunchedEffect(remote?.versionCode) {
         alreadyDismissed = remote?.let { UpdateChecker.isDismissed(it.versionCode) } ?: true
     }
-    val visible = state.status == UpdateStatus.AVAILABLE && remote != null && !alreadyDismissed && !dismissedHere
+    val install by UpdateInstaller.state.collectAsState()
+    val busy = install is InstallState.Downloading || install is InstallState.Verifying || install is InstallState.Installing
+    // Back from the "Install unknown apps" screen with it allowed: carry straight on.
+    androidx.lifecycle.compose.LifecycleResumeEffect(install, remote) {
+        if (install == InstallState.NeedsPermission && remote != null && canInstallUpdates(context)) {
+            UpdateInstaller.start(context, remote, DaydreaminApp.instance.appScope)
+        }
+        onPauseOrDispose { }
+    }
+    val visible = state.status == UpdateStatus.AVAILABLE && remote != null && (busy || install != InstallState.Idle || (!alreadyDismissed && !dismissedHere))
 
     AnimatedVisibility(
         visible = visible,
@@ -88,31 +98,40 @@ fun UpdateBanner(modifier: Modifier = Modifier) {
                 Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                     Text("Update available — v${remote.versionName}", style = MaterialTheme.typography.titleSmall, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
-                        remote.notes?.takeIf { it.isNotBlank() } ?: "Tap to get the latest version.",
+                        installLine(install) ?: remote.notes?.takeIf { it.isNotBlank() } ?: "Tap to get the latest version.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.65f),
-                        maxLines = 2,
+                        color = if (install is InstallState.Failed) Color(0xFFFFB4AB) else Color.White.copy(alpha = 0.65f),
+                        maxLines = if (install is InstallState.Failed) 4 else 2,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    if (install is InstallState.Failed) {
+                        Text(
+                            "Get it from GitHub instead",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color.White,
+                            modifier = Modifier.padding(top = 6.dp).pressable(onClick = { UpdateInstaller.openReleasePage(context, remote) }),
+                        )
+                    }
                 }
                 Text(
-                    "Update",
+                    when (install) {
+                        InstallState.NeedsPermission -> "Continue"
+                        is InstallState.Failed -> "Try again"
+                        else -> if (busy) "…" else "Update"
+                    },
                     style = MaterialTheme.typography.labelLarge,
                     color = Color.Black,
                     modifier = Modifier
-                        .pressable(onClick = {
-                            runCatching {
-                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(remote.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                            }
-                        })
+                        .then(if (!busy) Modifier.pressable(onClick = { UpdateInstaller.start(context, remote, DaydreaminApp.instance.appScope) }) else Modifier)
                         .clip(Radius.pill)
-                        .background(Color.White)
+                        .background(Color.White.copy(alpha = if (busy) 0.6f else 1f))
                         .padding(horizontal = 14.dp, vertical = 8.dp),
                 )
                 Spacer(Modifier.width(4.dp))
                 Box(
                     Modifier.size(32.dp).pressable(onClick = {
                         dismissedHere = true
+                        UpdateInstaller.reset()
                         scope.launch { UpdateChecker.dismiss(remote.versionCode) }
                     }),
                     contentAlignment = Alignment.Center,
@@ -123,3 +142,17 @@ fun UpdateBanner(modifier: Modifier = Modifier) {
         }
     }
 }
+
+/** The update's progress in words, or null while nothing is happening. */
+internal fun installLine(install: InstallState): String? = when (install) {
+    InstallState.Idle -> null
+    is InstallState.Downloading -> install.fraction?.let { "Downloading… ${(it * 100).toInt()}%" } ?: "Downloading…"
+    InstallState.Verifying -> "Checking the download…"
+    InstallState.NeedsPermission -> "Allow Daydreamin to install updates (Install unknown apps), then come back."
+    InstallState.Installing -> "Installing — confirm on the next screen."
+    is InstallState.Failed -> install.message
+}
+
+internal fun canInstallUpdates(context: android.content.Context): Boolean =
+    android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.O || context.packageManager.canRequestPackageInstalls()
+

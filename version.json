@@ -1,6 +1,9 @@
 {
-  "versionCode": 10,
-  "versionName": "1.4.2",
+  "versionCode": 11,
+  "versionName": "1.4.3",
   "url": "https://github.com/theankitverse/daydreamin-android/releases/latest",
-  "notes": "Songs keep playing when your screen is off, Play always works, swiping the app away stops the music, no more accidental exits from Home, and a new Recent searches list."
+  "notes": "Updates now download and install right inside the app — no more \"package appears to be invalid\".",
+  "apkUrl": "https://github.com/theankitverse/daydreamin-android/releases/download/v1.4.3/daydreamin-v1.4.3.apk",
+  "apkSize": 4718592,
+  "sha256": "f7b0fd6ee6805444afa3aefeb5f0d23d0b207ff4b5703ba37053e9d01dd114cd"
 }

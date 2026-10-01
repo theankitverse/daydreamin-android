@@ -15,8 +15,12 @@ android {
         // phone's version doesn't install at all ("There was a problem parsing the package").
         minSdk = 21
         targetSdk = 35
-        versionCode = 10
-        versionName = "1.4.2"
+        versionCode = 11
+        versionName = "1.4.3"
+        // Where installed apps look for new releases. Overridable only to test the updater locally.
+        val updateUrl = (project.findProperty("updateUrl") as String?)
+            ?: "https://raw.githubusercontent.com/theankitverse/daydreamin-android/main/version.json"
+        buildConfigField("String", "UPDATE_URL", "\"$updateUrl\"")
     }
 
     buildTypes {

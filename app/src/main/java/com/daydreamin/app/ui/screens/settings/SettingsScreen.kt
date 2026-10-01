@@ -551,37 +551,53 @@ private fun UpiRow() {
     }
 }
 
-/** The same background check Home's banner reads from, plus a manual "Check now" for whenever you want it. */
+/** The same background check Home's banner reads from, a manual "Check" — and, when there's a new version, "Update" right here. */
 @Composable
 private fun UpdateRow() {
     val state by com.daydreamin.app.data.update.UpdateChecker.state.collectAsState()
+    val install by com.daydreamin.app.data.update.UpdateInstaller.state.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
     val checking = state.status == com.daydreamin.app.data.update.UpdateStatus.CHECKING
+    val remote = state.remote?.takeIf { state.status == com.daydreamin.app.data.update.UpdateStatus.AVAILABLE }
+    val installing = install is com.daydreamin.app.data.update.InstallState.Downloading ||
+        install is com.daydreamin.app.data.update.InstallState.Verifying ||
+        install is com.daydreamin.app.data.update.InstallState.Installing
+    val busy = checking || installing
     Row(Modifier.fillMaxWidth().padding(horizontal = Space.gutter, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.align(Alignment.Top)) { RowIcon(Icons.Rounded.NewReleases) }
         Column(Modifier.weight(1f).padding(start = 14.dp)) {
             Text("App updates", style = MaterialTheme.typography.titleMedium, color = Color.White)
-            AnimatedContent(targetState = state.status, transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(120)) }, label = "updateCheck") { s ->
-                Text(
-                    when (s) {
-                        com.daydreamin.app.data.update.UpdateStatus.IDLE -> "You're on version ${BuildConfig.VERSION_NAME}."
-                        com.daydreamin.app.data.update.UpdateStatus.CHECKING -> "Checking…"
-                        com.daydreamin.app.data.update.UpdateStatus.UP_TO_DATE -> "You're on the latest version (${BuildConfig.VERSION_NAME})."
-                        com.daydreamin.app.data.update.UpdateStatus.AVAILABLE -> "Version ${state.remote?.versionName} is available — see the banner on Home."
-                        com.daydreamin.app.data.update.UpdateStatus.FAILED -> "Couldn't check — you may be offline."
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Muted,
-                )
+            val line = (if (remote != null) com.daydreamin.app.ui.components.installLine(install) else null) ?: when (state.status) {
+                com.daydreamin.app.data.update.UpdateStatus.IDLE -> "You're on version ${BuildConfig.VERSION_NAME}."
+                com.daydreamin.app.data.update.UpdateStatus.CHECKING -> "Checking…"
+                com.daydreamin.app.data.update.UpdateStatus.UP_TO_DATE -> "You're on the latest version (${BuildConfig.VERSION_NAME})."
+                com.daydreamin.app.data.update.UpdateStatus.AVAILABLE -> "Version ${state.remote?.versionName} is available."
+                com.daydreamin.app.data.update.UpdateStatus.FAILED -> "Couldn't check — you may be offline."
+            }
+            AnimatedContent(targetState = line, transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(120)) }, label = "updateCheck") { text ->
+                Text(text, style = MaterialTheme.typography.bodySmall, color = Muted)
             }
         }
         Spacer(Modifier.width(12.dp))
         Text(
-            if (checking) "…" else "Check",
+            when {
+                busy -> "…"
+                remote != null && install == com.daydreamin.app.data.update.InstallState.NeedsPermission -> "Continue"
+                remote != null && install is com.daydreamin.app.data.update.InstallState.Failed -> "Try again"
+                remote != null -> "Update"
+                else -> "Check"
+            },
             style = MaterialTheme.typography.labelLarge,
             color = Color.White,
             modifier = Modifier
-                .then(if (!checking) Modifier.pressable(onClick = { scope.launch { com.daydreamin.app.data.update.UpdateChecker.checkNow() } }) else Modifier)
+                .then(
+                    if (busy) Modifier
+                    else Modifier.pressable(onClick = {
+                        if (remote != null) com.daydreamin.app.data.update.UpdateInstaller.start(context, remote, com.daydreamin.app.DaydreaminApp.instance.appScope)
+                        else scope.launch { com.daydreamin.app.data.update.UpdateChecker.checkNow() }
+                    }),
+                )
                 .glass(Radius.pill, Glass.Clear)
                 .padding(horizontal = 14.dp, vertical = 7.dp),
         )
