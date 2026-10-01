@@ -141,6 +141,12 @@ object YouTubeExtractorService {
         songKeyToVideoId[songKey(artist, title)]?.let { cache.remove(it) }
     }
 
+    /** Drops every cached stream URL. They're signed for the IP address that fetched them, so after
+     *  a network change (mobile data ↔ Wi-Fi) the server refuses all of them at once. */
+    fun invalidateAllStreams() {
+        cache.clear()
+    }
+
     private fun isFresh(videoId: String) = cache[videoId]?.let { System.currentTimeMillis() - it.atMs < STREAM_CACHE_TTL_MS } == true
 
     /**

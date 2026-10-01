@@ -26,6 +26,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import java.io.IOException
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
@@ -142,8 +143,23 @@ object PlayerController {
     /** The song most recently re-resolved in place after its stream URL failed (see
      *  [recoverCurrentSong]); cleared once it's audibly playing again. Guards against looping. */
     private var recoveredPlayId: String? = null
+
+    /**
+     * Which play request owns the player. Every playSong / recovery / restore / skip takes the
+     * next number, and a stream lookup that finishes after a newer request has started is dropped
+     * instead of being handed to the player. Without this, two lookups in flight (a skip after an
+     * error, then you tapping a song) raced: whichever finished *last* took the player, so the
+     * screen could show the song you tapped while a different one played.
+     */
+    private var playRequest = 0
+
+    /** Network-error recoveries for the current song since it last played; capped so a stream that's broken for good still gets skipped. */
+    private var networkRecoveries = 0
     private var consecutiveResolveFailures = 0
     private const val MAX_CONSECUTIVE_RESOLVE_FAILURES = 3
+    private const val MAX_NETWORK_RECOVERIES = 4
+    private const val NETWORK_WAIT_MS = 45_000L
+    private const val NETWORK_ATTEMPTS = 3
     // The last song that actually, successfully started playing — what [handlePlaybackFailure]
     // reverts the displayed "current song" to when a resolve failure gives up with nothing left
     // to fall back on, since the player itself never actually left this song.
@@ -175,6 +191,7 @@ object PlayerController {
             attachListener()
             startTicker()
             connecting = false
+            NetworkWatch.watchForChanges(app) { onNetworkChanged() }
             restoreIfNeeded()
         }, MoreExecutors.directExecutor())
     }
@@ -203,6 +220,7 @@ object PlayerController {
                 _meta.update { it.copy(isPlaying = isPlaying) }
                 // The song is audibly playing again — its next URL failure gets a fresh in-place attempt.
                 if (isPlaying && controller?.currentMediaItem?.mediaId == recoveredPlayId) recoveredPlayId = null
+                if (isPlaying) networkRecoveries = 0
                 // A pause (user, audio-focus loss, headphones out) is exactly when the process
                 // is most likely to be killed next, and the ticker only saves while playing —
                 // so save the exact pause position instead of one up to ~5s stale.
@@ -255,10 +273,18 @@ object PlayerController {
                 // resolve failure) there's no "still actually playing" song to just redisplay.
                 val song = _meta.value.currentSong ?: return
                 Log.e(TAG, "player error on song='${song.title}': ${error.errorCodeName} ${error.message}", error)
-                if (shouldRecoverInPlace(error.errorCode, song.playId, recoveredPlayId)) {
-                    recoverCurrentSong(song, controller?.currentPosition?.coerceAtLeast(0) ?: 0L, controller?.playWhenReady ?: true)
-                } else {
-                    handlePlaybackFailure(song, error.message ?: error.errorCodeName, revertOnGiveUp = false)
+                val position = controller?.currentPosition?.coerceAtLeast(0) ?: 0L
+                val playWhenReady = controller?.playWhenReady ?: true
+                when {
+                    // The connection dropped or changed (mobile data <-> Wi-Fi changes the address the
+                    // stream URL was signed for): stay on this song, wait for the network and resume
+                    // it where it stopped. Skipping here jumped to another song on every network blip.
+                    isNetworkStreamError(error.errorCode) && networkRecoveries < MAX_NETWORK_RECOVERIES -> {
+                        networkRecoveries++
+                        recoverCurrentSong(song, position, playWhenReady)
+                    }
+                    shouldRecoverInPlace(error.errorCode, song.playId, recoveredPlayId) -> recoverCurrentSong(song, position, playWhenReady)
+                    else -> handlePlaybackFailure(song, error.message ?: error.errorCodeName, revertOnGiveUp = false)
                 }
             }
         })
@@ -334,6 +360,7 @@ object PlayerController {
             if (_meta.value.currentSong != null) return@launch // something already started playing before this landed — don't clobber it
 
             Log.d(TAG, "restoring song='${song.title}' positionMs=${snapshot.positionMs} queueSize=${snapshot.queue.size}")
+            val request = ++playRequest
             pendingStartMediaId = song.playId
             pendingStartRequestedAtMs = SystemClock.elapsedRealtime()
             pendingStartIsRestore = true
@@ -356,6 +383,7 @@ object PlayerController {
             fun releaseSwap() { if (!swapReleased) { swapReleased = true; pendingPlaylistSwaps-- } }
             try {
                 val result = resolveStreamWithRetry(song)
+                if (request != playRequest) return@launch // you started something else meanwhile
                 val resolved = result.getOrNull()
                 if (resolved == null) {
                     Log.w(TAG, "restore failed song='${song.title}' error=${result.exceptionOrNull()?.message}")
@@ -447,6 +475,7 @@ object PlayerController {
         pendingStartRequestedAtMs = SystemClock.elapsedRealtime()
         pendingStartIsRestore = false
         Log.d(TAG, "playSong requested song='${song.title}'")
+        val request = ++playRequest
 
         _meta.update { it.copy(currentSong = song, isBuffering = true, queue = queueContext, error = null) }
         _progress.update { PlaybackProgress(positionMs = 0L, durationMs = 0L) }
@@ -457,11 +486,14 @@ object PlayerController {
             var swapReleased = false
             fun releaseSwap() { if (!swapReleased) { swapReleased = true; pendingPlaylistSwaps-- } }
             try {
-            val result = resolveStreamWithRetry(song)
+            val result = resolveWhenOnline(song, request) ?: return@launch // a newer request owns the player now
             val resolved = result.getOrNull()
             if (resolved == null) {
                 releaseSwap()
-                handlePlaybackFailure(song, result.exceptionOrNull()?.message ?: "unknown error", revertOnGiveUp = true)
+                val error = result.exceptionOrNull()
+                // No connection is not this song's fault — skipping would just fail the next one too.
+                if (isTransientFailure(error)) giveUpOffline(song, error, revert = true)
+                else handlePlaybackFailure(song, error?.message ?: "unknown error", revertOnGiveUp = true)
                 return@launch
             }
             consecutiveResolveFailures = 0
@@ -502,30 +534,37 @@ object PlayerController {
     }
 
     /**
-     * The stream URL for [song] failed at the player level with an HTTP error (see
-     * [isStaleStreamError]) — most often a URL that expired while paused, or one YouTube handed
-     * out that doesn't actually work. Rather than skipping a song the user is listening to,
-     * fetch a fresh URL and put it back at [positionMs], keeping play/pause as it was. Follows the
-     * same playlist-swap protocol as [playSong] since `setMediaItem` replaces the player's whole
-     * playlist (including the pre-buffered next items, which [prepareUpcoming] restocks).
-     * If the fresh URL fails too, the normal skip logic runs ([recoveredPlayId] blocks a second try).
+     * The stream for [song] failed at the player level — a URL that expired, or one that stopped
+     * working because the network changed under it (URLs are signed for the address that fetched
+     * them). Rather than skipping a song you're listening to: wait for a connection, fetch a fresh
+     * URL and put it back at [positionMs], keeping play/pause as it was. Follows the same
+     * playlist-swap protocol as [playSong] since `setMediaItem` replaces the player's whole playlist
+     * (including the pre-buffered next items, which [prepareUpcoming] restocks). Only a song that
+     * fails for a reason other than the network gets skipped.
      */
     private fun recoverCurrentSong(song: Song, positionMs: Long, playWhenReady: Boolean) {
+        val request = ++playRequest
         recoveredPlayId = song.playId
-        Log.w(TAG, "stale stream for '${song.title}' — re-resolving and resuming at ${positionMs}ms (playWhenReady=$playWhenReady)")
-        YouTubeExtractorService.invalidateStream(song.artist, song.title, song.videoId)
+        Log.w(TAG, "stream failed for '${song.title}' — re-resolving and resuming at ${positionMs}ms (playWhenReady=$playWhenReady)")
+        // A failing stream after a network change means every cached URL was signed for the old address.
+        YouTubeExtractorService.invalidateAllStreams()
         preparedAheadPlayIds.clear()
         prepareUpcomingRequestId++
         pendingPlaylistSwaps++
+        _meta.update { it.copy(isBuffering = true) }
+        _progress.update { it.copy(positionMs = positionMs) }
         scope.launch {
             var swapReleased = false
             fun releaseSwap() { if (!swapReleased) { swapReleased = true; pendingPlaylistSwaps-- } }
             try {
-                val resolved = resolveStreamWithRetry(song).getOrNull()
-                if (_meta.value.currentSong?.playId != song.playId) return@launch // user moved on while we resolved
+                val result = resolveWhenOnline(song, request) ?: return@launch // you moved on while we waited
+                if (_meta.value.currentSong?.playId != song.playId) return@launch
+                val resolved = result.getOrNull()
                 if (resolved == null) {
                     releaseSwap()
-                    handlePlaybackFailure(song, "couldn't refresh the stream", revertOnGiveUp = false)
+                    val error = result.exceptionOrNull()
+                    if (isTransientFailure(error)) giveUpOffline(song, error, revert = false)
+                    else handlePlaybackFailure(song, "couldn't refresh the stream", revertOnGiveUp = false)
                     return@launch
                 }
                 controller?.setMediaItem(buildMediaItem(song, resolved), positionMs)
@@ -538,6 +577,66 @@ object PlayerController {
                 releaseSwap()
             }
         }
+    }
+
+    /**
+     * Resolves [song], riding out a network that's down or switching: waits for a connection
+     * (up to [NETWORK_WAIT_MS]) and retries transient failures a few times. Returns null if a newer
+     * play request took over meanwhile — the caller must then leave the player alone.
+     */
+    private suspend fun resolveWhenOnline(song: Song, request: Int): Result<ResolvedStream>? {
+        var result: Result<ResolvedStream> = Result.failure(IOException("offline"))
+        for (attempt in 1..NETWORK_ATTEMPTS) {
+            if (!NetworkWatch.awaitOnline(app, NETWORK_WAIT_MS)) {
+                result = Result.failure(IOException("failed to connect — offline"))
+                break
+            }
+            if (request != playRequest) return null
+            result = resolveStreamWithRetry(song)
+            if (request != playRequest) return null
+            if (result.isSuccess || !isTransientFailure(result.exceptionOrNull())) break
+            if (attempt < NETWORK_ATTEMPTS) delay(1_500L * attempt)
+        }
+        return if (request == playRequest) result else null
+    }
+
+    /**
+     * Couldn't reach YouTube even after waiting: stay on [song] (no skipping through the queue while
+     * offline) and say so. Play tries again (see [togglePlayPause]). With [revert], a song that never
+     * started gives the display back to the one still actually playing.
+     */
+    private fun giveUpOffline(song: Song, error: Throwable?, revert: Boolean) {
+        pendingStartMediaId = null
+        Log.w(TAG, "offline: song='${song.title}' — staying on it (${error?.message})")
+        val stillPlaying = revert && lastKnownGoodSong != null && controller?.isPlaying == true
+        _meta.update {
+            it.copy(
+                currentSong = if (stillPlaying) lastKnownGoodSong else it.currentSong,
+                isBuffering = false,
+                isPlaying = if (stillPlaying) true else false,
+                error = "Couldn't play \"${song.title}\": failed to connect — you're offline",
+            )
+        }
+    }
+
+    /**
+     * The phone moved to a different network. Stream URLs are signed for the old address, so
+     * every cached one is dead, including the songs already lined up in the player for gapless
+     * transitions — re-fetch those now on the new network instead of discovering it at the next
+     * song. (The current song keeps playing from its buffer; if it needs more and its URL is
+     * refused, [recoverCurrentSong] picks it up at the same position.)
+     */
+    private fun onNetworkChanged() {
+        Log.d(TAG, "network changed — refreshing stream URLs signed for the old address")
+        YouTubeExtractorService.invalidateAllStreams()
+        val c = controller ?: return
+        if (pendingPlaylistSwaps > 0 || preparedAheadPlayIds.isEmpty()) return
+        while (c.mediaItemCount > c.currentMediaItemIndex + 1) c.removeMediaItem(c.mediaItemCount - 1)
+        preparedAheadPlayIds.clear()
+        preparedResolved.clear()
+        preparedAtMs.clear()
+        prepareUpcomingRequestId++
+        prepareUpcoming()
     }
 
     /** A song failing to play — whether it never resolved (no audio stream on that particular
@@ -705,15 +804,24 @@ object PlayerController {
      *  audio transition already happened with no gap; this only syncs our own state to match. */
     private fun onGaplessAdvance(mediaItem: MediaItem?) {
         val previousSong = _meta.value.currentSong
-        val newCurrent = _meta.value.queue.firstOrNull() ?: return
-        if (mediaItem?.mediaId != newCurrent.playId) {
-            Log.w(TAG, "player advanced to '${mediaItem?.mediaId}' but the queue's next is '${newCurrent.playId}' — the shown queue no longer matches playback")
+        val queue = _meta.value.queue
+        val landedAt = queue.indexOfFirst { it.playId == mediaItem?.mediaId }
+        if (landedAt < 0) {
+            // The player moved to an item that's no longer in Up Next (the queue changed after it was
+            // lined up). Never leave one song playing under another's name: play the queue's next song.
+            Log.w(TAG, "player advanced to '${mediaItem?.mediaId}', which isn't in the queue — playing the queue's next song instead")
+            val next = queue.firstOrNull()
+            if (next != null) playSong(next, queueContext = queue.drop(1), autoFillQueue = queue.size <= 1) else controller?.pause()
             return
         }
+        // Normally the head of the queue; if the player is further along, the songs it passed are dropped too.
+        val newCurrent = queue[landedAt]
+        if (landedAt > 0) Log.w(TAG, "player advanced to queue position $landedAt — syncing to '${newCurrent.title}'")
+        playRequest++ // the player is on this song now; nothing still resolving for an earlier one may land
         Log.d(TAG, "gapless advance to '${newCurrent.title}' (pre-buffered, no resolve/buffer wait)")
         lastKnownGoodSong = newCurrent
 
-        val newQueue = _meta.value.queue.drop(1)
+        val newQueue = queue.drop(landedAt + 1)
         val resolved = preparedResolved.remove(newCurrent.playId)
         preparedAtMs.remove(newCurrent.playId)
         if (previousSong != null && previousSong.playId != newCurrent.playId) backStack.addLast(previousSong)
@@ -730,7 +838,9 @@ object PlayerController {
         _progress.update { PlaybackProgress(positionMs = 0L, durationMs = controller?.duration?.coerceAtLeast(0) ?: 0L) }
         recordStart(newCurrent)
         resolved?.let { r -> app.appScope.launch { TasteProfile.rememberVideoId(newCurrent, r.videoId) } }
-        if (preparedAheadPlayIds.isNotEmpty()) preparedAheadPlayIds.removeAt(0)
+        // Everything prepared up to and including this song has now been played or passed.
+        val passed = preparedAheadPlayIds.indexOf(newCurrent.playId)
+        if (passed >= 0) preparedAheadPlayIds.subList(0, passed + 1).clear() else preparedAheadPlayIds.clear()
 
         // Drop whatever's already been played from the player's own list — otherwise it just
         // keeps growing by one item per song for the entire session instead of always staying
@@ -807,6 +917,7 @@ object PlayerController {
         noteEarlySkip()
         val c = controller
         if (c != null && preparedAheadPlayIds.isNotEmpty() && c.mediaItemCount > c.currentMediaItemIndex + 1) {
+            playRequest++ // anything still resolving for the song we're leaving must not land
             c.seekToNextMediaItem() // already buffered — instant, onMediaItemTransition syncs state
         } else {
             scope.launch { advance(userInitiated = true) }

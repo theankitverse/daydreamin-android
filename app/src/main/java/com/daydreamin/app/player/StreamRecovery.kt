@@ -21,3 +21,11 @@ fun shouldRecoverInPlace(errorCode: Int, playId: String, alreadyRecoveredPlayId:
 
 /** HTTP statuses that mean "this URL is bad" rather than "the server/network is having a moment". */
 fun isStaleStreamHttpStatus(status: Int): Boolean = status == 403 || status == 404 || status == 410
+
+/**
+ * Any I/O failure while streaming — the connection dropped or timed out, or the server refused a
+ * URL (which is what happens to every URL at once when the phone changes networks, since they're
+ * signed for the old address). All of these are fixed by waiting for a connection and fetching a
+ * fresh URL; none of them mean the song itself is unplayable. Decoder/format errors aren't here.
+ */
+fun isNetworkStreamError(errorCode: Int): Boolean = errorCode in 2000..2999

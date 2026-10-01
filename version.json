@@ -1,9 +1,9 @@
 {
-  "versionCode": 11,
-  "versionName": "1.4.3",
+  "versionCode": 12,
+  "versionName": "1.4.4",
   "url": "https://github.com/theankitverse/daydreamin-android/releases/latest",
-  "notes": "Updates now download and install right inside the app — no more \"package appears to be invalid\".",
-  "apkUrl": "https://github.com/theankitverse/daydreamin-android/releases/download/v1.4.3/daydreamin-v1.4.3.apk",
-  "apkSize": 4718592,
-  "sha256": "f7b0fd6ee6805444afa3aefeb5f0d23d0b207ff4b5703ba37053e9d01dd114cd"
+  "notes": "Songs no longer skip or get mixed up when your network changes (Wi-Fi ↔ mobile data) — the song you were on picks up right where it stopped.",
+  "apkUrl": "https://github.com/theankitverse/daydreamin-android/releases/download/v1.4.4/daydreamin-v1.4.4.apk",
+  "apkSize": 4720223,
+  "sha256": "afb50f50ff43a67b1e1e75c934a162ad54e5d478f7f36351db3919d421e5d3b3"
 }
