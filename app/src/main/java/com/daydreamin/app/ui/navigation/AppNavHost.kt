@@ -17,6 +17,7 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -88,6 +89,18 @@ fun AppNavHost() {
 
     // Back closes an open drawer instead of leaving the app from underneath it.
     androidx.activity.compose.BackHandler(enabled = drawerState.isOpen) { closeDrawer() }
+
+    // On gesture-navigation phones, a sideways swipe across a shelf that starts near the left edge
+    // is the system Back gesture — and Back on Home closed the app, which looked exactly like a
+    // crash. Home now asks for a second Back within a couple of seconds before leaving.
+    var lastBackOnHomeMs by remember { androidx.compose.runtime.mutableLongStateOf(0L) }
+    androidx.activity.compose.BackHandler(enabled = currentRoute == Dest.HOME && !drawerState.isOpen && lastBackOnHomeMs == 0L) {
+        lastBackOnHomeMs = android.os.SystemClock.elapsedRealtime()
+        com.daydreamin.app.ui.components.Toaster.show("Swipe back again to exit")
+    }
+    androidx.compose.runtime.LaunchedEffect(lastBackOnHomeMs) {
+        if (lastBackOnHomeMs != 0L) { kotlinx.coroutines.delay(2_000); lastBackOnHomeMs = 0L }
+    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,

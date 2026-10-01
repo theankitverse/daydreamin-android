@@ -179,6 +179,24 @@ object PlayerController {
         }, MoreExecutors.directExecutor())
     }
 
+    /**
+     * The app was swiped out of Recents and the service has paused and asked to stop. A connected
+     * controller keeps the service (and its notification) alive, so let go of it; the next launch
+     * reconnects, and Play picks the song back up where it was (see [togglePlayPause]).
+     */
+    fun disconnect() {
+        val c = controller ?: return
+        c.currentPosition.takeIf { c.currentMediaItem?.mediaId == _meta.value.currentSong?.playId }?.let { pos ->
+            _progress.update { it.copy(positionMs = pos.coerceAtLeast(0)) }
+        }
+        _meta.update { it.copy(isPlaying = false, isBuffering = false) }
+        persistSnapshotSoon()
+        tickerJob?.cancel()
+        preparedAheadPlayIds.clear()
+        controller = null
+        c.release()
+    }
+
     private fun attachListener() {
         controller?.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -734,14 +752,26 @@ object PlayerController {
 
     fun playFromList(songs: List<Song>, startIndex: Int) {
         if (songs.isEmpty()) return
-        val target = songs[startIndex.coerceIn(songs.indices)]
-        val rest = songs.subList(startIndex + 1, songs.size)
+        val start = startIndex.coerceIn(songs.indices)
+        val target = songs[start]
+        val rest = songs.subList(start + 1, songs.size)
         playSong(target, queueContext = rest, autoFillQueue = rest.isEmpty())
     }
 
     fun togglePlayPause() {
         val c = controller ?: return
-        if (c.isPlaying) c.pause() else c.play()
+        if (c.isPlaying) { c.pause(); return }
+        val song = _meta.value.currentSong
+        // The song on screen may have nothing loaded behind it: a restore that ran while offline
+        // (or while Android had cut the app's network), or a song that stopped on an error. play()
+        // alone does nothing then — the Play button just looked dead — so fetch it again and resume.
+        val nothingLoaded = c.mediaItemCount == 0 || c.playbackState == Player.STATE_IDLE
+        if (song != null && nothingLoaded && !_meta.value.isBuffering) {
+            _meta.update { it.copy(isBuffering = true, error = null) }
+            recoverCurrentSong(song, _progress.value.positionMs, playWhenReady = true)
+            return
+        }
+        c.play() // also covers a restore still in flight: it lands playing instead of paused
     }
 
     /** Used by [SleepTimer] — pauses only if something is actually playing. */

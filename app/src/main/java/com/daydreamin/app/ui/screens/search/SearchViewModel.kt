@@ -9,7 +9,9 @@ import com.daydreamin.app.data.youtube.YouTubeExtractorService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.IOException
 
@@ -45,7 +47,18 @@ class SearchViewModel : ViewModel() {
     private val _state = MutableStateFlow(SearchUiState())
     val state: StateFlow<SearchUiState> = _state
 
-    fun onQueryChange(query: String) {
+    private val prefs = DaydreaminApp.instance.prefs
+    val history: StateFlow<List<String>> = prefs.searchHistory.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** Whether the query on screen is one you typed — a mood card or an artist row fills it in for you. */
+    private var typedByUser = false
+
+    /**
+     * [fromUser] is false when the app sets the query itself (a mood, an artist row); those
+     * never go into your search history.
+     */
+    fun onQueryChange(query: String, fromUser: Boolean = true) {
+        typedByUser = fromUser
         _state.value = _state.value.copy(query = query)
         searchJob?.cancel()
         playlistJob?.cancel()
@@ -76,6 +89,25 @@ class SearchViewModel : ViewModel() {
             if (_state.value.tab == SearchTab.PLAYLISTS) loadPlaylistsIfNeeded(query)
         }
     }
+
+    /**
+     * You meant this search: you pressed the keyboard's search key, or played or opened something
+     * it found. Only then does it join your history — never the half-typed queries in between.
+     */
+    fun commitSearch() {
+        val q = _state.value.query
+        if (typedByUser && q.isNotBlank()) viewModelScope.launch { prefs.addSearch(q) }
+    }
+
+    /** A past search, run again (and moved back to the top of the list). */
+    fun searchAgain(query: String) {
+        onQueryChange(query, fromUser = true)
+        commitSearch()
+    }
+
+    fun removeFromHistory(query: String) { viewModelScope.launch { prefs.removeSearch(query) } }
+
+    fun clearHistory() { viewModelScope.launch { prefs.clearSearchHistory() } }
 
     /** Runs the current query again (after an error). */
     fun retry() {

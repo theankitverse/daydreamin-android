@@ -1,5 +1,6 @@
 package com.daydreamin.app.ui.screens.search
 
+import com.daydreamin.app.ui.components.uniqueKeys
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -45,6 +46,7 @@ import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.BookmarkBorder
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -131,6 +133,7 @@ private data class NowPlaying(val playId: String?, val isPlaying: Boolean)
 fun SearchScreen(contentPadding: PaddingValues, onOpenPlayer: () -> Unit) {
     val vm: SearchViewModel = composeViewModel()
     val state by vm.state.collectAsState()
+    val searchHistory by vm.history.collectAsState()
     val meta = PlayerController.meta.collectAsState()
     val nowPlaying by remember { derivedStateOf { NowPlaying(meta.value.currentSong?.playId, meta.value.isPlaying) } }
     val keyboard = LocalSoftwareKeyboardController.current
@@ -149,6 +152,7 @@ fun SearchScreen(contentPadding: PaddingValues, onOpenPlayer: () -> Unit) {
 
     val play = { song: Song ->
         // The song that's already playing opens the player — tapping it never restarts it.
+        vm.commitSearch()
         if (nowPlaying.playId == song.playId) onOpenPlayer() else PlayerController.playSong(song)
     }
     // Scrolling results is reading, not typing: put the keyboard away.
@@ -180,7 +184,7 @@ fun SearchScreen(contentPadding: PaddingValues, onOpenPlayer: () -> Unit) {
             SearchField(
                 query = state.query,
                 onQueryChange = vm::onQueryChange,
-                onSubmit = { keyboard?.hide(); focusManager.clearFocus() },
+                onSubmit = { vm.commitSearch(); keyboard?.hide(); focusManager.clearFocus() },
                 modifier = Modifier.padding(horizontal = Space.gutter, vertical = Space.xs),
             )
             AnimatedContent(
@@ -194,7 +198,15 @@ fun SearchScreen(contentPadding: PaddingValues, onOpenPlayer: () -> Unit) {
             ) { p ->
                 val bottom = contentPadding.calculateBottomPadding() + Space.l
                 when (p) {
-                    Phase.IDLE -> IdleMoods(bottom, onMood = { vm.onQueryChange(it); keyboard?.hide(); focusManager.clearFocus() }, scroll = hideKeyboardOnScroll)
+                    Phase.IDLE -> IdleMoods(
+                        bottom,
+                        history = searchHistory,
+                        onHistory = { vm.searchAgain(it); keyboard?.hide(); focusManager.clearFocus() },
+                        onRemoveHistory = vm::removeFromHistory,
+                        onClearHistory = vm::clearHistory,
+                        onMood = { vm.onQueryChange(it, fromUser = false); keyboard?.hide(); focusManager.clearFocus() },
+                        scroll = hideKeyboardOnScroll,
+                    )
                     Phase.LOADING -> ResultsSkeleton()
                     Phase.ERROR -> Message(
                         icon = Icons.Rounded.CloudOff,
@@ -278,10 +290,47 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit, onSubmit
 
 // ---------------------------------------------------------------- idle
 
-/** Before you type: the same moods as Home, as quick starting points (each runs a real search). */
+/** Before you type: your recent searches, then the same moods as Home as quick starting points (each runs a real search). */
 @Composable
-private fun IdleMoods(bottom: androidx.compose.ui.unit.Dp, onMood: (String) -> Unit, scroll: NestedScrollConnection) {
+private fun IdleMoods(
+    bottom: androidx.compose.ui.unit.Dp,
+    history: List<String>,
+    onHistory: (String) -> Unit,
+    onRemoveHistory: (String) -> Unit,
+    onClearHistory: () -> Unit,
+    onMood: (String) -> Unit,
+    scroll: NestedScrollConnection,
+) {
     LazyColumn(Modifier.fillMaxSize().nestedScroll(scroll), contentPadding = PaddingValues(top = Space.l, bottom = bottom)) {
+        if (history.isNotEmpty()) {
+            item(key = "recent-title") {
+                Row(Modifier.fillMaxWidth().padding(start = Space.gutter, end = Space.gutter - 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Recent searches", style = MaterialTheme.typography.titleLarge, color = Color.White, modifier = Modifier.weight(1f))
+                    Text(
+                        "Clear",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color.White.copy(alpha = 0.6f),
+                        modifier = Modifier.clip(Radius.pill).pressable(onClick = onClearHistory).padding(horizontal = 10.dp, vertical = 8.dp),
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+            }
+            val recentKeys = history.uniqueKeys { "h-" + it.lowercase() }
+            itemsIndexed(history, key = { i, _ -> recentKeys[i] }) { _, q ->
+                Row(
+                    Modifier.fillMaxWidth().height(52.dp).pressable(onClick = { onHistory(q) }).padding(start = Space.gutter, end = Space.gutter - 10.dp).animateItem(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Rounded.History, contentDescription = null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(22.dp))
+                    Spacer(Modifier.width(14.dp))
+                    Text(q, style = MaterialTheme.typography.bodyLarge, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    Box(Modifier.size(40.dp).clip(CircleShape).pressable(onClick = { onRemoveHistory(q) }), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Rounded.Close, contentDescription = "Remove “$q” from history", tint = Color.White.copy(alpha = 0.45f), modifier = Modifier.size(18.dp))
+                    }
+                }
+            }
+            item(key = "recent-gap") { Spacer(Modifier.height(Space.l)) }
+        }
         item {
             Column(Modifier.padding(horizontal = Space.gutter)) {
                 Text("Start with a mood", style = MaterialTheme.typography.titleLarge, color = Color.White)
@@ -366,7 +415,8 @@ private fun Results(
                             item(key = "songs-title") {
                                 Text("Songs", style = MaterialTheme.typography.titleLarge, color = Color.White, modifier = Modifier.padding(start = Space.gutter, top = Space.l, bottom = Space.xs))
                             }
-                            itemsIndexed(state.songs.drop(1), key = { _, s -> "s-" + s.playId }) { _, s ->
+                            val songKeys = state.songs.drop(1).uniqueKeys { "s-" + it.playId }
+                            itemsIndexed(state.songs.drop(1), key = { i, _ -> songKeys[i] }) { _, s ->
                                 val np = nowPlaying()
                                 SongListRow(s, isCurrent = np.playId == s.playId, isPlaying = np.isPlaying, onClick = { play(s) }, modifier = Modifier.animateItem())
                             }
@@ -374,8 +424,10 @@ private fun Results(
                     }
                     SearchTab.ARTISTS -> {
                         val artists = vm.artists(state.songs)
-                        items(artists, key = { "a-" + it.name.lowercase() }) { a ->
-                            ArtistRow(a, onClick = { vm.onQueryChange(a.name); vm.onTabChange(SearchTab.SONGS) })
+                        val artistKeys = artists.uniqueKeys { "a-" + it.name.lowercase() }
+                        itemsIndexed(artists, key = { i, _ -> artistKeys[i] }) { _, a ->
+                            // What you typed found this artist — that's the search worth keeping, not the name the app fills in next.
+                            ArtistRow(a, onClick = { vm.commitSearch(); vm.onQueryChange(a.name, fromUser = false); vm.onTabChange(SearchTab.SONGS) })
                         }
                     }
                     SearchTab.PLAYLISTS -> playlistItems(state, vm)
@@ -454,13 +506,16 @@ private fun androidx.compose.foundation.lazy.LazyListScope.playlistItems(state: 
         state.playlists.isEmpty() -> item {
             Message(icon = Icons.Rounded.SearchOff, title = "No playlists for this one", body = "Songs and artists above may still have what you're after.", fill = false)
         }
-        else -> items(state.playlists, key = { "p-" + it.url }) { p -> PlaylistRow(p) }
+        else -> {
+            val playlistKeys = state.playlists.uniqueKeys { "p-" + it.url }
+            itemsIndexed(state.playlists, key = { i, _ -> playlistKeys[i] }) { _, p -> PlaylistRow(p, onOpen = vm::commitSearch) }
+        }
     }
 }
 
 /** A YouTube playlist: tapping loads its tracks and plays them in order; the bookmark keeps a copy in your library. */
 @Composable
-private fun PlaylistRow(p: YtPlaylist) {
+private fun PlaylistRow(p: YtPlaylist, onOpen: () -> Unit) {
     val scope = rememberCoroutineScope()
     var loading by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
@@ -472,6 +527,7 @@ private fun PlaylistRow(p: YtPlaylist) {
             .height(72.dp)
             .pressable(onClick = {
                 if (loading) return@pressable
+                onOpen()
                 loading = true
                 scope.launch {
                     val tracks = DaydreaminApp.instance.repository.playlistTracks(p.url).getOrDefault(emptyList())

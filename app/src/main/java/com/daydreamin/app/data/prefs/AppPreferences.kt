@@ -41,6 +41,7 @@ class AppPreferences(private val context: Context) {
         val HISTORY_JSON = stringSetPreferencesKey("history_json")
         val PLAYLISTS_JSON = stringPreferencesKey("playlists_json")
         val PLAYBACK_SNAPSHOT_JSON = stringPreferencesKey("playback_snapshot_json")
+        val SEARCH_HISTORY_JSON = stringPreferencesKey("search_history_json")
         val EQUALIZER_PRESET = stringPreferencesKey("equalizer_preset")
         val USER_NAME = stringPreferencesKey("user_name")
         val HAS_AVATAR = booleanPreferencesKey("has_avatar")
@@ -184,6 +185,23 @@ class AppPreferences(private val context: Context) {
 
     suspend fun clearPlaybackSnapshot() = edit { it.remove(Keys.PLAYBACK_SNAPSHOT_JSON) }
 
+    /** What you've searched for, newest first — only searches you made, never the ones the app runs for itself. */
+    val searchHistory: Flow<List<String>> = context.dataStore.data.map { prefs ->
+        prefs[Keys.SEARCH_HISTORY_JSON]?.let { runCatching { Json.decodeFromString<List<String>>(it) }.getOrNull() } ?: emptyList()
+    }
+
+    suspend fun addSearch(query: String) = edit { prefs ->
+        val current = prefs[Keys.SEARCH_HISTORY_JSON]?.let { runCatching { Json.decodeFromString<List<String>>(it) }.getOrNull() } ?: emptyList()
+        prefs[Keys.SEARCH_HISTORY_JSON] = Json.encodeToString(withSearch(current, query))
+    }
+
+    suspend fun removeSearch(query: String) = edit { prefs ->
+        val current = prefs[Keys.SEARCH_HISTORY_JSON]?.let { runCatching { Json.decodeFromString<List<String>>(it) }.getOrNull() } ?: emptyList()
+        prefs[Keys.SEARCH_HISTORY_JSON] = Json.encodeToString(current.filterNot { it.equals(query, ignoreCase = true) })
+    }
+
+    suspend fun clearSearchHistory() = edit { it.remove(Keys.SEARCH_HISTORY_JSON) }
+
     /** Everything the user has built up, read in one consistent snapshot of the store. */
     suspend fun exportLibrary(): LibraryBackup {
         val prefs = context.dataStore.data.first()
@@ -276,4 +294,11 @@ data class Playlist(
     val coverUrl: String? = null,
 ) {
     val isSaved: Boolean get() = sourceUrl != null
+}
+
+/** [query] moved to the front of [history]: trimmed, no case-insensitive repeats, at most [max] kept. */
+internal fun withSearch(history: List<String>, query: String, max: Int = 15): List<String> {
+    val q = query.trim().replace(Regex("\\s+"), " ")
+    if (q.isEmpty()) return history
+    return (listOf(q) + history.filterNot { it.equals(q, ignoreCase = true) }).take(max)
 }

@@ -1,5 +1,6 @@
 package com.daydreamin.app.ui.screens.home
 
+import com.daydreamin.app.ui.components.uniqueKeys
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
@@ -336,15 +337,18 @@ private fun LazyListScope.moodResults(browse: MoodBrowse, nowPlaying: () -> NowP
         browse.songs.isEmpty() -> item(key = "mood-empty") {
             Text("Nothing here right now.", color = TextSecondary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(Space.gutter))
         }
-        else -> itemsIndexed(browse.songs, key = { _, song -> "r-" + song.playId }) { index, song ->
-            StaggeredAppear(index, modifier = Modifier.padding(horizontal = Space.gutter)) {
-                val np = nowPlaying()
-                QuickPickRow(
-                    song = song,
-                    isCurrent = np.playId == song.playId,
-                    isPlaying = np.isPlaying,
-                    onClick = { PlayerController.playSong(song) },
-                )
+        else -> {
+            val rowKeys = browse.songs.uniqueKeys { "r-" + it.playId }
+            itemsIndexed(browse.songs, key = { i, _ -> rowKeys[i] }) { index, song ->
+                StaggeredAppear(index, modifier = Modifier.padding(horizontal = Space.gutter)) {
+                    val np = nowPlaying()
+                    QuickPickRow(
+                        song = song,
+                        isCurrent = np.playId == song.playId,
+                        isPlaying = np.isPlaying,
+                        onClick = { PlayerController.playSong(song) },
+                    )
+                }
             }
         }
     }
@@ -614,7 +618,8 @@ private fun QuickPicksGrid(songs: List<Song>, nowPlaying: () -> NowPlaying, onPl
         horizontalArrangement = Arrangement.spacedBy(Space.s),
         modifier = Modifier.fillMaxWidth().height(QuickPickRowHeight * rows),
     ) {
-        items(songs.size, key = { songs[it].playId }) { index ->
+        val songKeys = songs.uniqueKeys { it.playId }
+        items(songs.size, key = { songKeys[it] }) { index ->
             val song = songs[index]
             val np = nowPlaying()
             QuickPickRow(
@@ -659,7 +664,8 @@ private fun CardRow(songs: List<Song>, cardSize: Dp, nowPlaying: () -> NowPlayin
         contentPadding = PaddingValues(horizontal = Space.gutter),
         horizontalArrangement = Arrangement.spacedBy(Space.s + 2.dp),
     ) {
-        itemsIndexed(songs, key = { _, song -> song.playId }) { index, song ->
+        val songKeys = songs.uniqueKeys { it.playId }
+        itemsIndexed(songs, key = { i, _ -> songKeys[i] }) { index, song ->
             val np = nowPlaying()
             ArtCard(song, cardSize, isCurrent = np.playId == song.playId, isPlaying = np.isPlaying, onClick = { onClick(song, index) })
         }
@@ -708,7 +714,8 @@ private fun LibraryShelf(liked: List<Song>, playlists: List<Playlist>, onOpenLik
         item(key = "liked") {
             CollectionTile("Liked songs", songCount(liked.size), onClick = onOpenLiked) { LikedTile(TileSize) }
         }
-        items(playlists, key = { "pl-" + it.id }) { p ->
+        val playlistKeys = playlists.uniqueKeys { "pl-" + it.id }
+        itemsIndexed(playlists, key = { i, _ -> playlistKeys[i] }) { _, p ->
             CollectionTile(p.name, songCount(p.songs.size), onClick = { onOpenPlaylist(p) }) { PlaylistCover(p, TileSize) }
         }
         item(key = "new") {

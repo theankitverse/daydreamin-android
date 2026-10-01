@@ -1,5 +1,6 @@
 package com.daydreamin.app.ui.screens.queue
 
+import com.daydreamin.app.ui.components.uniqueKeys
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
@@ -304,7 +305,8 @@ fun QueueScreen(visibility: AnimatedVisibilityScope, onBack: () -> Unit) {
                             EmptyQueue(nothingPlaying = song == null, modifier = Modifier.animateItem())
                         }
                     }
-                    itemsIndexed(local, key = { _, s -> ROW + s.playId }) { index, s ->
+                    val rowKeys = local.uniqueKeys { ROW + it.playId }
+                    itemsIndexed(local, key = { i, _ -> rowKeys[i] }) { index, s ->
                         val key = ROW + s.playId
                         val isDragged = reorder.key == key
                         QueueRow(

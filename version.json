@@ -1,6 +1,6 @@
 {
-  "versionCode": 9,
-  "versionName": "1.4.1",
+  "versionCode": 10,
+  "versionName": "1.4.2",
   "url": "https://github.com/theankitverse/daydreamin-android/releases/latest",
-  "notes": "Installs on older and 32-bit phones (Android 5.0 and up), and update checks work again. Also includes 1.4.0: cleaner audio, a Home for new listeners, Up Next that follows your song, and smoother Now Playing gestures."
+  "notes": "Songs keep playing when your screen is off, Play always works, swiping the app away stops the music, no more accidental exits from Home, and a new Recent searches list."
 }

@@ -15,8 +15,8 @@ android {
         // phone's version doesn't install at all ("There was a problem parsing the package").
         minSdk = 21
         targetSdk = 35
-        versionCode = 9
-        versionName = "1.4.1"
+        versionCode = 10
+        versionName = "1.4.2"
     }
 
     buildTypes {
@@ -79,12 +79,12 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.8.1")
 
     // Media3 — playback, MediaSession, lock screen / notification controls
-    implementation("androidx.media3:media3-exoplayer:1.4.1")
-    implementation("androidx.media3:media3-session:1.4.1")
-    implementation("androidx.media3:media3-common:1.4.1")
+    implementation("androidx.media3:media3-exoplayer:1.8.0")
+    implementation("androidx.media3:media3-session:1.8.0")
+    implementation("androidx.media3:media3-common:1.8.0")
     // StandaloneDatabaseProvider — backs the on-disk audio cache's index (media3-datasource,
     // which SimpleCache/CacheDataSource live in, already comes in transitively via exoplayer).
-    implementation("androidx.media3:media3-database:1.4.1")
+    implementation("androidx.media3:media3-database:1.8.0")
 
     // Networking
     implementation("com.squareup.retrofit2:retrofit:2.11.0")

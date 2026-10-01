@@ -1,5 +1,6 @@
 package com.daydreamin.app.ui.screens.library
 
+import com.daydreamin.app.ui.components.uniqueKeys
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
@@ -232,7 +233,8 @@ private fun LazyListScope.likedTab(
             modifier = Modifier.animateItem(),
         )
     }
-    itemsIndexed(liked, key = { _, s -> "liked-" + s.playId }) { index, s ->
+    val likedKeys = liked.uniqueKeys { "liked-" + it.playId }
+    itemsIndexed(liked, key = { i, _ -> likedKeys[i] }) { index, s ->
         val np = nowPlaying()
         SongListRow(s, isCurrent = np.playId == s.playId, isPlaying = np.isPlaying, onClick = { play(liked, index, s) }, modifier = Modifier.animateItem())
     }
@@ -270,7 +272,8 @@ private fun LazyListScope.recentTab(
             ConfirmPill(label = "Clear", confirmLabel = "Clear all?", onConfirm = { onClear(); Toaster.show("Listening history cleared") })
         }
     }
-    itemsIndexed(history, key = { _, s -> "recent-" + s.playId }) { index, s ->
+    val historyKeys = history.uniqueKeys { "recent-" + it.playId }
+    itemsIndexed(history, key = { i, _ -> historyKeys[i] }) { index, s ->
         val np = nowPlaying()
         SongListRow(s, isCurrent = np.playId == s.playId, isPlaying = np.isPlaying, onClick = { play(index, s) }, modifier = Modifier.animateItem())
     }
@@ -315,7 +318,8 @@ private fun LazyListScope.playlistsTab(playlists: List<Playlist>, liked: List<So
         }
         return
     }
-    itemsIndexed(playlists, key = { _, p -> "pl-" + p.id }) { _, p ->
+    val playlistKeys = playlists.uniqueKeys { "pl-" + it.id }
+    itemsIndexed(playlists, key = { i, _ -> playlistKeys[i] }) { _, p ->
         Row(
             Modifier.animateItem().fillMaxWidth().height(76.dp).pressable(onClick = { onOpen(p) }).padding(start = Space.gutter, end = Space.m),
             verticalAlignment = Alignment.CenterVertically,
@@ -376,7 +380,8 @@ private fun LazyListScope.playlistDetail(
         }
         return
     }
-    itemsIndexed(playlist.songs, key = { _, s -> "pd-" + s.playId }) { index, s ->
+    val songKeys = playlist.songs.uniqueKeys { "pd-" + it.playId }
+    itemsIndexed(playlist.songs, key = { i, _ -> songKeys[i] }) { index, s ->
         val np = nowPlaying()
         SongListRow(
             s,

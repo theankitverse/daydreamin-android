@@ -1,5 +1,6 @@
 package com.daydreamin.app.ui.screens.profile
 
+import com.daydreamin.app.ui.components.uniqueKeys
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -186,7 +187,8 @@ fun ProfileScreen(
                         contentPadding = PaddingValues(horizontal = Space.gutter),
                         horizontalArrangement = Arrangement.spacedBy(Space.s + 2.dp),
                     ) {
-                        itemsIndexed(recent, key = { _, s -> s.playId }) { i, s ->
+                        val recentKeys = recent.uniqueKeys { it.playId }
+                        itemsIndexed(recent, key = { i, _ -> recentKeys[i] }) { i, s ->
                             RecentCard(
                                 song = s,
                                 isCurrent = s.playId == nowPlayingId,

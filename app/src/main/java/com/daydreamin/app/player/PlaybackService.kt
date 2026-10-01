@@ -204,11 +204,15 @@ class PlaybackService : MediaSessionService() {
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
 
+    /**
+     * Swiping Daydreamin out of Recents ends the session: music stops and the notification goes,
+     * instead of playing on with no app to come back to. (The pause also saves where you were,
+     * so the next launch resumes there.) Media3 keeps the service in the foreground for a while
+     * after a pause, so a plain stopSelf() is no longer enough — this pauses and stops together.
+     */
     override fun onTaskRemoved(rootIntent: Intent?) {
-        val player = mediaSession?.player ?: return
-        if (!player.playWhenReady || player.mediaItemCount == 0) {
-            stopSelf()
-        }
+        pauseAllPlayersAndStopSelf()
+        PlayerController.disconnect()
     }
 
     override fun onDestroy() {

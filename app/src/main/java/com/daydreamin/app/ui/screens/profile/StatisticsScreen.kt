@@ -1,5 +1,6 @@
 package com.daydreamin.app.ui.screens.profile
 
+import com.daydreamin.app.ui.components.uniqueKeys
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -105,7 +106,8 @@ fun StatisticsScreen(onBack: () -> Unit) {
             }
             if (artists.isNotEmpty()) {
                 item { Section("Top artists lately") }
-                itemsIndexed(artists, key = { _, g -> "a-" + g.first().artist.lowercase() }) { i, group ->
+                val artistKeys = artists.uniqueKeys { "a-" + it.first().artist.lowercase() }
+                itemsIndexed(artists, key = { i, _ -> artistKeys[i] }) { i, group ->
                     Row(
                         Modifier
                             .fillMaxWidth()
@@ -125,7 +127,8 @@ fun StatisticsScreen(onBack: () -> Unit) {
             }
             if (history.isNotEmpty()) {
                 item { Section("Recently played") }
-                itemsIndexed(history.take(30), key = { _, s -> "h-" + s.playId }) { _, s ->
+                val historyKeys = history.take(30).uniqueKeys { "h-" + it.playId }
+                itemsIndexed(history.take(30), key = { i, _ -> historyKeys[i] }) { _, s ->
                     SongListRow(
                         s,
                         isCurrent = s.playId == nowId,
