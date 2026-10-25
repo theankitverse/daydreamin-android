@@ -1,6 +1,8 @@
 package com.daydreamin.app.ui.components
 
 import android.content.ActivityNotFoundException
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -14,7 +16,6 @@ object Support {
     private const val URL = "https://www.buymeacoffee.com/$BUY_ME_A_COFFEE_USERNAME"
 
     const val UPI_ID = "ankitkrchaurasiya2024@okicici"
-    private const val UPI_PAYEE_NAME = "Ankit"
 
     fun open(context: Context) {
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(URL)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -26,21 +27,34 @@ object Support {
     }
 
     /**
-     * Opens the person's UPI app (GPay, PhonePe, Paytm, …) on its payment screen with the UPI ID
-     * already filled in; they choose the amount.
+     * Copies the UPI ID and opens the person's UPI app (GPay, PhonePe, Paytm, …) on its home screen,
+     * where they pay it with "Pay UPI ID" — any amount.
+     *
+     * Not a upi://pay link: GPay refuses those for a personal UPI ID ("you have exceeded the bank
+     * limit", even for ₹1, or a ₹2,000 cap), and only a business UPI ID gets past that. An ID
+     * pasted into the app by hand has no such limit.
      */
     fun openUpi(context: Context) {
-        // The standard UPI link, written out plainly (an encoded "@" trips up some UPI apps).
-        val uri = Uri.parse("upi://pay?pa=$UPI_ID&pn=$UPI_PAYEE_NAME&tn=Donation%20to%20Daydreamin&cu=INR")
-        // Straight to Android, no "is there a UPI app?" check first: Android 11+ hides other apps from
-        // such checks unless the manifest names them exactly, and a check that got that wrong is why
-        // this button once did nothing. Opening the link isn't restricted that way. With several UPI
-        // apps, Android asks which one to use.
-        val pay = Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("UPI ID", UPI_ID))
+        Toaster.show("UPI ID copied. In your UPI app, tap “Pay UPI ID” and paste it", durationMs = 8_000)
+
+        // The installed UPI apps (the manifest's <queries> lets us see them), opened normally.
+        val pm = context.packageManager
+        val apps = pm.queryIntentActivities(Intent(Intent.ACTION_VIEW, Uri.parse("upi://pay")), 0)
+            .map { it.activityInfo.packageName }
+            .distinct()
+            .mapNotNull { pm.getLaunchIntentForPackage(it) }
+        if (apps.isEmpty()) {
+            Toaster.show("UPI ID copied: $UPI_ID. Paste it in GPay, PhonePe or Paytm to donate", durationMs = 8_000)
+            return
+        }
+        val open = if (apps.size == 1) apps[0] else
+            Intent.createChooser(apps[0], "Donate with").putExtra(Intent.EXTRA_INITIAL_INTENTS, apps.drop(1).toTypedArray())
         try {
-            context.startActivity(pay)
+            context.startActivity(open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         } catch (e: ActivityNotFoundException) {
-            Toaster.show("No UPI app found on this phone. Install GPay, PhonePe or Paytm to donate")
+            Toaster.show("UPI ID copied: $UPI_ID. Paste it in your UPI app to donate", durationMs = 8_000)
         }
     }
 }

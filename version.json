@@ -1,9 +1,9 @@
 {
-  "versionCode": 17,
-  "versionName": "1.6.1",
+  "versionCode": 18,
+  "versionName": "1.6.2",
   "url": "https://github.com/theankitverse/daydreamin-android/releases/latest",
-  "notes": "Donate via UPI now opens your UPI app directly.",
-  "apkUrl": "https://github.com/theankitverse/daydreamin-android/releases/download/v1.6.1/daydreamin-v1.6.1.apk",
-  "apkSize": 4780033,
-  "sha256": "3591803bea0dbc24f95ca01527161e6b72e3dfae5e68f172c6a5c9de8e9af84d"
+  "notes": "Donate via UPI fixed: it copies the UPI ID and opens your UPI app. Tap Pay UPI ID and paste it, any amount.",
+  "apkUrl": "https://github.com/theankitverse/daydreamin-android/releases/download/v1.6.2/daydreamin-v1.6.2.apk",
+  "apkSize": 4780130,
+  "sha256": "d1ed254744d5f4129ce78298a411b3d208532b6f2291ab335dfe228927a172c8"
 }

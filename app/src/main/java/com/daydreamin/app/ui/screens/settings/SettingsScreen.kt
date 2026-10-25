@@ -607,7 +607,7 @@ private fun UpiRow() {
         RowIcon(Icons.Rounded.CurrencyRupee)
         Column(Modifier.weight(1f).padding(start = 14.dp)) {
             Text("Donate via UPI", style = MaterialTheme.typography.titleMedium, color = Color.White)
-            Text("Any amount, from your UPI app", style = MaterialTheme.typography.bodySmall, color = Muted, maxLines = 1)
+            Text(com.daydreamin.app.ui.components.Support.UPI_ID, style = MaterialTheme.typography.bodySmall, color = Muted, maxLines = 1)
         }
         Spacer(Modifier.width(12.dp))
         Row(
