@@ -33,6 +33,8 @@ import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.DownloadDone
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Favorite
@@ -279,6 +281,17 @@ fun SongMenu(song: Song, onDismiss: () -> Unit, extra: List<SongMenuAction> = em
                         SongActions.toggleLiked(song, liked); onDismiss()
                     }
                     MenuRow(Icons.AutoMirrored.Rounded.PlaylistAdd, "Add to playlist", trailing = Icons.Rounded.ChevronRight) { page = 1 }
+                    val download = rememberDownload(song)
+                    val downloadScope = androidx.compose.runtime.rememberCoroutineScope()
+                    MenuRow(
+                        if (download?.status == com.daydreamin.app.data.download.DownloadStatus.DONE) Icons.Rounded.DownloadDone else Icons.Rounded.Download,
+                        when (download?.status) {
+                            null -> "Download"
+                            com.daydreamin.app.data.download.DownloadStatus.DONE -> "Remove download"
+                            com.daydreamin.app.data.download.DownloadStatus.FAILED -> "Try download again"
+                            else -> "Cancel download"
+                        },
+                    ) { toggleDownload(song, download, downloadScope); onDismiss() }
                     extra.forEach { a -> MenuRow(a.icon, a.label, destructive = a.destructive) { a.onClick(); onDismiss() } }
                 } else {
                     MenuRow(Icons.Rounded.ChevronLeft, "Add to playlist", dim = true) { page = 0 }

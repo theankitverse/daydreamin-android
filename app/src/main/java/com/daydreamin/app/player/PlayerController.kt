@@ -11,6 +11,7 @@ import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.daydreamin.app.DaydreaminApp
+import com.daydreamin.app.data.download.Downloads
 import com.daydreamin.app.data.model.Song
 import com.daydreamin.app.data.repository.toSong
 import com.daydreamin.app.data.taste.TasteProfile
@@ -392,6 +393,18 @@ object PlayerController {
             var swapReleased = false
             fun releaseSwap() { if (!swapReleased) { swapReleased = true; pendingPlaylistSwaps-- } }
             try {
+                Downloads.awaitReady()
+                if (request != playRequest) return@launch
+                downloadedItem(song)?.let { item ->
+                    // Downloaded: restores with no connection and no lookup.
+                    controller?.setMediaItem(item, snapshot.positionMs)
+                    releaseSwap()
+                    controller?.prepare()
+                    lastKnownGoodSong = song
+                    _meta.update { it.copy(isBuffering = false, streamQuality = "Downloaded") }
+                    prepareUpcoming()
+                    return@launch
+                }
                 val result = resolveStreamWithRetry(song)
                 if (request != playRequest) return@launch // you started something else meanwhile
                 val resolved = result.getOrNull()
@@ -500,6 +513,36 @@ object PlayerController {
             var swapReleased = false
             fun releaseSwap() { if (!swapReleased) { swapReleased = true; pendingPlaylistSwaps-- } }
             try {
+            Downloads.awaitReady()
+            if (request != playRequest) return@launch
+            val downloaded = downloadedItem(song)
+            if (downloaded != null) {
+                consecutiveResolveFailures = 0
+                lastKnownGoodSong = song
+                controller?.setMediaItem(downloaded)
+                releaseSwap()
+                controller?.prepare()
+                controller?.play()
+                Log.d(TAG, "playing downloaded '${song.title}'")
+                _meta.update { it.copy(streamQuality = "Downloaded") }
+                if (queueContext.isEmpty() && autoFillQueue) fillQueueAfterDownloaded(song)
+                prepareUpcoming()
+                persistSnapshotNow()
+                return@launch
+            }
+            // Offline, and this song isn't on the phone: give a network switch a moment, then
+            // carry on with the next downloaded song in the queue rather than failing on each one.
+            if (!NetworkWatch.isOnline(app) && !NetworkWatch.awaitOnline(app, 5_000)) {
+                if (request != playRequest) return@launch
+                val next = queueContext.indexOfFirst { Downloads.isDownloaded(it.playId) }
+                if (next >= 0) {
+                    releaseSwap()
+                    Log.w(TAG, "offline: '${song.title}' isn't downloaded — playing the next downloaded song")
+                    _meta.update { it.copy(error = "Couldn't play \"${song.title}\": failed to connect") }
+                    playSong(queueContext[next], queueContext.drop(next + 1), autoFillQueue = false)
+                    return@launch
+                }
+            }
             val result = resolveWhenOnline(song, request) ?: return@launch // a newer request owns the player now
             val resolved = result.getOrNull()
             if (resolved == null) {
@@ -571,6 +614,31 @@ object PlayerController {
             var swapReleased = false
             fun releaseSwap() { if (!swapReleased) { swapReleased = true; pendingPlaylistSwaps-- } }
             try {
+                downloadedItem(song)?.let { item ->
+                    // Downloaded: back in place from the phone, no network involved.
+                    if (request != playRequest || _meta.value.currentSong?.playId != song.playId) return@launch
+                    controller?.setMediaItem(item, positionMs)
+                    releaseSwap()
+                    controller?.prepare()
+                    if (playWhenReady) controller?.play()
+                    Log.d(TAG, "recovered '${song.title}' from its download at ${positionMs}ms")
+                    prepareUpcoming()
+                    return@launch
+                }
+                // Offline, and this song isn't on the phone: after a moment's grace for a network
+                // switch, move on to the next downloaded song instead of waiting for a connection.
+                if (!NetworkWatch.isOnline(app) && !NetworkWatch.awaitOnline(app, 5_000)) {
+                    if (request != playRequest || _meta.value.currentSong?.playId != song.playId) return@launch
+                    val queue = _meta.value.queue
+                    val next = queue.indexOfFirst { Downloads.isDownloaded(it.playId) }
+                    if (next >= 0) {
+                        releaseSwap()
+                        Log.w(TAG, "offline: '${song.title}' isn't downloaded — moving on to the next downloaded song")
+                        _meta.update { it.copy(error = "Couldn't play \"${song.title}\": failed to connect") }
+                        playSong(queue[next], queue.drop(next + 1), autoFillQueue = false)
+                        return@launch
+                    }
+                }
                 val result = resolveWhenOnline(song, request) ?: return@launch // you moved on while we waited
                 if (_meta.value.currentSong?.playId != song.playId) return@launch
                 val resolved = result.getOrNull()
@@ -646,6 +714,7 @@ object PlayerController {
     private fun onNetworkChanged() {
         Log.d(TAG, "network changed — refreshing stream URLs signed for the old address")
         YouTubeExtractorService.invalidateAllStreams()
+        Downloads.retryFailed()
         val c = controller ?: return
         if (pendingPlaylistSwaps > 0 || preparedAheadPlayIds.isEmpty()) return
         while (c.mediaItemCount > c.currentMediaItemIndex + 1) c.removeMediaItem(c.mediaItemCount - 1)
@@ -695,6 +764,24 @@ object PlayerController {
         }
     }
 
+    /** A downloaded song plays straight from the phone: no lookup and no connection needed. */
+    private fun downloadedItem(song: Song): MediaItem? {
+        val videoId = Downloads.downloadedSong(song.playId)?.videoId ?: return null
+        return MediaItem.Builder()
+            .setMediaId(song.playId)
+            .setUri(Downloads.uriFor(videoId))
+            .setCustomCacheKey(Downloads.cacheKeyFor(song.playId))
+            .setMediaMetadata(metadataFor(song))
+            .build()
+    }
+
+    private fun metadataFor(song: Song): MediaMetadata =
+        MediaMetadata.Builder()
+            .setTitle(song.title)
+            .setArtist(song.artist)
+            .setArtworkUri(song.artworkUrl.takeIf { it.isNotBlank() }?.let(Uri::parse))
+            .build()
+
     private fun buildMediaItem(song: Song, resolved: ResolvedStream): MediaItem =
         MediaItem.Builder()
             .setMediaId(song.playId)
@@ -707,13 +794,7 @@ object PlayerController {
             // video later, the key changes too and we safely re-fetch instead of risking
             // stitching mismatched cached bytes onto a differently-encoded stream.
             .setCustomCacheKey("${song.videoId ?: song.playId}_${resolved.bitrateKbps}_${resolved.codec}")
-            .setMediaMetadata(
-                MediaMetadata.Builder()
-                    .setTitle(song.title)
-                    .setArtist(song.artist)
-                    .setArtworkUri(song.artworkUrl.takeIf { it.isNotBlank() }?.let(Uri::parse))
-                    .build()
-            )
+            .setMediaMetadata(metadataFor(song))
             .build()
 
     /**
@@ -727,13 +808,32 @@ object PlayerController {
      * tracks by other artists: more variety, still seeded by this song. Runs in the background so
      * it never blocks playback starting.
      */
-    private suspend fun autoFillQueueFor(song: Song, resolved: ResolvedStream) {
+    private suspend fun autoFillQueueFor(song: Song, resolved: ResolvedStream) = autoFillQueueFor(song, resolved.videoId)
+
+    /**
+     * Up Next for a downloaded song: its radio when online (as for any song), and otherwise the rest
+     * of your downloads, shuffled, so listening carries on with no connection.
+     */
+    private fun fillQueueAfterDownloaded(song: Song) {
+        val videoId = Downloads.downloadedSong(song.playId)?.videoId
+        if (videoId != null && NetworkWatch.isOnline(app)) {
+            scope.launch { runCatching { autoFillQueueFor(song, videoId) } }
+        } else {
+            val others = Downloads.items.value.values
+                .filter { it.status == com.daydreamin.app.data.download.DownloadStatus.DONE && it.song.playId != song.playId }
+                .map { it.song }
+                .shuffled()
+            _meta.update { it.copy(queue = others) }
+        }
+    }
+
+    private suspend fun autoFillQueueFor(song: Song, videoId: String) {
         val recentTitles = app.prefs.history.first().take(15)
             .map { YouTubeExtractorService.normalizeTitleForDedup(it.title) }
             .toSet()
 
         val primaryMix = YouTubeExtractorService
-            .fetchRadioMix(resolved.videoId, song.title, song.artist, recentTitles)
+            .fetchRadioMix(videoId, song.title, song.artist, recentTitles)
             .map { it.toSong() }
             .filterNot { it.playId == song.playId }
 
@@ -802,6 +902,15 @@ object PlayerController {
         scope.launch {
             for (song in missing) {
                 if (requestId != prepareUpcomingRequestId) return@launch // superseded by a newer call
+                val downloaded = downloadedItem(song)
+                if (downloaded != null) {
+                    val cur = controller ?: return@launch
+                    if (_meta.value.queue.getOrNull(preparedAheadPlayIds.size)?.playId != song.playId) return@launch
+                    cur.addMediaItem(downloaded)
+                    preparedAheadPlayIds.add(song.playId)
+                    Log.d(TAG, "prepared ahead downloaded '${song.title}' depth=${preparedAheadPlayIds.size}/$PREPARE_AHEAD")
+                    continue
+                }
                 val resolved = resolveStreamWithRetry(song).getOrNull() ?: continue
                 val cur = controller ?: return@launch
                 if (requestId != prepareUpcomingRequestId) return@launch
@@ -875,6 +984,9 @@ object PlayerController {
             // own related tracks/radio mix, so a long listening session never stalls out.
             _meta.update { it.copy(queue = resolved.related.map { t -> t.toSong() }.filterNot { s -> s.playId == newCurrent.playId }) }
             scope.launch { autoFillQueueFor(newCurrent, resolved) }
+        } else if (Downloads.isDownloaded(newCurrent.playId)) {
+            // A downloaded song has no lookup to borrow related songs from: its radio, or other downloads offline.
+            fillQueueAfterDownloaded(newCurrent)
         }
         persistSnapshotSoon()
     }

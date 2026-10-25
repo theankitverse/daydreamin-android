@@ -1,5 +1,11 @@
 package com.daydreamin.app.ui.screens.library
 
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.DownloadDone
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import com.daydreamin.app.ui.components.uniqueKeys
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
@@ -150,6 +156,7 @@ fun LibraryScreen(contentPadding: PaddingValues, onOpenPlayer: () -> Unit, onGoH
     }
     val light = rememberArtworkLight(leadArt?.cover?.ifBlank { leadArt.artworkUrl }, DefaultLight)
 
+    val downloadItems by com.daydreamin.app.data.download.Downloads.items.collectAsState()
     val listState = rememberLazyListState()
     val scrollY = { if (listState.firstVisibleItemIndex > 0) 2_000f else listState.firstVisibleItemScrollOffset.toFloat() }
     val haze = remember { HazeState() }
@@ -188,6 +195,7 @@ fun LibraryScreen(contentPadding: PaddingValues, onOpenPlayer: () -> Unit, onGoH
                             if (nowPlaying.playId == song.playId) onOpenPlayer() else PlayerController.playSong(song)
                         }, onGoHome = onGoHome)
                         LibraryTab.PLAYLISTS -> playlistsTab(playlists, liked, onOpen = { vm.openPlaylist(it.id) }, onOpenLiked = { vm.onTabChange(LibraryTab.LIKED) })
+                        LibraryTab.DOWNLOADS -> downloadsTab(downloadItems.values.toList(), { nowPlaying }, onGoHome, play)
                     }
                 }
             }
@@ -215,7 +223,7 @@ private fun LazyListScope.likedTab(
             EmptyCollection(
                 icon = Icons.Rounded.FavoriteBorder,
                 title = "Songs you love live here",
-                body = "Tap the heart on anything that's playing. Liked songs are also saved for offline listening over Wi-Fi.",
+                body = "Tap the heart on anything that's playing. Liked songs also download, so they play without a connection.",
                 action = "Find something on Home",
                 onAction = onGoHome,
                 modifier = Modifier.animateItem(),
@@ -230,6 +238,7 @@ private fun LazyListScope.likedTab(
             light = light,
             onPlay = { PlayerController.playFromList(liked, 0) },
             onShuffle = { PlayerController.playFromList(liked.shuffled(), 0) },
+            trailing = { LikedDownloadToggle() },
             modifier = Modifier.animateItem(),
         )
     }
@@ -365,7 +374,13 @@ private fun LazyListScope.playlistDetail(
             byline = playlist.author?.takeIf { playlist.isSaved && it.isNotBlank() },
             onPlay = { PlayerController.playFromList(playlist.songs, 0) },
             onShuffle = { PlayerController.playFromList(playlist.songs.shuffled(), 0) },
-            trailing = { PlaylistMenu(playlist, onDeleted = onBack) },
+            trailing = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    PlaylistDownloadToggle(playlist)
+                    Spacer(Modifier.width(8.dp))
+                    PlaylistMenu(playlist, onDeleted = onBack)
+                }
+            },
             modifier = Modifier.animateItem(),
         )
     }
@@ -435,7 +450,7 @@ private fun Segmented(tab: LibraryTab, onTab: (LibraryTab) -> Unit, modifier: Mo
                 Box(
                     Modifier.weight(1f).fillMaxHeight().pressable(role = androidx.compose.ui.semantics.Role.Tab, onClick = { onTab(t) }),
                     contentAlignment = Alignment.Center,
-                ) { Text(t.label, style = MaterialTheme.typography.labelLarge, color = color) }
+                ) { Text(t.label, style = MaterialTheme.typography.labelLarge, color = color, maxLines = 1, softWrap = false) }
             }
         }
     }
@@ -660,3 +675,117 @@ private fun collectionSummary(songs: List<Song>): String {
     val length = if (minutes >= 60) "${minutes / 60} hr ${minutes % 60} min" else "$minutes min"
     return "${songCount(songs)} · $length"
 }
+
+// ---------------------------------------------------------------- downloads
+
+/** Everything kept on the phone: what's still downloading first, then the rest, newest first. */
+private fun LazyListScope.downloadsTab(
+    downloads: List<com.daydreamin.app.data.download.DownloadInfo>,
+    nowPlaying: () -> NowPlaying,
+    onGoHome: () -> Unit,
+    play: (List<Song>, Int, Song) -> Unit,
+) {
+    if (downloads.isEmpty()) {
+        item(key = "dl-empty") {
+            EmptyCollection(
+                icon = Icons.Rounded.Download,
+                title = "Nothing downloaded yet",
+                body = "Tap the download arrow in Now Playing, or Download in any song's ⋯ menu. Downloaded songs play without a connection, and liked songs download by themselves.",
+                action = "Find something on Home",
+                onAction = onGoHome,
+                modifier = Modifier.animateItem(),
+            )
+        }
+        return
+    }
+    val done = downloads.filter { it.status == com.daydreamin.app.data.download.DownloadStatus.DONE }.map { it.song }
+    val busy = downloads.filter { it.status == com.daydreamin.app.data.download.DownloadStatus.QUEUED || it.status == com.daydreamin.app.data.download.DownloadStatus.DOWNLOADING }
+    val failed = downloads.filter { it.status == com.daydreamin.app.data.download.DownloadStatus.FAILED }
+    item(key = "dl-summary") {
+        DownloadsSummary(done = done.size, busy = busy.size, failed = failed.size, modifier = Modifier.animateItem())
+    }
+    val ordered = busy.map { it.song } + failed.map { it.song } + done
+    val keys = ordered.uniqueKeys { "dl-" + it.playId }
+    itemsIndexed(ordered, key = { i, _ -> keys[i] }) { _, s ->
+        val np = nowPlaying()
+        SongListRow(
+            s,
+            isCurrent = np.playId == s.playId,
+            isPlaying = np.isPlaying,
+            // Downloads play as a list of downloads, so they keep going with no connection.
+            onClick = { val i = done.indexOfFirst { it.playId == s.playId }; if (i >= 0) play(done, i, s) else PlayerController.playSong(s) },
+            modifier = Modifier.animateItem(),
+        )
+    }
+}
+
+@Composable
+private fun DownloadsSummary(done: Int, busy: Int, failed: Int, modifier: Modifier = Modifier) {
+    val bytes = remember(done, busy) { com.daydreamin.app.data.download.Downloads.bytesUsed() }
+    Row(modifier.fillMaxWidth().padding(start = Space.gutter, end = Space.gutter, bottom = Space.s), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                "$done ${if (done == 1) "song" else "songs"} · ${formatMegabytes(bytes)} on your phone",
+                style = MaterialTheme.typography.titleSmall,
+                color = Color.White,
+            )
+            Text(
+                when {
+                    busy > 0 -> "Downloading $busy more…"
+                    failed > 0 -> "$failed couldn't download"
+                    else -> "Plays without a connection"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.55f),
+            )
+        }
+        if (failed > 0 && busy == 0) {
+            Text(
+                "Try again",
+                style = MaterialTheme.typography.labelLarge,
+                color = Color.White,
+                modifier = Modifier.pressable(onClick = { com.daydreamin.app.data.download.Downloads.retryFailed() }).glass(Radius.pill, Glass.Clear).padding(horizontal = 14.dp, vertical = 7.dp),
+            )
+        }
+    }
+}
+
+private fun formatMegabytes(bytes: Long): String =
+    if (bytes >= 1024L * 1024 * 1024) "%.1f GB".format(bytes / (1024.0 * 1024 * 1024)) else "${(bytes / (1024 * 1024)).coerceAtLeast(0)} MB"
+
+/** Keeps every liked song downloaded, including ones liked later. */
+@Composable
+private fun LikedDownloadToggle() {
+    val prefs = com.daydreamin.app.DaydreaminApp.instance.prefs
+    val on by prefs.downloadLiked.collectAsState(initial = true)
+    val scope = rememberCoroutineScope()
+    CollectionDownloadToggle(on, label = "liked songs") { scope.launch { prefs.setDownloadLiked(!on) } }
+}
+
+/** Keeps this playlist downloaded, including songs added to it later. */
+@Composable
+private fun PlaylistDownloadToggle(playlist: Playlist) {
+    val prefs = com.daydreamin.app.DaydreaminApp.instance.prefs
+    val ids by prefs.downloadedPlaylists.collectAsState(initial = emptySet())
+    val on = playlist.id in ids
+    val scope = rememberCoroutineScope()
+    CollectionDownloadToggle(on, label = "“${playlist.name}”") { scope.launch { prefs.setPlaylistDownloaded(playlist.id, !on) } }
+}
+
+@Composable
+private fun CollectionDownloadToggle(on: Boolean, label: String, onToggle: () -> Unit) {
+    Box(
+        Modifier
+            .size(40.dp)
+            .semantics { contentDescription = if (on) "Remove download of $label" else "Download $label" }
+            .pressable(onClick = {
+                onToggle()
+                com.daydreamin.app.ui.components.Toaster.show(if (on) "Removed download of $label" else "Downloading $label")
+            })
+            .glass(Radius.pill, if (on) Glass.Frosted else Glass.Regular),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(if (on) Icons.Rounded.DownloadDone else Icons.Rounded.Download, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+    }
+}
+

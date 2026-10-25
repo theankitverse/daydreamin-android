@@ -179,10 +179,11 @@ object YouTubeExtractorService {
         throw lastError ?: IllegalStateException("No playable YouTube stream found for \"$artist - $title\".")
     }
 
-    suspend fun resolveVideoId(videoId: String): ResolvedStream {
+    /** [maxAgeMs]: how old a cached URL may be and still be handed out (the downloader asks for a fresh one on a retry). */
+    suspend fun resolveVideoId(videoId: String, maxAgeMs: Long = STREAM_CACHE_TTL_MS): ResolvedStream {
         cache[videoId]?.let { entry ->
             val age = System.currentTimeMillis() - entry.atMs
-            if (age < STREAM_CACHE_TTL_MS) {
+            if (age < minOf(maxAgeMs, STREAM_CACHE_TTL_MS)) {
                 if (age > STREAM_CACHE_TTL_MS - refreshMarginMs) refreshInBackground(videoId)
                 return entry.stream
             }

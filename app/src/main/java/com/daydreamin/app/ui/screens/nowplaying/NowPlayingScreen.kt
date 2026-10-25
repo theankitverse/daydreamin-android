@@ -537,6 +537,7 @@ private fun TitleRow(song: Song, liked: Boolean, onLike: () -> Unit, modifier: M
                 )
             }
         }
+        com.daydreamin.app.ui.components.DownloadButton(song, size = if (large) 44.dp else 40.dp)
         LikeButton(liked = liked, onClick = onLike, size = if (large) 44.dp else 40.dp)
     }
 }

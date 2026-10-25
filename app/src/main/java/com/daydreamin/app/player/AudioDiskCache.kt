@@ -29,7 +29,7 @@ object AudioDiskCache {
             cache ?: SimpleCache(
                 File(context.applicationContext.cacheDir, "audio_cache"),
                 LeastRecentlyUsedCacheEvictor(MAX_CACHE_BYTES),
-                StandaloneDatabaseProvider(context.applicationContext),
+                MediaDatabase.get(context),
             ).also { cache = it }
         }
 

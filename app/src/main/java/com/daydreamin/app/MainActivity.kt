@@ -70,6 +70,11 @@ class MainActivity : ComponentActivity() {
 
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
+    override fun onStart() {
+        super.onStart()
+        com.daydreamin.app.data.download.Downloads.onAppVisible()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         // The system launch screen can only show the still icon, so it hands over as soon as the
         // app can draw: we note exactly where it drew the icon and draw the same icon there

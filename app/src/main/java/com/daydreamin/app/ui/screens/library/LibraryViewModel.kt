@@ -18,7 +18,7 @@ import androidx.compose.runtime.setValue
  * list regrouped — and with YouTube-sourced songs, "album" is almost always a placeholder and
  * "artist" often a channel name — so they were dropped rather than dressed up.)
  */
-enum class LibraryTab(val label: String) { LIKED("Liked"), RECENT("Recent"), PLAYLISTS("Playlists") }
+enum class LibraryTab(val label: String) { LIKED("Liked"), RECENT("Recent"), PLAYLISTS("Playlists"), DOWNLOADS("Downloads") }
 
 /** Another screen asking Library to open on a particular collection or playlist (Profile's stat tiles, Home's shelves). Read once, then cleared. */
 object LibraryLaunch {

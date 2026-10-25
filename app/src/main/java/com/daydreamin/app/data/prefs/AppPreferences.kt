@@ -43,6 +43,9 @@ class AppPreferences(private val context: Context) {
         val PLAYBACK_SNAPSHOT_JSON = stringPreferencesKey("playback_snapshot_json")
         val SEARCH_HISTORY_JSON = stringPreferencesKey("search_history_json")
         val TOTAL_PLAYS = intPreferencesKey("total_plays")
+        val DOWNLOADED_SONGS_JSON = stringPreferencesKey("downloaded_songs_json")
+        val DOWNLOAD_LIKED = booleanPreferencesKey("download_liked")
+        val DOWNLOADED_PLAYLISTS = stringSetPreferencesKey("downloaded_playlists")
         val EQUALIZER_PRESET = stringPreferencesKey("equalizer_preset")
         val USER_NAME = stringPreferencesKey("user_name")
         val HAS_AVATAR = booleanPreferencesKey("has_avatar")
@@ -80,7 +83,8 @@ class AppPreferences(private val context: Context) {
     val audioNormalization: Flow<Boolean> = context.dataStore.data.map { it[Keys.AUDIO_NORMALIZATION] ?: false }
     suspend fun setAudioNormalization(value: Boolean) = edit { it[Keys.AUDIO_NORMALIZATION] = value }
 
-    val downloadWifiOnly: Flow<Boolean> = context.dataStore.data.map { it[Keys.DOWNLOAD_WIFI_ONLY] ?: true }
+    /** Off by default: most people listen on mobile data, and downloads should just work there. */
+    val downloadWifiOnly: Flow<Boolean> = context.dataStore.data.map { it[Keys.DOWNLOAD_WIFI_ONLY] ?: false }
     suspend fun setDownloadWifiOnly(value: Boolean) = edit { it[Keys.DOWNLOAD_WIFI_ONLY] = value }
 
     /** One of [com.daydreamin.app.player.EqPreset]'s names — stored as a plain string (not the
@@ -176,6 +180,36 @@ class AppPreferences(private val context: Context) {
     suspend fun startPlayCount(onRecord: Int) = edit { if (it[Keys.TOTAL_PLAYS] == null) it[Keys.TOTAL_PLAYS] = onRecord }
 
     suspend fun countPlay() = edit { it[Keys.TOTAL_PLAYS] = (it[Keys.TOTAL_PLAYS] ?: 0) + 1 }
+
+    // ---- downloads: what you asked to keep on the phone (the files themselves live in Downloads)
+
+    /** Songs you downloaded one by one, newest first. */
+    val downloadedSongs: Flow<List<Song>> = context.dataStore.data.map { prefs ->
+        prefs[Keys.DOWNLOADED_SONGS_JSON]?.let { runCatching { Json.decodeFromString<List<Song>>(it) }.getOrNull() } ?: emptyList()
+    }
+
+    suspend fun setSongDownloaded(song: Song, downloaded: Boolean) = edit { prefs ->
+        val current = prefs[Keys.DOWNLOADED_SONGS_JSON]?.let { runCatching { Json.decodeFromString<List<Song>>(it) }.getOrNull() } ?: emptyList()
+        val without = current.filterNot { it.playId == song.playId }
+        prefs[Keys.DOWNLOADED_SONGS_JSON] = Json.encodeToString(if (downloaded) listOf(song) + without else without)
+    }
+
+    /** Keep every liked song downloaded, including ones you like later. On by default. */
+    val downloadLiked: Flow<Boolean> = context.dataStore.data.map { it[Keys.DOWNLOAD_LIKED] ?: true }
+    suspend fun setDownloadLiked(value: Boolean) = edit { it[Keys.DOWNLOAD_LIKED] = value }
+
+    /** Playlists kept downloaded, songs added later included. */
+    val downloadedPlaylists: Flow<Set<String>> = context.dataStore.data.map { it[Keys.DOWNLOADED_PLAYLISTS] ?: emptySet() }
+    suspend fun setPlaylistDownloaded(id: String, downloaded: Boolean) = edit { prefs ->
+        val current = prefs[Keys.DOWNLOADED_PLAYLISTS] ?: emptySet()
+        prefs[Keys.DOWNLOADED_PLAYLISTS] = if (downloaded) current + id else current - id
+    }
+
+    suspend fun clearAllDownloads() = edit { prefs ->
+        prefs.remove(Keys.DOWNLOADED_SONGS_JSON)
+        prefs.remove(Keys.DOWNLOADED_PLAYLISTS)
+        prefs[Keys.DOWNLOAD_LIKED] = false
+    }
 
     val playlists: Flow<List<Playlist>> = context.dataStore.data.map { prefs ->
         prefs[Keys.PLAYLISTS_JSON]?.let {

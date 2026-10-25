@@ -2,7 +2,7 @@
 
 A native Android music app, built in Kotlin and Jetpack Compose, that streams music straight from
 YouTube — resolved entirely on-device, with no backend of its own. Search, gapless playback, a
-recommendation engine, on-device caching for offline listening, and a liquid-glass, AMOLED-first
+recommendation engine, downloads for offline listening, crossfade, and a liquid-glass, AMOLED-first
 design across every screen.
 
 This repo is the Android app only. It's a separate project from [Daydreamin's original web
@@ -21,7 +21,11 @@ app](https://github.com/theankitverse/Daydreamin).
   playlists (or your mix) to your library.
 - **Search** merges iTunes and YouTube results into one ranked, typo-tolerant list, with lyrics
   (via [LRCLIB](https://lrclib.net/)) synced Apple Music-style.
-- **Gapless playback**, disk caching, stream-URL refresh, retry/backoff, and audio-focus handling
+- **Downloads for offline listening**: download any song, your liked songs or whole playlists, and
+  they play with no connection. Downloads run in the background, resume after a dropped connection,
+  and work on mobile data (or Wi-Fi only, if you choose).
+- **Crossfade** between songs (Settings → Sound), gapless playback, disk caching, stream-URL refresh,
+  retry/backoff, and audio-focus handling
   built on Media3/ExoPlayer.
 - **Your library survives an uninstall.** A backup (liked songs, playlists, history, profile) is
   saved automatically to `Download/Daydreamin`, which Android doesn't touch when the app is
@@ -37,7 +41,7 @@ cd daydreamin-android
 ```
 
 The debug APK lands in `app/build/outputs/apk/debug/`. Requires JDK 17 and the Android SDK
-(`compileSdk 35`, `minSdk 26`).
+(`compileSdk 35`, `minSdk 21`, so it runs on Android 5.0 and up).
 
 ## Installing
 

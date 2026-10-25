@@ -20,20 +20,12 @@ import kotlinx.coroutines.withContext
 private const val TAG = "Precache"
 
 /**
- * Proactively warms [AudioDiskCache] so playback feels instant more often than "resolve, then
- * wait for the first buffer" would otherwise allow. Two modes:
- *  - [precacheAll]: the *entire* song — for liked songs, where you've expressed durable intent
- *    to have them reliably available offline, worth the full download.
- *  - [precacheLeadIn]: just enough of the *start* of a song to let ExoPlayer begin playback
- *    instantly — for songs merely visible on screen (Home's trending list) that the user
- *    hasn't actually chosen yet. Full-downloading everything trending on every app launch would
- *    waste real data on songs that might never get tapped; a small lead-in gets the "feels
- *    instant" benefit for whichever one actually does, at a fraction of the cost. The rest of
- *    the song streams in normally during playback, same as any uncached song.
+ * Warms [AudioDiskCache] with just the *start* of songs visible on screen (Home's top picks), so
+ * whichever one you tap begins instantly. The rest streams normally. Full songs for offline
+ * listening are Downloads' job (see [com.daydreamin.app.data.download.Downloads]), not this cache's.
  *
- * Both respect the existing "Wi-Fi only" download preference, and both are cheap to call
- * repeatedly — [CacheWriter] skips whatever's already cached rather than re-fetching it, so
- * re-running either (e.g. on every app start, or every trending-list reload) is fine.
+ * Respects the "Wi-Fi only" download preference, and is cheap to call repeatedly — [CacheWriter]
+ * skips whatever's already cached.
  */
 object SongPrecacher {
 
@@ -41,17 +33,6 @@ object SongPrecacher {
      *  playback instantly without waiting on the network, without fully downloading a song
      *  nobody's chosen yet. */
     private const val LEAD_IN_BYTES = 400_000L
-
-    suspend fun precacheAll(context: Context, songs: List<Song>) {
-        if (songs.isEmpty() || !shouldPrecache(context)) return
-        withContext(Dispatchers.IO) {
-            val cacheDataSource = buildCacheDataSource(context)
-            for (song in songs) {
-                runCatching { precacheOne(cacheDataSource, song, maxBytes = null) }
-                    .onFailure { Log.w(TAG, "couldn't precache '${song.title}': ${it.message}") }
-            }
-        }
-    }
 
     suspend fun precacheLeadIn(context: Context, song: Song) {
         if (!shouldPrecache(context)) return
@@ -100,7 +81,7 @@ object SongPrecacher {
     private fun buildCacheDataSource(context: Context): CacheDataSource =
         CacheDataSource.Factory()
             .setCache(AudioDiskCache.get(context))
-            .setUpstreamDataSourceFactory(DefaultDataSource.Factory(context, buildStreamHttpDataSourceFactory()))
+            .setUpstreamDataSourceFactory(streamDataSourceFactory(context))
             .createDataSource()
 
     private fun isOnWifi(context: Context): Boolean {

@@ -1,5 +1,7 @@
 package com.daydreamin.app.ui.screens.settings
 
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.DownloadDone
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -126,6 +128,9 @@ fun SettingsScreen(onBack: () -> Unit) {
     val wifiOnly by vm.downloadWifiOnly.collectAsState()
     val eqPreset by vm.equalizerPreset.collectAsState()
     val crossfade by vm.crossfadeSeconds.collectAsState()
+    val downloadLiked by vm.downloadLiked.collectAsState()
+    val downloads by com.daydreamin.app.data.download.Downloads.items.collectAsState()
+    var confirmRemoveDownloads by remember { mutableStateOf(false) }
     val extractor by vm.extractorState.collectAsState()
     val backupStatus by vm.backupStatus.collectAsState()
     val storage by vm.storage.collectAsState()
@@ -199,11 +204,33 @@ fun SettingsScreen(onBack: () -> Unit) {
             item { Section("Offline") }
             item {
                 ToggleRow(
+                    icon = Icons.Rounded.Favorite,
+                    title = "Download liked songs",
+                    body = "Every song you like downloads by itself, so it plays without a connection.",
+                    checked = downloadLiked,
+                    onChange = vm::setDownloadLiked,
+                )
+            }
+            item { Hairline() }
+            item {
+                ToggleRow(
                     icon = Icons.Rounded.Wifi,
-                    title = "Save offline on Wi-Fi only",
-                    body = "Liked songs, and the start of songs you’re likely to tap, are saved so they play instantly and work offline. Turn off to also save over mobile data.",
+                    title = "Download on Wi-Fi only",
+                    body = "Off: downloads use mobile data too. Turn on to save your data plan.",
                     checked = wifiOnly,
                     onChange = vm::setDownloadWifiOnly,
+                )
+            }
+            item { Hairline() }
+            item {
+                val done = downloads.values.count { it.status == com.daydreamin.app.data.download.DownloadStatus.DONE }
+                val bytes = remember(downloads.size, done) { com.daydreamin.app.data.download.Downloads.bytesUsed() }
+                ActionRow(
+                    icon = Icons.Rounded.DownloadDone,
+                    title = "Downloads",
+                    body = if (done == 0) "Nothing downloaded yet." else "$done ${if (done == 1) "song" else "songs"}, ${formatBytes(bytes)} on your phone.",
+                    action = "Remove all",
+                    onClick = { if (downloads.isNotEmpty()) confirmRemoveDownloads = true },
                 )
             }
             item { Hairline() }
@@ -278,6 +305,15 @@ fun SettingsScreen(onBack: () -> Unit) {
         TopBar(haze = haze, statusTop = statusTop, scrollY = scrollY, onBack = onBack)
     }
 
+    if (confirmRemoveDownloads) {
+        ConfirmDialog(
+            title = "Remove all downloads?",
+            body = "Downloaded songs will need a connection to play again. Liked songs stop downloading too; you can turn that back on here.",
+            confirm = "Remove all",
+            onDismiss = { confirmRemoveDownloads = false },
+            onConfirm = { confirmRemoveDownloads = false; vm.removeAllDownloads() },
+        )
+    }
     if (confirmClear) {
         ConfirmDialog(
             title = "Clear artwork cache?",

@@ -15,8 +15,8 @@ android {
         // phone's version doesn't install at all ("There was a problem parsing the package").
         minSdk = 21
         targetSdk = 35
-        versionCode = 13
-        versionName = "1.4.5"
+        versionCode = 14
+        versionName = "1.5.0"
         // Where installed apps look for new releases. Overridable only to test the updater locally.
         val updateUrl = (project.findProperty("updateUrl") as String?)
             ?: "https://raw.githubusercontent.com/theankitverse/daydreamin-android/main/version.json"
@@ -118,6 +118,8 @@ dependencies {
     implementation("dev.chrisbanes.haze:haze-materials:1.5.3")
 
     testImplementation("junit:junit:4.13.2")
+    // Real Android classes (Uri and friends) for unit tests that need them.
+    testImplementation("org.robolectric:robolectric:4.14.1")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
 }

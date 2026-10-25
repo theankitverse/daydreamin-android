@@ -57,7 +57,10 @@ fun SongListRow(
         Artwork(url = song.cover.ifBlank { song.artworkUrl }, shape = Radius.thumbShape, modifier = Modifier.size(50.dp))
         Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
             Text(song.title, style = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.5.sp, fontWeight = FontWeight.Medium), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(song.artist, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.55f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                DownloadedMark(song, Modifier.padding(end = 5.dp))
+                Text(song.artist, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.55f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         }
         if (isCurrent) EqualizerBars(playing = isPlaying, color = Color.White, modifier = Modifier.padding(end = 4.dp))
         Box(Modifier.size(44.dp).pressable(onClick = { menuOpen = true }), contentAlignment = Alignment.Center) {

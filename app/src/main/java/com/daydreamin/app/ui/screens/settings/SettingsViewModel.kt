@@ -136,6 +136,10 @@ class SettingsViewModel : ViewModel() {
     fun setDownloadWifiOnly(v: Boolean) = viewModelScope.launch { prefs.setDownloadWifiOnly(v) }
     fun setEqualizerPreset(v: String) = viewModelScope.launch { prefs.setEqualizerPreset(v) }
 
+    val downloadLiked: StateFlow<Boolean> = prefs.downloadLiked.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    fun setDownloadLiked(v: Boolean) = viewModelScope.launch { prefs.setDownloadLiked(v) }
+    fun removeAllDownloads() = viewModelScope.launch { com.daydreamin.app.data.download.Downloads.removeAll() }
+
     val crossfadeSeconds: StateFlow<Int> = prefs.crossfadeSeconds.stateIn(viewModelScope, SharingStarted.Eagerly, 6)
     fun setCrossfadeSeconds(v: Int) = viewModelScope.launch { prefs.setCrossfadeSeconds(v) }
 }

@@ -1,9 +1,9 @@
 {
-  "versionCode": 13,
-  "versionName": "1.4.5",
+  "versionCode": 14,
+  "versionName": "1.5.0",
   "url": "https://github.com/theankitverse/daydreamin-android/releases/latest",
-  "notes": "Crossfade between songs, like Apple Music. Switching songs stops the old one right away, and the Played count on your profile keeps counting past 200.",
-  "apkUrl": "https://github.com/theankitverse/daydreamin-android/releases/download/v1.4.5/daydreamin-v1.4.5.apk",
-  "apkSize": 4726890,
-  "sha256": "f5b1ff566d9a3098b9ad83e67090661bf435da7bf2109430671049de09997312"
+  "notes": "Downloads are here: save songs, your liked songs or whole playlists and listen with no connection. Songs also load much faster now.",
+  "apkUrl": "https://github.com/theankitverse/daydreamin-android/releases/download/v1.5.0/daydreamin-v1.5.0.apk",
+  "apkSize": 4775054,
+  "sha256": "dbbf6dc49265d14fecacb66a49388c6670fbc8bf021af62c3819568c2d43823a"
 }

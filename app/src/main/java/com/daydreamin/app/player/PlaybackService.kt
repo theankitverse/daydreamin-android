@@ -65,7 +65,7 @@ class PlaybackService : MediaSessionService() {
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
             .build()
 
-        val upstreamDataSourceFactory = DefaultDataSource.Factory(this, buildStreamHttpDataSourceFactory())
+        val upstreamDataSourceFactory = streamDataSourceFactory(this)
 
         // Transparently serves repeat plays (and anything already downloaded once) from disk
         // instead of re-fetching from YouTube's CDN — the actual audio bytes, not just the
@@ -78,6 +78,16 @@ class PlaybackService : MediaSessionService() {
             .setCache(AudioDiskCache.get(this))
             .setUpstreamDataSourceFactory(upstreamDataSourceFactory)
             .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+
+        // Downloaded songs play from the download store — no connection needed. It's read-only here:
+        // the download manager is the only writer, and a missing piece (should it ever happen)
+        // streams from a fresh link instead.
+        val downloadsDataSourceFactory = CacheDataSource.Factory()
+            .setCache(com.daydreamin.app.data.download.Downloads.cache(this))
+            .setUpstreamDataSourceFactory(com.daydreamin.app.data.download.Downloads.upstream(this))
+            .setCacheWriteDataSinkFactory(null)
+            .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+        val dataSourceFactory = DownloadRoutingDataSourceFactory(cacheDataSourceFactory, downloadsDataSourceFactory)
 
         // handleAudioFocus=true + setHandleAudioBecomingNoisy(true) cover the standard
         // interruption cases on their own: ExoPlayer auto-pauses on focus loss (a call, another
@@ -109,7 +119,7 @@ class PlaybackService : MediaSessionService() {
         fun buildPlayer(active: Boolean): ExoPlayer = ExoPlayer.Builder(this, renderers)
             .setAudioAttributes(audioAttributes, /* handleAudioFocus = */ active)
             .setHandleAudioBecomingNoisy(active)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(cacheDataSourceFactory))
+            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
             .build()
             .also { p ->
                 p.setAudioSessionId(audioSessionId)
@@ -200,14 +210,6 @@ class PlaybackService : MediaSessionService() {
             }
         }
 
-        // Keeps liked songs available offline even if they haven't actually been played from
-        // this device — fires once with whatever's already liked at startup, then again every
-        // time the liked list changes. Cheap to re-run: see SongPrecacher's kdoc.
-        serviceScope.launch {
-            DaydreaminApp.instance.prefs.likedSongs.collect { liked ->
-                SongPrecacher.precacheAll(applicationContext, liked)
-            }
-        }
     }
 
     private fun attachLoudnessEnhancer(audioSessionId: Int) {

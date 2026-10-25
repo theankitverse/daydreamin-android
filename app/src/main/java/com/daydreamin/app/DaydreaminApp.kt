@@ -72,6 +72,9 @@ class DaydreaminApp : Application(), coil.ImageLoaderFactory {
         // automatically. Fire-and-forget: nothing on screen waits on it.
         com.daydreamin.app.data.update.UpdateChecker.start(prefs, appScope)
 
+        // Songs kept for offline listening — loads what's on the phone and keeps it in step with what you chose.
+        com.daydreamin.app.data.download.Downloads.init(this, appScope)
+
         // Loads the last personal mix from disk straight away (Home shows it on the first frame),
         // then rebuilds it in the background if it's stale.
         homeFeed = HomeFeedRepository(this).also { it.start() }
