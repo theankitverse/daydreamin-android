@@ -15,12 +15,14 @@ android {
         // phone's version doesn't install at all ("There was a problem parsing the package").
         minSdk = 21
         targetSdk = 35
-        versionCode = 15
-        versionName = "1.5.1"
+        versionCode = 16
+        versionName = "1.6.0"
         // Where installed apps look for new releases. Overridable only to test the updater locally.
         val updateUrl = (project.findProperty("updateUrl") as String?)
             ?: "https://raw.githubusercontent.com/theankitverse/daydreamin-android/main/version.json"
         buildConfigField("String", "UPDATE_URL", "\"$updateUrl\"")
+        // Test builds pass -PusageTestMode=true so their usage pings land in TelemetryDeck's test view, not the real counts.
+        buildConfigField("boolean", "USAGE_TEST_MODE", (project.findProperty("usageTestMode") as String? ?: "false"))
     }
 
     buildTypes {

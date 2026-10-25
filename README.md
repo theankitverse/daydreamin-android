@@ -57,6 +57,15 @@ Daydreamin is free, with no ads and no account required. If you'd like to suppor
 you can [buy me a coffee](https://www.buymeacoffee.com/theankitverse) — completely optional,
 and it doesn't unlock anything, since there's nothing locked to begin with.
 
+## Privacy
+
+No account, no ads, and nothing about what you listen to ever leaves your phone. To see roughly how
+many people use the app, it sends one anonymous count a day to
+[TelemetryDeck](https://telemetrydeck.com) (a privacy-focused analytics service): a random ID made
+on the phone (hashed before sending), the app and Android version, the country, and which app
+installed Daydreamin. Never songs, searches, your name or anything else. Turn it off in
+**Settings → Share anonymous usage stats**.
+
 ## A note on how this works
 
 This app plays audio by resolving stream URLs directly from YouTube (via NewPipeExtractor) rather

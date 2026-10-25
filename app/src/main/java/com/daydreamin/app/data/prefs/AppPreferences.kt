@@ -46,6 +46,9 @@ class AppPreferences(private val context: Context) {
         val DOWNLOADED_SONGS_JSON = stringPreferencesKey("downloaded_songs_json")
         val DOWNLOAD_LIKED = booleanPreferencesKey("download_liked")
         val DOWNLOADED_PLAYLISTS = stringSetPreferencesKey("downloaded_playlists")
+        val USAGE_STATS = booleanPreferencesKey("usage_stats")
+        val USAGE_ID = stringPreferencesKey("usage_id")
+        val USAGE_LAST_SENT_DAY = stringPreferencesKey("usage_last_sent_day")
         val EQUALIZER_PRESET = stringPreferencesKey("equalizer_preset")
         val USER_NAME = stringPreferencesKey("user_name")
         val HAS_AVATAR = booleanPreferencesKey("has_avatar")
@@ -203,6 +206,24 @@ class AppPreferences(private val context: Context) {
     suspend fun setPlaylistDownloaded(id: String, downloaded: Boolean) = edit { prefs ->
         val current = prefs[Keys.DOWNLOADED_PLAYLISTS] ?: emptySet()
         prefs[Keys.DOWNLOADED_PLAYLISTS] = if (downloaded) current + id else current - id
+    }
+
+    // ---- anonymous usage counts (see UsageStats)
+
+    /** On by default; one switch in Settings turns it off. */
+    val usageStatsEnabled: Flow<Boolean> = context.dataStore.data.map { it[Keys.USAGE_STATS] ?: true }
+    suspend fun setUsageStatsEnabled(value: Boolean) = edit { it[Keys.USAGE_STATS] = value }
+
+    /** The day today's count went out (yyyy-MM-dd); null until the first one. */
+    val usageLastSentDay: Flow<String?> = context.dataStore.data.map { it[Keys.USAGE_LAST_SENT_DAY] }
+    suspend fun setUsageLastSentDay(day: String) = edit { it[Keys.USAGE_LAST_SENT_DAY] = day }
+
+    /** A random ID made on this phone, so one phone counts once. Hashed before it's sent. */
+    suspend fun usageId(): String {
+        context.dataStore.data.first()[Keys.USAGE_ID]?.let { return it }
+        val id = java.util.UUID.randomUUID().toString()
+        edit { if (it[Keys.USAGE_ID] == null) it[Keys.USAGE_ID] = id }
+        return context.dataStore.data.first()[Keys.USAGE_ID] ?: id
     }
 
     suspend fun clearAllDownloads() = edit { prefs ->

@@ -72,6 +72,9 @@ class DaydreaminApp : Application(), coil.ImageLoaderFactory {
         // automatically. Fire-and-forget: nothing on screen waits on it.
         com.daydreamin.app.data.update.UpdateChecker.start(prefs, appScope)
 
+        // At most one anonymous count a day (version, Android version, country, how it was installed); off in Settings.
+        com.daydreamin.app.data.usage.UsageStats.start(this, prefs, appScope)
+
         // Songs kept for offline listening — loads what's on the phone and keeps it in step with what you chose.
         com.daydreamin.app.data.download.Downloads.init(this, appScope)
 

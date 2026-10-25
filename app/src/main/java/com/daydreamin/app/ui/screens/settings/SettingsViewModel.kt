@@ -136,6 +136,9 @@ class SettingsViewModel : ViewModel() {
     fun setDownloadWifiOnly(v: Boolean) = viewModelScope.launch { prefs.setDownloadWifiOnly(v) }
     fun setEqualizerPreset(v: String) = viewModelScope.launch { prefs.setEqualizerPreset(v) }
 
+    val usageStats: StateFlow<Boolean> = prefs.usageStatsEnabled.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    fun setUsageStats(v: Boolean) = viewModelScope.launch { prefs.setUsageStatsEnabled(v) }
+
     val downloadLiked: StateFlow<Boolean> = prefs.downloadLiked.stateIn(viewModelScope, SharingStarted.Eagerly, true)
     fun setDownloadLiked(v: Boolean) = viewModelScope.launch { prefs.setDownloadLiked(v) }
     fun removeAllDownloads() = viewModelScope.launch { com.daydreamin.app.data.download.Downloads.removeAll() }

@@ -1,5 +1,6 @@
 package com.daydreamin.app.ui.screens.settings
 
+import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.DownloadDone
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -129,6 +130,7 @@ fun SettingsScreen(onBack: () -> Unit) {
     val eqPreset by vm.equalizerPreset.collectAsState()
     val crossfade by vm.crossfadeSeconds.collectAsState()
     val downloadLiked by vm.downloadLiked.collectAsState()
+    val usageStats by vm.usageStats.collectAsState()
     val downloads by com.daydreamin.app.data.download.Downloads.items.collectAsState()
     var confirmRemoveDownloads by remember { mutableStateOf(false) }
     val extractor by vm.extractorState.collectAsState()
@@ -299,6 +301,16 @@ fun SettingsScreen(onBack: () -> Unit) {
             item { UpiRow() }
             item { CreatorRow() }
             item { UpdateRow() }
+            item { Hairline() }
+            item {
+                ToggleRow(
+                    icon = Icons.Rounded.BarChart,
+                    title = "Share anonymous usage stats",
+                    body = "Once a day: app version, Android version, country and which app installed Daydreamin, so its maker can see how many people use it. Never your songs, searches or anything about you.",
+                    checked = usageStats,
+                    onChange = vm::setUsageStats,
+                )
+            }
             item { ExtractorRow(extractor, onCheck = vm::testExtractor) }
         }
 

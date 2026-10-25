@@ -1,9 +1,9 @@
 {
-  "versionCode": 15,
-  "versionName": "1.5.1",
+  "versionCode": 16,
+  "versionName": "1.6.0",
   "url": "https://github.com/theankitverse/daydreamin-android/releases/latest",
-  "notes": "Donating by UPI now works for any amount, and downloads tell you where to find them (Library › Downloads).",
-  "apkUrl": "https://github.com/theankitverse/daydreamin-android/releases/download/v1.5.1/daydreamin-v1.5.1.apk",
-  "apkSize": 4777276,
-  "sha256": "200459cb59367c3505032c3761a610860af8db5b11675b47fb06c6683a7429b3"
+  "notes": "Daydreamin now sends one anonymous count a day so its maker can see how many people use it. You can turn it off in Settings.",
+  "apkUrl": "https://github.com/theankitverse/daydreamin-android/releases/download/v1.6.0/daydreamin-v1.6.0.apk",
+  "apkSize": 4780889,
+  "sha256": "6bddc10c3dce6626443843a138672fea03cbde63a8f4754f1d9be2035586c7db"
 }
