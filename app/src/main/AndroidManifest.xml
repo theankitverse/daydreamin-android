@@ -11,11 +11,11 @@
     <!-- Updating in-app: the new version is downloaded and handed to Android's installer (you confirm it). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
-    <!-- To find the installed UPI apps (GPay, PhonePe, Paytm, …) for "Donate via UPI". -->
+    <!-- The UPI apps (GPay, PhonePe, Paytm, …) that "Donate via UPI" opens. They register for upi://pay, host included. -->
     <queries>
         <intent>
             <action android:name="android.intent.action.VIEW" />
-            <data android:scheme="upi" />
+            <data android:scheme="upi" android:host="pay" />
         </intent>
     </queries>
 

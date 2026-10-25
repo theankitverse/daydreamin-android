@@ -46,7 +46,6 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.material.icons.rounded.Coffee
-import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.CurrencyRupee
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.FileDownload
@@ -600,7 +599,7 @@ private fun UpiRow() {
     Row(
         Modifier
             .fillMaxWidth()
-            .semantics(mergeDescendants = true) { contentDescription = "Donate via UPI — ${com.daydreamin.app.ui.components.Support.UPI_ID}" }
+            .semantics(mergeDescendants = true) { contentDescription = "Donate via UPI" }
             .pressable(role = Role.Button, onClick = { com.daydreamin.app.ui.components.Support.openUpi(context) })
             .padding(horizontal = Space.gutter, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -608,23 +607,14 @@ private fun UpiRow() {
         RowIcon(Icons.Rounded.CurrencyRupee)
         Column(Modifier.weight(1f).padding(start = 14.dp)) {
             Text("Donate via UPI", style = MaterialTheme.typography.titleMedium, color = Color.White)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(com.daydreamin.app.ui.components.Support.UPI_ID, style = MaterialTheme.typography.bodySmall, color = Muted, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                Spacer(Modifier.width(6.dp))
-                Icon(
-                    Icons.Rounded.ContentCopy,
-                    contentDescription = "Copy UPI ID",
-                    tint = Muted,
-                    modifier = Modifier.size(13.dp).pressable(onClick = { com.daydreamin.app.ui.components.Support.copyUpiId(context) }),
-                )
-            }
+            Text("Any amount, from your UPI app", style = MaterialTheme.typography.bodySmall, color = Muted, maxLines = 1)
         }
         Spacer(Modifier.width(12.dp))
         Row(
             Modifier.glass(Radius.pill, Glass.Clear).padding(start = 14.dp, end = 10.dp, top = 7.dp, bottom = 7.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Copy & pay", style = MaterialTheme.typography.labelLarge, color = Color.White)
+            Text("Donate", style = MaterialTheme.typography.labelLarge, color = Color.White)
             Spacer(Modifier.width(4.dp))
             Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(15.dp))
         }
