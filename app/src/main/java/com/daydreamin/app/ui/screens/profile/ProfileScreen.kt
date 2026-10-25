@@ -124,6 +124,7 @@ fun ProfileScreen(
     val prefs = DaydreaminApp.instance.prefs
     val liked by prefs.likedSongs.collectAsState(initial = emptyList())
     val history by prefs.history.collectAsState(initial = emptyList())
+    val totalPlays by prefs.totalPlays.collectAsState(initial = null)
     val playlists by prefs.playlists.collectAsState(initial = emptyList())
     val meta = PlayerController.meta.collectAsState()
     val nowPlayingId by remember { derivedStateOf { meta.value.currentSong?.playId } }
@@ -153,7 +154,7 @@ fun ProfileScreen(
                 StatStrip(
                     liked = liked.size,
                     playlists = playlists.size,
-                    played = history.size,
+                    played = totalPlays ?: history.size,
                     onOpen = onOpenLibrary,
                     modifier = Modifier.padding(horizontal = Space.gutter).padding(top = Space.l),
                 )

@@ -135,6 +135,9 @@ class SettingsViewModel : ViewModel() {
     fun setAudioNormalization(v: Boolean) = viewModelScope.launch { prefs.setAudioNormalization(v) }
     fun setDownloadWifiOnly(v: Boolean) = viewModelScope.launch { prefs.setDownloadWifiOnly(v) }
     fun setEqualizerPreset(v: String) = viewModelScope.launch { prefs.setEqualizerPreset(v) }
+
+    val crossfadeSeconds: StateFlow<Int> = prefs.crossfadeSeconds.stateIn(viewModelScope, SharingStarted.Eagerly, 6)
+    fun setCrossfadeSeconds(v: Int) = viewModelScope.launch { prefs.setCrossfadeSeconds(v) }
 }
 
 private fun count(n: Int, word: String) = "$n $word" + if (n == 1) "" else "s"

@@ -262,6 +262,16 @@ object PlayerController {
                 // handles itself, so it's ignored here.
                 if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO || reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK) {
                     onGaplessAdvance(mediaItem)
+                } else if (
+                    // A crossfade hands the session to the second player mid-fade (see Crossfader), which
+                    // reaches us as a playlist change onto the next song in the queue. Our own swaps
+                    // (playSong, recovery, restore) always land on the song already marked current.
+                    pendingPlaylistSwaps == 0 &&
+                    mediaItem != null &&
+                    mediaItem.mediaId != _meta.value.currentSong?.playId &&
+                    _meta.value.queue.any { it.playId == mediaItem.mediaId }
+                ) {
+                    onGaplessAdvance(mediaItem)
                 }
             }
 
@@ -477,6 +487,10 @@ object PlayerController {
         Log.d(TAG, "playSong requested song='${song.title}'")
         val request = ++playRequest
 
+        // The song you're leaving stops now, not when the new one has finished loading: hearing the
+        // old song carry on for seconds after picking another read as the app ignoring you.
+        controller?.takeIf { it.playWhenReady && it.currentMediaItem?.mediaId != song.playId }?.pause()
+
         _meta.update { it.copy(currentSong = song, isBuffering = true, queue = queueContext, error = null) }
         _progress.update { PlaybackProgress(positionMs = 0L, durationMs = 0L) }
         recordStart(song)
@@ -608,12 +622,15 @@ object PlayerController {
     private fun giveUpOffline(song: Song, error: Throwable?, revert: Boolean) {
         pendingStartMediaId = null
         Log.w(TAG, "offline: song='${song.title}' — staying on it (${error?.message})")
-        val stillPlaying = revert && lastKnownGoodSong != null && controller?.isPlaying == true
+        // The previous song is still what's loaded in the player (paused when you picked this one):
+        // show that, so Play resumes what the screen says rather than a song under another's name.
+        val previous = lastKnownGoodSong
+        val stillLoaded = revert && previous != null && controller?.currentMediaItem?.mediaId == previous.playId
         _meta.update {
             it.copy(
-                currentSong = if (stillPlaying) lastKnownGoodSong else it.currentSong,
+                currentSong = if (stillLoaded) previous else it.currentSong,
                 isBuffering = false,
-                isPlaying = if (stillPlaying) true else false,
+                isPlaying = stillLoaded && controller?.isPlaying == true,
                 error = "Couldn't play \"${song.title}\": failed to connect — you're offline",
             )
         }
@@ -665,11 +682,13 @@ object PlayerController {
         } else {
             Log.e(TAG, "giving up: song='${song.title}' ($reason), consecutiveFailures=$consecutiveResolveFailures, queueEmpty=${nextInQueue == null}")
             consecutiveResolveFailures = 0
+            val previous = lastKnownGoodSong
+            val revert = revertOnGiveUp && previous != null && controller?.currentMediaItem?.mediaId == previous.playId
             _meta.update {
                 it.copy(
-                    currentSong = if (revertOnGiveUp) lastKnownGoodSong else it.currentSong,
+                    currentSong = if (revert) previous else it.currentSong,
                     isBuffering = false,
-                    isPlaying = if (revertOnGiveUp) (controller?.isPlaying ?: false) else false,
+                    isPlaying = revert && controller?.isPlaying == true,
                     error = "Couldn't play \"${song.title}\": $reason",
                 )
             }
@@ -900,6 +919,7 @@ object PlayerController {
         app.appScope.launch {
             app.prefs.pushHistory(song)
             TasteProfile.recordPlay(song)
+            app.prefs.countPlay()
         }
     }
 

@@ -49,6 +49,7 @@ import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material.icons.rounded.Sensors
@@ -124,6 +125,7 @@ fun SettingsScreen(onBack: () -> Unit) {
     val normalization by vm.audioNormalization.collectAsState()
     val wifiOnly by vm.downloadWifiOnly.collectAsState()
     val eqPreset by vm.equalizerPreset.collectAsState()
+    val crossfade by vm.crossfadeSeconds.collectAsState()
     val extractor by vm.extractorState.collectAsState()
     val backupStatus by vm.backupStatus.collectAsState()
     val storage by vm.storage.collectAsState()
@@ -166,6 +168,20 @@ fun SettingsScreen(onBack: () -> Unit) {
                     RowHeader(Icons.Rounded.GraphicEq, "Equalizer", eqDescription(preset), animateBody = true)
                     Spacer(Modifier.height(12.dp))
                     EqSelector(selected = preset, onSelect = { vm.setEqualizerPreset(it.label) })
+                }
+            }
+            item { Hairline() }
+            item {
+                val choice = CROSSFADE_CHOICES.indexOf(crossfade).coerceAtLeast(0)
+                Column(Modifier.padding(horizontal = Space.gutter, vertical = 10.dp)) {
+                    RowHeader(Icons.Rounded.Tune, "Crossfade", crossfadeDescription(crossfade), animateBody = true)
+                    Spacer(Modifier.height(12.dp))
+                    GlassSegments(
+                        labels = CROSSFADE_CHOICES.map { if (it == 0) "Off" else "${it}s" },
+                        selected = choice,
+                        descriptions = CROSSFADE_CHOICES.map { if (it == 0) "Crossfade off" else "Crossfade $it seconds" },
+                        onSelect = { vm.setCrossfadeSeconds(CROSSFADE_CHOICES[it]) },
+                    )
                 }
             }
             item { Hairline() }
@@ -367,26 +383,42 @@ private fun GlassSwitch(checked: Boolean) {
 @Composable
 private fun EqSelector(selected: EqPreset, onSelect: (EqPreset) -> Unit) {
     val presets = EqPreset.entries
+    GlassSegments(
+        labels = presets.map { it.label.removeSuffix(" Boost") },
+        selected = selected.ordinal,
+        descriptions = presets.map { it.label },
+        onSelect = { onSelect(presets[it]) },
+    )
+}
+
+/** Options in one glass bar; the white lens springs to the chosen one. */
+@Composable
+private fun GlassSegments(labels: List<String>, selected: Int, descriptions: List<String>, onSelect: (Int) -> Unit) {
     BoxWithConstraints(Modifier.fillMaxWidth().padding(start = TextStart - Space.gutter).height(42.dp).glass(Radius.pill, Glass.Clear).padding(4.dp)) {
-        val w = maxWidth / presets.size
-        val x by animateDpAsState(w * selected.ordinal, spring(dampingRatio = 0.75f, stiffness = 480f), label = "eqLens")
+        val w = maxWidth / labels.size
+        val x by animateDpAsState(w * selected, spring(dampingRatio = 0.75f, stiffness = 480f), label = "segmentLens")
         Box(Modifier.offset { IntOffset(x.roundToPx(), 0) }.width(w).fillMaxHeight().clip(Radius.pill).background(Color.White.copy(alpha = 0.95f)))
         Row(Modifier.fillMaxSize()) {
-            presets.forEach { p ->
-                val isSel = p == selected
-                val color by animateColorAsState(if (isSel) Color.Black else Color.White.copy(alpha = 0.75f), Motion.settle(), label = "eqText")
+            labels.forEachIndexed { i, label ->
+                val color by animateColorAsState(if (i == selected) Color.Black else Color.White.copy(alpha = 0.75f), Motion.settle(), label = "segmentText")
                 Box(
                     Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .semantics { contentDescription = p.label }
-                        .pressable(role = Role.RadioButton, onClick = { onSelect(p) }),
+                        .semantics { contentDescription = descriptions[i] }
+                        .pressable(role = Role.RadioButton, onClick = { onSelect(i) }),
                     contentAlignment = Alignment.Center,
-                ) { Text(p.label.removeSuffix(" Boost"), style = MaterialTheme.typography.labelLarge, color = color, maxLines = 1) }
+                ) { Text(label, style = MaterialTheme.typography.labelLarge, color = color, maxLines = 1) }
             }
         }
     }
 }
+
+private val CROSSFADE_CHOICES = listOf(0, 3, 6, 9, 12)
+
+private fun crossfadeDescription(seconds: Int) =
+    if (seconds <= 0) "Off — each song plays to its very end before the next begins."
+    else "The next song fades in over the last $seconds seconds of the one playing, when a song ends on its own."
 
 private fun eqDescription(p: EqPreset) = when (p) {
     EqPreset.OFF -> "Flat — the song as it was mixed."

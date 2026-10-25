@@ -1,9 +1,9 @@
 {
-  "versionCode": 12,
-  "versionName": "1.4.4",
+  "versionCode": 13,
+  "versionName": "1.4.5",
   "url": "https://github.com/theankitverse/daydreamin-android/releases/latest",
-  "notes": "Songs no longer skip or get mixed up when your network changes (Wi-Fi ↔ mobile data) — the song you were on picks up right where it stopped.",
-  "apkUrl": "https://github.com/theankitverse/daydreamin-android/releases/download/v1.4.4/daydreamin-v1.4.4.apk",
-  "apkSize": 4720223,
-  "sha256": "afb50f50ff43a67b1e1e75c934a162ad54e5d478f7f36351db3919d421e5d3b3"
+  "notes": "Crossfade between songs, like Apple Music. Switching songs stops the old one right away, and the Played count on your profile keeps counting past 200.",
+  "apkUrl": "https://github.com/theankitverse/daydreamin-android/releases/download/v1.4.5/daydreamin-v1.4.5.apk",
+  "apkSize": 4726890,
+  "sha256": "f5b1ff566d9a3098b9ad83e67090661bf435da7bf2109430671049de09997312"
 }

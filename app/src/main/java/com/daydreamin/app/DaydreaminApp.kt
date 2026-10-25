@@ -15,6 +15,8 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 private const val TAG = "StartupTiming"
 
@@ -54,6 +56,9 @@ class DaydreaminApp : Application(), coil.ImageLoaderFactory {
         val prefsStart = SystemClock.elapsedRealtime()
         prefs = AppPreferences(this)
         Log.d(TAG, "AppPreferences() at +${SystemClock.elapsedRealtime() - processStartAtMs}ms (took ${SystemClock.elapsedRealtime() - prefsStart}ms)")
+
+        // The lifetime play count starts from what's already on record (see AppPreferences.totalPlays).
+        appScope.launch { prefs.startPlayCount(maxOf(TasteProfile.recordedPlays(), prefs.history.first().size)) }
 
         Region.init(this)
         val newPipeStart = SystemClock.elapsedRealtime()

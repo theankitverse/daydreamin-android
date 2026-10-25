@@ -51,6 +51,9 @@ object TasteProfile {
 
     suspend fun snapshot(): Map<String, PlayStat> = mutex.withLock { load().toMap() }
 
+    /** Plays on record across every song kept here. */
+    suspend fun recordedPlays(): Int = mutex.withLock { load().values.sumOf { it.plays } }
+
     suspend fun recordPlay(song: Song) {
         if (song.playId.isBlank()) return
         update(song) { it.copy(song = song.mergedWith(it), plays = it.plays + 1, lastPlayedAtMs = System.currentTimeMillis()) }

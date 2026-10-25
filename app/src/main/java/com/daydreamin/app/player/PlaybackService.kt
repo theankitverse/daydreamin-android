@@ -47,6 +47,11 @@ class PlaybackService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
     private var player: ExoPlayer? = null
+    private var spare: ExoPlayer? = null
+    private var crossfader: Crossfader? = null
+    @Volatile private var crossfadeMs = 0L
+    /** The volume players rest at: full, or lowered to leave the equalizer room to boost. */
+    @Volatile private var baseVolume = 1f
     private var loudnessEnhancer: LoudnessEnhancer? = null
     private var equalizer: Equalizer? = null
     @Volatile private var normalizationEnabled = false
@@ -97,54 +102,72 @@ class PlaybackService : MediaSessionService() {
                 out.add(HeadroomAudioRenderer(context, codecAdapterFactory, mediaCodecSelector, enableDecoderFallback, eventHandler, eventListener, audioSink))
             }
         }
-        val player = ExoPlayer.Builder(this, renderers)
-            .setAudioAttributes(audioAttributes, /* handleAudioFocus = */ true)
-            .setHandleAudioBecomingNoisy(true)
+        // Two identical players: one plays, the other is the spare the crossfade brings the next
+        // song in on (see Crossfader). They share one audio session, so the equalizer and the
+        // loudness boost below apply to whichever is playing, and to both during a fade.
+        val audioSessionId = androidx.media3.common.util.Util.generateAudioSessionIdV21(this)
+        fun buildPlayer(active: Boolean): ExoPlayer = ExoPlayer.Builder(this, renderers)
+            .setAudioAttributes(audioAttributes, /* handleAudioFocus = */ active)
+            .setHandleAudioBecomingNoisy(active)
             .setMediaSourceFactory(DefaultMediaSourceFactory(cacheDataSourceFactory))
             .build()
+            .also { p ->
+                p.setAudioSessionId(audioSessionId)
+                // No silence skipping: its defaults cut 80% out of anything quieter than -30 dBFS for
+                // 100ms — quiet intros, rests, the breath before a chorus — which played as small jumps.
+                p.addAnalyticsListener(object : AnalyticsListener {
+                    override fun onAudioUnderrun(eventTime: AnalyticsListener.EventTime, bufferSize: Int, bufferSizeMs: Long, elapsedSinceLastFeedMs: Long) {
+                        Log.w(TAG, "audio underrun at ${p.currentPosition}ms (buffer ${bufferSizeMs}ms, ${elapsedSinceLastFeedMs}ms since last feed)")
+                    }
+                })
+                p.addListener(object : Player.Listener {
+                    override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                        if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS) {
+                            Log.d(TAG, "paused: lost audio focus")
+                        } else if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY) {
+                            Log.d(TAG, "paused: audio becoming noisy (headphones/Bluetooth disconnected)")
+                        }
+                    }
+
+                    override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                        Log.e(TAG, "player error: ${error.errorCodeName} ${error.message}", error)
+                    }
+                })
+            }
+        val player = buildPlayer(active = true)
+        val spare = buildPlayer(active = false)
         this.player = player
+        this.spare = spare
 
-        // No silence skipping: its defaults cut 80% out of anything quieter than -30 dBFS for
-        // 100ms — quiet intros, rests, the breath before a chorus — which played as small jumps.
-        player.addAnalyticsListener(object : AnalyticsListener {
-            override fun onAudioUnderrun(eventTime: AnalyticsListener.EventTime, bufferSize: Int, bufferSizeMs: Long, elapsedSinceLastFeedMs: Long) {
-                Log.w(TAG, "audio underrun at ${player.currentPosition}ms (buffer ${bufferSizeMs}ms, ${elapsedSinceLastFeedMs}ms since last feed)")
-            }
-        })
-
-        // onAudioSessionIdChanged only fires when the id *changes* — but ExoPlayer assigns its
-        // session id during construction, before this listener exists, so relying on the
-        // callback alone means the effects below could simply never attach. Attach once up
-        // front with whatever id the player already has; the listener then keeps them in sync
-        // if it's ever reassigned later.
-        Log.d(TAG, "initial audioSessionId=${player.audioSessionId}")
-        attachLoudnessEnhancer(player.audioSessionId)
-        attachEqualizer(player.audioSessionId)
-
-        player.addListener(object : Player.Listener {
-            override fun onAudioSessionIdChanged(audioSessionId: Int) {
-                Log.d(TAG, "audioSessionId changed -> $audioSessionId")
-                attachLoudnessEnhancer(audioSessionId)
-                attachEqualizer(audioSessionId)
-            }
-
-            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
-                if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS) {
-                    Log.d(TAG, "paused: lost audio focus")
-                } else if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY) {
-                    Log.d(TAG, "paused: audio becoming noisy (headphones/Bluetooth disconnected)")
-                }
-            }
-
-            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                Log.e(TAG, "player error: ${error.errorCodeName} ${error.message}", error)
-            }
-        })
+        Log.d(TAG, "audioSessionId=$audioSessionId")
+        attachLoudnessEnhancer(audioSessionId)
+        attachEqualizer(audioSessionId)
 
         // Standard "skip to next/previous" commands (Bluetooth remote, notification, lock
         // screen, Android Auto) are routed to the session through this wrapper so they always
         // go through PlayerController's real queue logic — see QueueAwarePlayer's kdoc.
-        mediaSession = MediaSession.Builder(this, QueueAwarePlayer(player)).build()
+        val session = MediaSession.Builder(this, QueueAwarePlayer(player)).build()
+        mediaSession = session
+
+        crossfader = Crossfader(
+            first = player,
+            second = spare,
+            fadeMs = { crossfadeMs },
+            baseVolume = { baseVolume },
+            allowed = { PlayerController.meta.value.repeatMode != RepeatMode.ONE },
+            makeActive = { incoming, outgoing ->
+                // Focus first leaves the outgoing player (so asking for it on the incoming one doesn't
+                // pause the song that's fading out), then the incoming one takes it, and the session
+                // — app, notification, lock screen — moves to it.
+                outgoing.setAudioAttributes(audioAttributes, false)
+                outgoing.setHandleAudioBecomingNoisy(false)
+                incoming.setAudioAttributes(audioAttributes, true)
+                incoming.setHandleAudioBecomingNoisy(true)
+                session.player = QueueAwarePlayer(incoming)
+                this.player = incoming
+                this.spare = outgoing
+            },
+        ).also { it.start() }
 
         // Playback ownership lives here, in the Service, not the UI: this guarantees the
         // MediaController connects (and the persisted playback state restores — see
@@ -166,7 +189,14 @@ class PlaybackService : MediaSessionService() {
                 equalizer?.let { applyPreset(it, eqPreset) }
                 // The equalizer boosts after the player's volume is applied, so a boost needs the
                 // same amount of room made below it, or boosted bands clip on loud tracks.
-                player?.volume = if (eqPreset == EqPreset.OFF) 1f else EQ_HEADROOM_VOLUME
+                baseVolume = if (eqPreset == EqPreset.OFF) 1f else EQ_HEADROOM_VOLUME
+                if (crossfader?.isFading != true) player?.volume = baseVolume // mid-fade, the fade applies it
+            }
+        }
+
+        serviceScope.launch {
+            DaydreaminApp.instance.prefs.crossfadeSeconds.collect { seconds ->
+                crossfadeMs = seconds.coerceIn(0, 12) * 1000L
             }
         }
 
@@ -211,12 +241,15 @@ class PlaybackService : MediaSessionService() {
      * after a pause, so a plain stopSelf() is no longer enough — this pauses and stops together.
      */
     override fun onTaskRemoved(rootIntent: Intent?) {
+        crossfader?.cancel()
         pauseAllPlayersAndStopSelf()
         PlayerController.disconnect()
     }
 
     override fun onDestroy() {
         serviceScope.cancel()
+        crossfader?.release()
+        spare?.release()
         loudnessEnhancer?.release()
         equalizer?.release()
         mediaSession?.run {

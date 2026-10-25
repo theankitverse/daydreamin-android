@@ -42,6 +42,7 @@ class AppPreferences(private val context: Context) {
         val PLAYLISTS_JSON = stringPreferencesKey("playlists_json")
         val PLAYBACK_SNAPSHOT_JSON = stringPreferencesKey("playback_snapshot_json")
         val SEARCH_HISTORY_JSON = stringPreferencesKey("search_history_json")
+        val TOTAL_PLAYS = intPreferencesKey("total_plays")
         val EQUALIZER_PRESET = stringPreferencesKey("equalizer_preset")
         val USER_NAME = stringPreferencesKey("user_name")
         val HAS_AVATAR = booleanPreferencesKey("has_avatar")
@@ -71,7 +72,8 @@ class AppPreferences(private val context: Context) {
     val streamingQuality: Flow<String> = context.dataStore.data.map { it[Keys.STREAMING_QUALITY] ?: "Auto" }
     suspend fun setStreamingQuality(value: String) = edit { it[Keys.STREAMING_QUALITY] = value }
 
-    val crossfadeSeconds: Flow<Int> = context.dataStore.data.map { it[Keys.CROSSFADE_SECONDS] ?: 3 }
+    /** Crossfade between songs that end on their own, in seconds; 0 is off. */
+    val crossfadeSeconds: Flow<Int> = context.dataStore.data.map { it[Keys.CROSSFADE_SECONDS] ?: 6 }
     suspend fun setCrossfadeSeconds(value: Int) = edit { it[Keys.CROSSFADE_SECONDS] = value }
 
     /** Off unless you turn it on: most of what plays is mastered loud already, and boosting it costs clarity. */
@@ -162,6 +164,18 @@ class AppPreferences(private val context: Context) {
     }
 
     suspend fun clearHistory() = edit { it[Keys.HISTORY_JSON] = emptySet() }
+
+    /**
+     * Every song you've started, replays included, for as long as you've had the app. (Profile used
+     * to show the size of [history], which keeps only the last [HISTORY_LIMIT] different songs, so the
+     * count stopped at 200.) Null until [startPlayCount] has run once.
+     */
+    val totalPlays: Flow<Int?> = context.dataStore.data.map { it[Keys.TOTAL_PLAYS] }
+
+    /** Sets the lifetime count the first time only, from the plays already on record — existing listeners don't start from zero. */
+    suspend fun startPlayCount(onRecord: Int) = edit { if (it[Keys.TOTAL_PLAYS] == null) it[Keys.TOTAL_PLAYS] = onRecord }
+
+    suspend fun countPlay() = edit { it[Keys.TOTAL_PLAYS] = (it[Keys.TOTAL_PLAYS] ?: 0) + 1 }
 
     val playlists: Flow<List<Playlist>> = context.dataStore.data.map { prefs ->
         prefs[Keys.PLAYLISTS_JSON]?.let {
