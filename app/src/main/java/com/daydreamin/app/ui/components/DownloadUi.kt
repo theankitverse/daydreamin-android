@@ -44,7 +44,7 @@ fun toggleDownload(song: Song, info: DownloadInfo?, scope: kotlinx.coroutines.Co
     when (info?.status) {
         null -> {
             Downloads.download(song)
-            Toaster.show("Downloading “${song.title}”")
+            Toaster.show("Downloading “${song.title}”. Find it in Library › Downloads", durationMs = 5_000, target = ToastTarget.DOWNLOADS)
         }
         DownloadStatus.FAILED -> {
             Downloads.download(song)

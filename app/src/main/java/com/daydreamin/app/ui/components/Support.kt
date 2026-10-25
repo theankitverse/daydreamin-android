@@ -15,7 +15,6 @@ object Support {
     private const val URL = "https://www.buymeacoffee.com/$BUY_ME_A_COFFEE_USERNAME"
 
     const val UPI_ID = "ankitkrchaurasiya2024@okhdfcbank"
-    private const val UPI_PAYEE_NAME = "Ankit"
 
     fun open(context: Context) {
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(URL)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -26,21 +25,36 @@ object Support {
         }
     }
 
-    /** Opens whatever UPI app is installed (GPay, PhonePe, Paytm, …) with the payee already filled in. */
+    /**
+     * Copies the UPI ID and opens the person's UPI app (GPay, PhonePe, Paytm, …) on its home screen,
+     * so they pay to the ID from inside the app — any amount.
+     *
+     * Not a `upi://pay` link: UPI apps and banks cap payments that start from a link in another app
+     * and go to a personal UPI ID (around ₹2,000, and some apps refuse them outright). A normal
+     * "pay to UPI ID" started inside the UPI app has no such cap.
+     */
     fun openUpi(context: Context) {
-        val uri = Uri.parse("upi://pay?pa=$UPI_ID&pn=$UPI_PAYEE_NAME&cu=INR")
-        val intent = Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        copyUpiId(context, quiet = true)
+        Toaster.show("UPI ID copied. In your UPI app, tap Pay → UPI ID, paste it and send any amount", durationMs = 7_000)
+        val pm = context.packageManager
+        val upiApps = pm.queryIntentActivities(Intent(Intent.ACTION_VIEW, Uri.parse("upi://pay")), 0)
+            .map { it.activityInfo.packageName }
+            .distinct()
+            .mapNotNull { pm.getLaunchIntentForPackage(it) }
+        if (upiApps.isEmpty()) return // the ID is copied; the message says what to do with it
+        val intent = if (upiApps.size == 1) upiApps.first() else {
+            Intent.createChooser(upiApps.first(), "Pay with").putExtra(Intent.EXTRA_INITIAL_INTENTS, upiApps.drop(1).toTypedArray())
+        }
         try {
-            context.startActivity(intent)
+            context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         } catch (e: ActivityNotFoundException) {
-            copyUpiId(context)
-            Toaster.show("No UPI app found — ID copied instead")
+            // Already copied, with instructions showing.
         }
     }
 
-    fun copyUpiId(context: Context) {
+    fun copyUpiId(context: Context, quiet: Boolean = false) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
         clipboard.setPrimaryClip(ClipData.newPlainText("UPI ID", UPI_ID))
-        Toaster.show("UPI ID copied")
+        if (!quiet) Toaster.show("UPI ID copied")
     }
 }

@@ -11,6 +11,14 @@
     <!-- Updating in-app: the new version is downloaded and handed to Android's installer (you confirm it). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- To find the installed UPI apps (GPay, PhonePe, Paytm, …) for "Donate via UPI". -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="upi" />
+        </intent>
+    </queries>
+
     <application
         android:name=".DaydreaminApp"
         android:allowBackup="true"

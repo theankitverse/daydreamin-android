@@ -183,23 +183,29 @@ object SongActions {
     }
 }
 
+/** Where a toast can take you when it's tapped. */
+enum class ToastTarget { DOWNLOADS }
+
+/** One toast: what it says, how long it stays, and where tapping it goes (if anywhere). */
+data class Toast(val text: String, val durationMs: Long, val target: ToastTarget?, val id: Long = System.nanoTime())
+
 /** One short confirmation at a time ("Added to queue"), shown by [ToastHost]. */
 object Toaster {
-    private val _message = MutableStateFlow<Pair<String, Long>?>(null)
-    val message: StateFlow<Pair<String, Long>?> = _message
-    fun show(text: String) { _message.value = text to System.nanoTime() }
+    private val _message = MutableStateFlow<Toast?>(null)
+    val message: StateFlow<Toast?> = _message
+    fun show(text: String, durationMs: Long = 2_200, target: ToastTarget? = null) { _message.value = Toast(text, durationMs, target) }
     internal fun clear() { _message.value = null }
 }
 
 /** A small glass note that rises, waits, and leaves. Place once, above the bottom chrome. */
 @Composable
-fun ToastHost(modifier: Modifier = Modifier) {
+fun ToastHost(modifier: Modifier = Modifier, onOpenDownloads: () -> Unit = {}) {
     val message by Toaster.message.collectAsState()
-    var shown by remember { mutableStateOf("") }
+    var shown by remember { mutableStateOf<Toast?>(null) }
     LaunchedEffect(message) {
         val m = message ?: return@LaunchedEffect
-        shown = m.first
-        delay(2_200)
+        shown = m
+        delay(m.durationMs)
         Toaster.clear()
     }
     AnimatedVisibility(
@@ -208,14 +214,22 @@ fun ToastHost(modifier: Modifier = Modifier) {
         exit = fadeOut(tween(200)) + slideOutVertically(tween(200)) { it / 2 },
         modifier = modifier,
     ) {
+        val toast = shown
         Text(
-            shown,
+            toast?.text.orEmpty(),
             style = MaterialTheme.typography.labelLarge,
             color = Color.White,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             modifier = Modifier
-                .glass(Radius.pill, Glass.Frosted, tint = Color(0xE6141418))
+                .padding(horizontal = 20.dp)
+                .then(
+                    if (toast?.target == ToastTarget.DOWNLOADS) {
+                        Modifier.pressable(onClick = { Toaster.clear(); onOpenDownloads() })
+                    } else Modifier,
+                )
+                .glass(RoundedCornerShape(22.dp), Glass.Frosted, tint = Color(0xF5141418))
                 .padding(horizontal = 18.dp, vertical = 11.dp),
         )
     }

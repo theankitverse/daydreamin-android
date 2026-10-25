@@ -315,7 +315,13 @@ fun AppNavHost() {
                 ) { StatisticsScreen(onBack = { navController.popIfOn(Dest.STATISTICS) }) }
             }
             // Confirmations for song actions ("Added to queue"), floating just above the bottom chrome.
-            ToastHost(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = padding.calculateBottomPadding() + 12.dp))
+            ToastHost(
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = padding.calculateBottomPadding() + 12.dp),
+                onOpenDownloads = {
+                    LibraryLaunch.tab = com.daydreamin.app.ui.screens.library.LibraryTab.DOWNLOADS
+                    navController.navigateTopLevel(Dest.LIBRARY)
+                },
+            )
           }
           }
         }

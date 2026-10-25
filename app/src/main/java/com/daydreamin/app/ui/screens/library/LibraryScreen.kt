@@ -780,7 +780,12 @@ private fun CollectionDownloadToggle(on: Boolean, label: String, onToggle: () ->
             .semantics { contentDescription = if (on) "Remove download of $label" else "Download $label" }
             .pressable(onClick = {
                 onToggle()
-                com.daydreamin.app.ui.components.Toaster.show(if (on) "Removed download of $label" else "Downloading $label")
+                if (on) com.daydreamin.app.ui.components.Toaster.show("Removed download of $label")
+                else com.daydreamin.app.ui.components.Toaster.show(
+                    "Downloading $label. Find them in Library › Downloads",
+                    durationMs = 5_000,
+                    target = com.daydreamin.app.ui.components.ToastTarget.DOWNLOADS,
+                )
             })
             .glass(Radius.pill, if (on) Glass.Frosted else Glass.Regular),
         contentAlignment = Alignment.Center,

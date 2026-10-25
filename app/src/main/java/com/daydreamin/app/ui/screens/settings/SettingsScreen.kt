@@ -612,7 +612,7 @@ private fun UpiRow() {
             Modifier.glass(Radius.pill, Glass.Clear).padding(start = 14.dp, end = 10.dp, top = 7.dp, bottom = 7.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Donate", style = MaterialTheme.typography.labelLarge, color = Color.White)
+            Text("Copy & pay", style = MaterialTheme.typography.labelLarge, color = Color.White)
             Spacer(Modifier.width(4.dp))
             Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(15.dp))
         }

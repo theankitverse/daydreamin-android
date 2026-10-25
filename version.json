@@ -1,9 +1,9 @@
 {
-  "versionCode": 14,
-  "versionName": "1.5.0",
+  "versionCode": 15,
+  "versionName": "1.5.1",
   "url": "https://github.com/theankitverse/daydreamin-android/releases/latest",
-  "notes": "Downloads are here: save songs, your liked songs or whole playlists and listen with no connection. Songs also load much faster now.",
-  "apkUrl": "https://github.com/theankitverse/daydreamin-android/releases/download/v1.5.0/daydreamin-v1.5.0.apk",
-  "apkSize": 4775054,
-  "sha256": "dbbf6dc49265d14fecacb66a49388c6670fbc8bf021af62c3819568c2d43823a"
+  "notes": "Donating by UPI now works for any amount, and downloads tell you where to find them (Library › Downloads).",
+  "apkUrl": "https://github.com/theankitverse/daydreamin-android/releases/download/v1.5.1/daydreamin-v1.5.1.apk",
+  "apkSize": 4777276,
+  "sha256": "200459cb59367c3505032c3761a610860af8db5b11675b47fb06c6683a7429b3"
 }
