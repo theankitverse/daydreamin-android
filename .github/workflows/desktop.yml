@@ -66,15 +66,14 @@ jobs:
           case "$RUNNER_OS" in
             macOS) app=("$dir/Daydreamin.app/Contents/MacOS/Daydreamin") ;;
             Linux) app=(xvfb-run -a "$dir/daydreamin/bin/daydreamin") ;;
-            Windows)
-              # The .exe is a windowed program (Windows discards its output); its own runtime and
-              # jars, started directly, run the same thing with a log.
-              out="$(cygpath -w "$PWD/snapshots")"
-              app=("$dir/Daydreamin/runtime/bin/java.exe" -cp "$(cygpath -w "$PWD/$dir/Daydreamin/app")\*" com.daydreamin.app.MainKt) ;;
+            # A windowed program: Windows discards its console output, so the app writes its log
+            # into the snapshot folder (snapshots/app.log) in this mode.
+            Windows) out="$(cygpath -w "$PWD/snapshots")"; app=("$dir/Daydreamin/Daydreamin.exe") ;;
           esac
           ls -la "$dir"
           status=0
-          "${app[@]}" --snapshot "$out" --onboarded --pages home,settings > run.log 2>&1 || status=$?
+          "${app[@]}" --snapshot "$out" --onboarded --pages home,settings > /dev/null 2>&1 || status=$?
+          cp snapshots/app.log run.log 2>/dev/null || touch run.log
           grep -vE "^D/" run.log | tail -40 || true
           if [ $status -ne 0 ]; then echo "::error::the packaged app exited with $status"; exit 1; fi
           for f in home-desktop settings-desktop home-phone; do

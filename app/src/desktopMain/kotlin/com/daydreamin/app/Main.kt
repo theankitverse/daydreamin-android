@@ -59,6 +59,17 @@ private fun platformName(): String = System.getProperty("os.name").lowercase().l
 
 fun main(args: Array<String>) {
     val startedAt = elapsedRealtime()
+    // --snapshot also writes the app's log next to the pictures (on Windows the app has no console).
+    args.indexOf("--snapshot").takeIf { it >= 0 }?.let { args.getOrNull(it + 1) }?.let { dir ->
+        File(dir).mkdirs()
+        val log = java.io.FileOutputStream(File(dir, "app.log"), true)
+        fun tee(to: java.io.PrintStream) = java.io.PrintStream(object : java.io.OutputStream() {
+            override fun write(b: Int) { to.write(b); log.write(b) }
+            override fun write(b: ByteArray, off: Int, len: Int) { to.write(b, off, len); log.write(b, off, len); log.flush() }
+        }, true)
+        System.setOut(tee(System.out))
+        System.setErr(tee(System.err))
+    }
     AppInfo.versionName = System.getProperty("daydreamin.version") ?: "dev"
     AppInfo.versionCode = System.getProperty("daydreamin.versionCode")?.toIntOrNull() ?: 0
     // Desktop releases have their own file (Android's version.json describes the APK), with the same mirrors.

@@ -21,7 +21,7 @@ class LinuxMprisTest {
         try {
             val song = Song(id = "abc", title = "Kesariya", artist = "Arijit Singh")
             mpris.update(NowPlaying(song, playing = true, positionMs = 42_000, durationMs = 268_000, artworkUrl = null))
-            DBusConnectionBuilder.forSessionBus().build().use { other ->
+            DBusConnectionBuilder.forSessionBus().transportConfig().withServiceLoaderClassLoader(LinuxMpris::class.java.classLoader).back().build().use { other ->
                 val props = other.getRemoteObject("org.mpris.MediaPlayer2.daydreamin", "/org/mpris/MediaPlayer2", Properties::class.java)
                 assertEquals("Playing", props.Get<String>("org.mpris.MediaPlayer2.Player", "PlaybackStatus"))
                 @Suppress("UNCHECKED_CAST")

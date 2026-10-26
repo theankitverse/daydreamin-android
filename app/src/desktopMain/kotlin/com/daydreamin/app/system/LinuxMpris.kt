@@ -39,7 +39,11 @@ interface MprisPlayer : DBusInterface {
  * media keys, `playerctl`. Daydreamin appears on the session bus as org.mpris.MediaPlayer2.daydreamin.
  */
 class LinuxMpris : MediaBridge, MprisRoot, MprisPlayer, Properties {
-    private val connection: DBusConnection = DBusConnectionBuilder.forSessionBus().build()
+    // The Unix-socket transport is found through a ServiceLoader; point it at this app's own classes,
+    // not whichever class loader the starting thread happens to have (it found nothing in some setups).
+    private val connection: DBusConnection = DBusConnectionBuilder.forSessionBus()
+        .transportConfig().withServiceLoaderClassLoader(LinuxMpris::class.java.classLoader).back()
+        .build()
     @Volatile private var state: NowPlaying? = null
 
     init {
