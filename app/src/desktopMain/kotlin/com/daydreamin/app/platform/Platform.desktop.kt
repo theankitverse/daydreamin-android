@@ -1,6 +1,10 @@
 package com.daydreamin.app.platform
 
+import androidx.compose.foundation.onClick
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import com.daydreamin.app.ui.components.Toaster
 import java.awt.Desktop
 import java.awt.Toolkit
@@ -19,9 +23,40 @@ actual fun elapsedRealtime(): Long = System.nanoTime() / 1_000_000
 // A computer rarely has no connection at all, and a wrong "offline" is worse than a wrong "online".
 actual fun isOnline(): Boolean = true
 
-// Esc handling comes with the desktop layout (Phase 3); there's no system back button here.
+/**
+ * Esc is "back" on desktop. Screens register what back means for them (close the lyrics, the open
+ * playlist…); the most recently shown one that's enabled gets it, otherwise the app goes back a page.
+ */
+object DesktopBack {
+    class Entry { var enabled = false; var onBack: () -> Unit = {} }
+    private val entries = mutableListOf<Entry>()
+
+    fun add(e: Entry) = synchronized(entries) { entries.add(e) }
+    fun remove(e: Entry) = synchronized(entries) { entries.remove(e) }
+
+    /** True if something handled it. */
+    fun handle(): Boolean {
+        val entry = synchronized(entries) { entries.lastOrNull { it.enabled } }
+        if (entry != null) { entry.onBack(); return true }
+        return com.daydreamin.app.ui.navigation.NavCommands.goBack?.invoke() ?: false
+    }
+}
+
 @Composable
-actual fun BackHandler(enabled: Boolean, onBack: () -> Unit) {}
+actual fun BackHandler(enabled: Boolean, onBack: () -> Unit) {
+    val latest = rememberUpdatedState(onBack)
+    val entry = remember { DesktopBack.Entry() }
+    entry.enabled = enabled
+    entry.onBack = { latest.value() }
+    DisposableEffect(entry) {
+        DesktopBack.add(entry)
+        onDispose { DesktopBack.remove(entry) }
+    }
+}
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+actual fun androidx.compose.ui.Modifier.onSecondaryClick(onClick: () -> Unit): androidx.compose.ui.Modifier =
+    this.onClick(matcher = androidx.compose.foundation.PointerMatcher.mouse(androidx.compose.ui.input.pointer.PointerButton.Secondary), onClick = onClick)
 
 actual val supportsRenderEffectBlur: Boolean = true
 
@@ -39,3 +74,5 @@ actual fun donateViaUpi(upiId: String) {
     runCatching { Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(upiId), null) }
     Toaster.show("UPI ID copied: $upiId. Pay it from any UPI app on your phone (“Pay UPI ID”)", durationMs = 8_000)
 }
+
+actual val isDesktop: Boolean = true

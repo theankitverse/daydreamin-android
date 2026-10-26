@@ -9,6 +9,10 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.DrawerValue
@@ -65,8 +69,20 @@ import com.daydreamin.app.ui.screens.settings.SettingsScreen
 import com.daydreamin.app.ui.screens.themecustomize.ThemeCustomizeScreen
 import kotlinx.coroutines.launch
 
+/** Wider than this, the desktop app shows a sidebar instead of the bottom tabs and the slide-out menu. */
+private val SidebarMinWidth = 840.dp
+private val SidebarWidth = 264.dp
+
+/** [startRoute]: the page shown first — Home, except when rendering a page on its own (desktop --snapshot). */
 @Composable
-fun AppNavHost() {
+fun AppNavHost(startRoute: String = Dest.HOME) {
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+        AppNavHost(wide = com.daydreamin.app.platform.isDesktop && maxWidth >= SidebarMinWidth, startRoute = startRoute)
+    }
+}
+
+@Composable
+private fun AppNavHost(wide: Boolean, startRoute: String) {
     val navController = rememberNavController()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -76,7 +92,9 @@ fun AppNavHost() {
     val onTab = currentRoute in Dest.bottomNavRoutes
     // While Now Playing grows out of the mini player, the chrome stays on screen fading out
     // (the route has already changed, but the flight hasn't finished).
-    val showChrome = onTab || (currentRoute == Dest.NOW_PLAYING && PlayerSheet.morphInProgress)
+    val showChrome = onTab || (currentRoute == Dest.NOW_PLAYING && PlayerSheet.morphInProgress) ||
+        // With a sidebar, every page is a place you navigate to, so the player bar stays under all of them.
+        (wide && currentRoute != Dest.NOW_PLAYING && currentRoute != Dest.QUEUE)
     val hazeState = remember { HazeState() }
     val glassStyle = daydreamGlassStyle()
     val chromeStyle = remember {
@@ -94,7 +112,8 @@ fun AppNavHost() {
     // is the system Back gesture — and Back on Home closed the app, which looked exactly like a
     // crash. Home now asks for a second Back within a couple of seconds before leaving.
     var lastBackOnHomeMs by remember { androidx.compose.runtime.mutableLongStateOf(0L) }
-    com.daydreamin.app.platform.BackHandler(enabled = currentRoute == Dest.HOME && !drawerState.isOpen && lastBackOnHomeMs == 0L) {
+    // (A phone thing: there's no swipe to trip over on a computer, and Esc on Home just does nothing.)
+    com.daydreamin.app.platform.BackHandler(enabled = !com.daydreamin.app.platform.isDesktop && currentRoute == Dest.HOME && !drawerState.isOpen && lastBackOnHomeMs == 0L) {
         lastBackOnHomeMs = elapsedRealtime()
         com.daydreamin.app.ui.components.Toaster.show("Swipe back again to exit")
     }
@@ -104,7 +123,7 @@ fun AppNavHost() {
 
     ModalNavigationDrawer(
         drawerState = drawerState,
-        gesturesEnabled = onTab,
+        gesturesEnabled = onTab && !wide,
         drawerContent = {
             AppDrawerContent(
                 hazeState = hazeState,
@@ -120,8 +139,25 @@ fun AppNavHost() {
             )
         },
     ) {
+      Row(Modifier.fillMaxSize()) {
+        if (wide) {
+            AppDrawerContent(
+                hazeState = hazeState,
+                glassStyle = glassStyle,
+                currentRoute = currentRoute,
+                onHome = { navController.navigateTopLevel(Dest.HOME) },
+                onSearch = { navController.navigateTopLevel(Dest.SEARCH) },
+                onLibrary = { navController.navigateTopLevel(Dest.LIBRARY) },
+                onProfile = { navController.navigateTopLevel(Dest.PROFILE) },
+                onStatistics = { navController.navigateFromSidebar(Dest.STATISTICS) },
+                onTheme = { navController.navigateFromSidebar(Dest.THEME_CUSTOMIZE) },
+                onSettings = { navController.navigateFromSidebar(Dest.SETTINGS) },
+                modifier = Modifier.width(SidebarWidth),
+            )
+        }
         Scaffold(
             containerColor = Color.Transparent,
+            modifier = Modifier.weight(1f),
             bottomBar = {
                 if (showChrome) {
                     // Scoped to this lambda (its own recomposition group) on purpose: the ticking
@@ -135,7 +171,10 @@ fun AppNavHost() {
                             // Fades away as Now Playing opens and back as it closes into the mini player.
                             .graphicsLayer { alpha = 1f - PlayerSheet.expansion }
                             .then(
-                                if (dev.chrisbanes.haze.HazeDefaults.blurEnabled()) {
+                                // With a sidebar there are no tabs to keep readable, and the player bar
+                                // frosts itself; a frosted strip here only cut the page's glow off.
+                                if (wide) Modifier
+                                else if (dev.chrisbanes.haze.HazeDefaults.blurEnabled()) {
                                     Modifier.hazeEffect(state = hazeState, style = chromeStyle) {
                                         inputScale = dev.chrisbanes.haze.HazeInputScale.Auto
                                         progressive = HazeProgressive.verticalGradient(
@@ -179,7 +218,7 @@ fun AppNavHost() {
                                 )
                             }
                         }
-                        DaydreaminBottomBar(currentRoute = currentRoute, onSelect = { navController.navigateTopLevel(it) })
+                        if (!wide) DaydreaminBottomBar(currentRoute = currentRoute, onSelect = { navController.navigateTopLevel(it) })
                     }
                 }
             },
@@ -189,6 +228,12 @@ fun AppNavHost() {
                   PlayerSheet.requestMorphOpen()
                   navController.navigate(Dest.NOW_PLAYING)
               }
+          }
+          LaunchedEffect(startRoute) { if (startRoute != Dest.HOME) navController.navigate(startRoute) }
+          androidx.compose.runtime.DisposableEffect(navController) {
+              NavCommands.goBack = { navController.previousBackStackEntry != null && navController.popBackStack() }
+              NavCommands.openSearch = { SearchFocus.requested = true; navController.navigateTopLevel(Dest.SEARCH) }
+              onDispose { NavCommands.goBack = null; NavCommands.openSearch = null }
           }
           // Opened from the player notification: straight to Now Playing (if something is playing and it isn't open already).
           val openRequested = com.daydreamin.app.ui.components.PlayerSheet.openRequested
@@ -219,8 +264,10 @@ fun AppNavHost() {
                 popExitTransition = { fadeOut(tween(90)) },
             ) {
                 composable(Dest.HOME) {
+                  Capped(wide) {
                     HomeScreen(
-                        onOpenDrawer = { scope.launch { drawerState.open() } },
+                        // The sidebar already lists every place; the avatar goes to your profile.
+                        onOpenDrawer = { if (wide) navController.navigateTopLevel(Dest.PROFILE) else scope.launch { drawerState.open() } },
                         onSearchClick = { SearchFocus.requested = true; navController.navigateTopLevel(Dest.SEARCH) },
                         onOpenLibrary = { tab, playlistId ->
                             LibraryLaunch.tab = tab
@@ -229,8 +276,10 @@ fun AppNavHost() {
                         },
                         contentPadding = padding,
                     )
+                  }
                 }
                 composable(Dest.SEARCH) {
+                  Capped(wide) {
                     SearchScreen(
                         contentPadding = padding,
                         onOpenPlayer = {
@@ -238,8 +287,10 @@ fun AppNavHost() {
                             navController.navigate(Dest.NOW_PLAYING)
                         },
                     )
+                  }
                 }
                 composable(Dest.LIBRARY) {
+                  Capped(wide) {
                     // Draws its own glow behind the status bar, like Home.
                     LibraryScreen(
                         contentPadding = padding,
@@ -249,8 +300,10 @@ fun AppNavHost() {
                         },
                         onGoHome = { navController.navigateTopLevel(Dest.HOME) },
                     )
+                  }
                 }
                 composable(Dest.PROFILE) {
+                  Capped(wide) {
                     // Draws its own glow behind the status bar, like Home and Library.
                     ProfileScreen(
                         contentPadding = padding,
@@ -266,6 +319,7 @@ fun AppNavHost() {
                             navController.navigate(Dest.NOW_PLAYING)
                         },
                     )
+                  }
                 }
                 // Modal-style destinations — pushed up from the bottom over whatever's behind
                 // them, like a sheet, instead of the flat tab crossfade above.
@@ -307,21 +361,21 @@ fun AppNavHost() {
                     exitTransition = { fadeOut(tween(150)) },
                     popExitTransition = { slideDownExit() },
                     popEnterTransition = { fadeIn(tween(200)) },
-                ) { SettingsScreen(onBack = { navController.popIfOn(Dest.SETTINGS) }) }
+                ) { Capped(wide, bottom = padding.calculateBottomPadding()) { SettingsScreen(onBack = { navController.popIfOn(Dest.SETTINGS) }) } }
                 composable(
                     Dest.THEME_CUSTOMIZE,
                     enterTransition = { slideUpEnter() },
                     exitTransition = { fadeOut(tween(150)) },
                     popExitTransition = { slideDownExit() },
                     popEnterTransition = { fadeIn(tween(200)) },
-                ) { ThemeCustomizeScreen(onBack = { navController.popIfOn(Dest.THEME_CUSTOMIZE) }) }
+                ) { Capped(wide, bottom = padding.calculateBottomPadding()) { ThemeCustomizeScreen(onBack = { navController.popIfOn(Dest.THEME_CUSTOMIZE) }) } }
                 composable(
                     Dest.STATISTICS,
                     enterTransition = { slideUpEnter() },
                     exitTransition = { fadeOut(tween(150)) },
                     popExitTransition = { slideDownExit() },
                     popEnterTransition = { fadeIn(tween(200)) },
-                ) { StatisticsScreen(onBack = { navController.popIfOn(Dest.STATISTICS) }) }
+                ) { Capped(wide, bottom = padding.calculateBottomPadding()) { StatisticsScreen(onBack = { navController.popIfOn(Dest.STATISTICS) }) } }
             }
             // Confirmations for song actions ("Added to queue"), floating just above the bottom chrome.
             ToastHost(
@@ -334,6 +388,21 @@ fun AppNavHost() {
           }
           }
         }
+      }
+    }
+}
+
+/**
+ * A page beside the sidebar. Pages use the full width (shelves and song columns fill it, like
+ * other music apps; a cap left the page's glow cut off at its edges). [bottom] keeps a page that
+ * doesn't scroll under the player bar (Settings and the like) clear of it.
+ */
+@Composable
+private fun Capped(wide: Boolean, bottom: androidx.compose.ui.unit.Dp? = null, content: @Composable () -> Unit) {
+    if (!wide || bottom == null) { content(); return }
+    // Settings-style pages are plain rows of text and switches: a readable width, centred.
+    Box(Modifier.fillMaxSize().padding(bottom = bottom), contentAlignment = Alignment.TopCenter) {
+        Box(Modifier.widthIn(max = 880.dp).fillMaxHeight()) { content() }
     }
 }
 
@@ -358,6 +427,12 @@ private fun slideDownExit() = slideOutVertically(
  */
 private fun androidx.navigation.NavController.popIfOn(route: String) {
     if (currentBackStackEntry?.destination?.route == route) popBackStack()
+}
+
+/** Statistics, Theme and Settings from the sidebar: one copy on the stack, on top of the current tab. */
+private fun androidx.navigation.NavController.navigateFromSidebar(route: String) {
+    if (currentBackStackEntry?.destination?.route == route) return
+    navigate(route) { launchSingleTop = true; popUpTo(route) { inclusive = true } }
 }
 
 private fun androidx.navigation.NavController.navigateTopLevel(route: String) {

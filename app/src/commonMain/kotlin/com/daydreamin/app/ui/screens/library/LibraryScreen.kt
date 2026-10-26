@@ -223,7 +223,7 @@ private fun LazyListScope.likedTab(
             EmptyCollection(
                 icon = Icons.Rounded.FavoriteBorder,
                 title = "Songs you love live here",
-                body = "Tap the heart on anything that's playing. Liked songs also download, so they play without a connection.",
+                body = "Tap the heart on anything that's playing. To keep them for offline too, turn on Download liked songs in Settings.",
                 action = "Find something on Home",
                 onAction = onGoHome,
                 modifier = Modifier.animateItem(),

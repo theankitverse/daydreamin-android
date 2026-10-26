@@ -29,6 +29,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -253,7 +255,11 @@ fun NowPlayingScreen(
         // Everything except the artwork fades with the open/close; the artwork flies instead.
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                // A phone fills it; a wide window keeps the player in a comfortable centred column.
+                .align(Alignment.TopCenter)
+                .fillMaxHeight()
+                .widthIn(max = 640.dp)
+                .fillMaxWidth()
                 .graphicsLayer { alpha = ((e() - 0.45f) / 0.55f).coerceIn(0f, 1f) }
                 .statusBarsPadding()
                 .navigationBarsPadding(),

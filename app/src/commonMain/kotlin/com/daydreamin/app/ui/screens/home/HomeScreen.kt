@@ -611,7 +611,8 @@ private fun QuickPicksGrid(songs: List<Song>, nowPlaying: () -> NowPlaying, onPl
     // The shelf is full width, so this is the screen's width on a phone (and the window's on a computer).
     androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
     // The next column peeks in from the right so it's obvious the shelf scrolls.
-    val columnWidth = maxWidth - Space.gutter * 2 - 28.dp
+    // On a wide window several columns show side by side instead of one window-wide column.
+    val columnWidth = minOf(maxWidth - Space.gutter * 2 - 28.dp, 420.dp)
     LazyHorizontalGrid(
         rows = GridCells.Fixed(rows),
         state = gridState,

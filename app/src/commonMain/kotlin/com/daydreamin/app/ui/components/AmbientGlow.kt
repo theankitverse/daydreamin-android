@@ -36,7 +36,8 @@ fun AmbientGlow(light: ArtworkLight, scrollY: () -> Float) {
                         0.4f to light.key.copy(alpha = 0.12f),
                         1f to Color.Transparent,
                         center = Offset(size.width * 0.08f, 0f),
-                        radius = size.width * 1.1f,
+                        // Fades out inside the box even on a wide window (on a phone, width is the smaller one).
+                        radius = minOf(size.width * 1.1f, size.height),
                     ),
                 )
                 drawRect(
@@ -45,7 +46,7 @@ fun AmbientGlow(light: ArtworkLight, scrollY: () -> Float) {
                         0.5f to light.fill.copy(alpha = 0.08f),
                         1f to Color.Transparent,
                         center = Offset(size.width * 0.98f, size.height * 0.26f),
-                        radius = size.width * 0.85f,
+                        radius = minOf(size.width * 0.85f, size.height * 0.74f),
                     ),
                 )
             },

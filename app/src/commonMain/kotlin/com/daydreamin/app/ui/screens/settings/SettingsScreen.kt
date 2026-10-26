@@ -1,6 +1,7 @@
 package com.daydreamin.app.ui.screens.settings
 
 import com.daydreamin.app.platform.PickKind
+import com.daydreamin.app.platform.isDesktop
 import com.daydreamin.app.platform.rememberPicker
 import com.daydreamin.app.resources.Res
 import com.daydreamin.app.resources.splash_logo
@@ -211,8 +212,9 @@ fun SettingsScreen(onBack: () -> Unit) {
                     onChange = vm::setDownloadLiked,
                 )
             }
-            item { Hairline() }
-            item {
+            // A computer has no mobile data plan to save, and doesn't keep streamed songs for replay.
+            if (!isDesktop) item { Hairline() }
+            if (!isDesktop) item {
                 ToggleRow(
                     icon = Icons.Rounded.Wifi,
                     title = "Download on Wi-Fi only",
@@ -228,13 +230,13 @@ fun SettingsScreen(onBack: () -> Unit) {
                 ActionRow(
                     icon = Icons.Rounded.DownloadDone,
                     title = "Downloads",
-                    body = if (done == 0) "Nothing downloaded yet." else "$done ${if (done == 1) "song" else "songs"}, ${formatBytes(bytes)} on your phone.",
+                    body = if (done == 0) "Nothing downloaded yet." else "$done ${if (done == 1) "song" else "songs"}, ${formatBytes(bytes)} on ${if (isDesktop) "this computer" else "your phone"}.",
                     action = "Remove all",
                     onClick = { if (downloads.isNotEmpty()) confirmRemoveDownloads = true },
                 )
             }
-            item { Hairline() }
-            item { StorageRow(storage) }
+            if (!isDesktop) item { Hairline() }
+            if (!isDesktop) item { StorageRow(storage) }
             item { Hairline() }
             item {
                 ActionRow(
@@ -298,9 +300,10 @@ fun SettingsScreen(onBack: () -> Unit) {
             item { SupportRow() }
             item { UpiRow() }
             item { CreatorRow() }
-            item { UpdateRow() }
+            // Updates and the usage count come to the desktop app with its installers.
+            if (!isDesktop) item { UpdateRow() }
             item { Hairline() }
-            item {
+            if (!isDesktop) item {
                 ToggleRow(
                     icon = Icons.Rounded.BarChart,
                     title = "Share anonymous usage stats",

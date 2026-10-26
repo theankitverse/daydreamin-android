@@ -1,19 +1,29 @@
 package com.daydreamin.app
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
+import androidx.compose.ui.window.WindowPlacement
+import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import com.daydreamin.app.data.Region
 import com.daydreamin.app.data.prefs.AppPreferences
+import com.daydreamin.app.data.repository.toSong
 import com.daydreamin.app.data.taste.TasteProfile
 import com.daydreamin.app.data.youtube.YouTubeExtractorService
 import com.daydreamin.app.platform.elapsedRealtime
@@ -69,36 +79,83 @@ fun main(args: Array<String>) {
     if (snapshotDir != null) {
         // --onboarded: skip first-run setup, to see Home and the rest with whatever library is here.
         if ("--onboarded" in args) kotlinx.coroutines.runBlocking { AppGraph.prefs.setOnboarded() }
-        saveSnapshots(File(snapshotDir)) { DaydreaminRoot() }
+        // --play "<search>": something playing, to see the player bar and Now Playing.
+        args.indexOf("--play").takeIf { it >= 0 }?.let { args.getOrNull(it + 1) }?.let { query ->
+            kotlinx.coroutines.runBlocking {
+                YouTubeExtractorService.search(query, limit = 1).firstOrNull()?.let { com.daydreamin.app.player.PlayerController.playSong(it.toSong()) }
+            }
+        }
+        // --pages home,settings,now_playing (routes; default: home)
+        val pages = args.indexOf("--pages").takeIf { it >= 0 }?.let { args.getOrNull(it + 1) }?.split(',') ?: listOf("home")
+        saveSnapshots(File(snapshotDir), pages) { page -> DaydreaminRoot(startRoute = page) }
         kotlin.system.exitProcess(0)
     }
 
+    val saved = WindowMemory.load(dataDir)
     application {
+        val windowState = rememberWindowState(
+            placement = if (saved?.maximized == true) WindowPlacement.Maximized else WindowPlacement.Floating,
+            // Only a place that's on one of today's screens (a monitor may have been unplugged since).
+            position = saved?.takeIf { WindowMemory.isOnScreen(it) }?.let { WindowPosition(it.x.dp, it.y.dp) } ?: WindowPosition.PlatformDefault,
+            size = saved?.let { DpSize(it.width.dp, it.height.dp) } ?: DpSize(1200.dp, 820.dp),
+        )
         Window(
             onCloseRequest = {
+                WindowMemory.save(dataDir, windowState)
                 com.daydreamin.app.player.PlayerController.disconnect()
                 exitApplication()
             },
             title = "Daydreamin",
             icon = painterResource(Res.drawable.splash_logo),
-            state = rememberWindowState(size = DpSize(1200.dp, 820.dp)),
+            state = windowState,
+            onKeyEvent = ::handleShortcut,
         ) {
+            // Narrower than a phone, the phone layout itself would start to squeeze.
+            androidx.compose.runtime.LaunchedEffect(Unit) { window.minimumSize = java.awt.Dimension(380, 560) }
             DaydreaminRoot()
         }
     }
 }
 
+/**
+ * Keyboard shortcuts. These only see keys nothing else wanted — typing in the search box, or Space
+ * on a focused button, never gets here.
+ */
+internal fun handleShortcut(event: androidx.compose.ui.input.key.KeyEvent): Boolean {
+    if (event.type != androidx.compose.ui.input.key.KeyEventType.KeyDown) return false
+    val command = event.isMetaPressed || event.isCtrlPressed // Cmd on a Mac, Ctrl elsewhere
+    val player = com.daydreamin.app.player.PlayerController
+    return when {
+        event.key == Key.Spacebar && !command -> { player.togglePlayPause(); true }
+        event.key == Key.DirectionRight && command -> { player.next(); true }
+        event.key == Key.DirectionLeft && command -> { player.previous(); true }
+        event.key == Key.DirectionRight && event.isShiftPressed -> { seekBy(10_000); true }
+        event.key == Key.DirectionLeft && event.isShiftPressed -> { seekBy(-10_000); true }
+        event.key == Key.F && command -> { com.daydreamin.app.ui.navigation.NavCommands.openSearch?.invoke(); true }
+        event.key == Key.Escape -> com.daydreamin.app.platform.DesktopBack.handle()
+        else -> false
+    }
+}
+
+private fun seekBy(deltaMs: Long) {
+    val player = com.daydreamin.app.player.PlayerController
+    val p = player.progress.value
+    if (player.meta.value.currentSong == null) return
+    val target = (p.positionMs + deltaMs).coerceIn(0L, if (p.durationMs > 0) p.durationMs - 1_000 else Long.MAX_VALUE)
+    player.seekTo(target)
+}
+
 /** The whole app: first-run setup until it's done, then Home and everything reachable from it. */
 @androidx.compose.runtime.Composable
-fun DaydreaminRoot() {
+fun DaydreaminRoot(startRoute: String = com.daydreamin.app.ui.navigation.Dest.HOME) {
     val prefs = AppGraph.prefs
     val accentName by prefs.accentName.collectAsState(initial = "Violet")
     // null until the store has been read — nothing is shown until we know.
     val onboarded by prefs.onboarded.collectAsState(initial = null)
     val scope = rememberCoroutineScope()
     DaydreaminTheme(accent = accentByName(accentName)) {
-        Box(Modifier.fillMaxSize()) {
-            if (onboarded == true) AppNavHost()
+        Box(Modifier.fillMaxSize().background(com.daydreamin.app.ui.theme.BgBase)) {
+            if (onboarded == true) AppNavHost(startRoute)
             if (onboarded == false) OnboardingScreen(onDone = { scope.launch { prefs.setOnboarded() } })
         }
     }

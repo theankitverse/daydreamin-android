@@ -64,11 +64,12 @@ fun AppDrawerContent(
     onStatistics: () -> Unit,
     onTheme: () -> Unit,
     onSettings: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val name by AppGraph.prefs.userName.collectAsState(initial = "")
     ModalDrawerSheet(
         drawerContainerColor = Color.Transparent,
-        modifier = Modifier.hazeEffect(state = hazeState, style = glassStyle) { inputScale = HazeInputScale.Auto },
+        modifier = modifier.hazeEffect(state = hazeState, style = glassStyle) { inputScale = HazeInputScale.Auto },
     ) {
         Column(Modifier.fillMaxHeight().statusBarsPadding().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 20.dp)) {
             Row(
@@ -89,10 +90,10 @@ fun AppDrawerContent(
             ).forEach { (item, route) -> DrawerRow(item, selected = currentRoute == route) }
             Box(Modifier.padding(horizontal = 12.dp, vertical = 10.dp).fillMaxWidth().height(0.7.dp).background(Color.White.copy(alpha = 0.08f)))
             listOf(
-                DrawerItem("Statistics", Icons.Rounded.BarChart, onStatistics),
-                DrawerItem("Theme", Icons.Rounded.Palette, onTheme),
-                DrawerItem("Settings", Icons.Rounded.Settings, onSettings),
-            ).forEach { DrawerRow(it, selected = false) }
+                DrawerItem("Statistics", Icons.Rounded.BarChart, onStatistics) to "statistics",
+                DrawerItem("Theme", Icons.Rounded.Palette, onTheme) to "theme_customize",
+                DrawerItem("Settings", Icons.Rounded.Settings, onSettings) to "settings",
+            ).forEach { (item, route) -> DrawerRow(item, selected = currentRoute == route) }
 
             Spacer(Modifier.weight(1f))
             // Credit line — tapping it opens the maker's Instagram.

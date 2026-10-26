@@ -44,3 +44,7 @@ actual fun openUrl(url: String, failMessage: String) {
 actual fun donateViaUpi(upiId: String) = com.daydreamin.app.ui.components.openUpiApp(DaydreaminApp.instance, upiId)
 
 actual val supportsRenderEffectBlur: Boolean get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+
+actual val isDesktop: Boolean = false
+
+actual fun androidx.compose.ui.Modifier.onSecondaryClick(onClick: () -> Unit): androidx.compose.ui.Modifier = this

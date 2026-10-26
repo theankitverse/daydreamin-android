@@ -23,6 +23,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import com.daydreamin.app.platform.onSecondaryClick
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -55,6 +58,9 @@ fun Modifier.pressable(
     val scale by animateFloatAsState(if (pressed) Motion.pressedScale else 1f, Motion.press(), label = "press")
     this
         .graphicsLayer { scaleX = scale; scaleY = scale }
+        .pointerHoverIcon(PointerIcon.Hand)
+        // With a mouse, right-click opens what long-press opens on a phone (the song menu).
+        .then(if (onLongClick != null) Modifier.onSecondaryClick(onLongClick) else Modifier)
         .then(
             if (onLongClick != null) {
                 Modifier.combinedClickable(interactionSource = interaction, indication = null, role = role, onLongClick = onLongClick, onClick = onClick)

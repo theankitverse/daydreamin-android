@@ -22,12 +22,14 @@ import java.io.File
  * saves a PNG of each — for checking layouts where there's no display to look at (CI, Windows and
  * Linux build machines) and for comparing sizes side by side.
  */
-fun saveSnapshots(dir: File, content: @Composable () -> Unit) {
+fun saveSnapshots(dir: File, pages: List<String>, content: @Composable (page: String) -> Unit) {
     dir.mkdirs()
-    for ((name, size) in listOf("phone" to (400 to 860), "tablet" to (820 to 1100), "desktop" to (1280 to 820))) {
-        val file = File(dir, "$name.png")
-        renderOffscreen(file, size.first, size.second, settleMs = 12_000, content)
-        println("snapshot: ${file.absolutePath}")
+    for (page in pages) {
+        for ((name, size) in listOf("phone" to (400 to 860), "desktop" to (1280 to 820), "wide" to (1720 to 980))) {
+            val file = File(dir, "${page.replace('/', '_')}-$name.png")
+            renderOffscreen(file, size.first, size.second, settleMs = 9_000) { content(page) }
+            println("snapshot: ${file.absolutePath}")
+        }
     }
 }
 
@@ -43,11 +45,12 @@ private fun renderOffscreen(file: File, widthDp: Int, heightDp: Int, settleMs: L
     val scene = ImageComposeScene(widthDp * 2, heightDp * 2, Density(2f), coroutineContext = coroutineContext) {
         CompositionLocalProvider(LocalLifecycleOwner provides owner, LocalViewModelStoreOwner provides owner) { content() }
     }
-    // Let data and artwork arrive: keep drawing frames (which also runs the screen's effects) for a while.
+    // Let data and artwork arrive: keep drawing frames (which also runs the screen's effects) for a
+    // while — ten a second is plenty to settle animations, and drawing is slow off-screen (no GPU).
     var t = 0L
     while (t < settleMs * 1_000_000) {
         scene.render(t)
-        delay(16); t += 16_000_000
+        delay(100); t += 100_000_000
     }
     file.writeBytes(scene.render(t).encodeToData(EncodedImageFormat.PNG)!!.bytes)
     scene.close()
