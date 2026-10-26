@@ -43,9 +43,6 @@ import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 
-enum class DownloadStatus { QUEUED, DOWNLOADING, DONE, FAILED }
-
-data class DownloadInfo(val song: Song, val status: DownloadStatus, val percent: Float, val bytes: Long)
 
 /**
  * Songs kept on the phone for listening offline.
@@ -65,7 +62,7 @@ data class DownloadInfo(val song: Song, val status: DownloadStatus, val percent:
  * songs go, unless something else still wants them.
  */
 @UnstableApi
-object Downloads {
+actual object Downloads {
     private const val TAG = "Downloads"
     const val SCHEME = "daydreamin"
     private const val PARALLEL = 3
@@ -81,7 +78,7 @@ object Downloads {
 
     private val _items = MutableStateFlow<Map<String, DownloadInfo>>(emptyMap())
     /** Every download, by the song's playId. */
-    val items: StateFlow<Map<String, DownloadInfo>> = _items
+    actual val items: StateFlow<Map<String, DownloadInfo>> = _items
 
     /** Songs being looked up before their download can be queued — shown as queued straight away. */
     private val pending = ConcurrentHashMap<String, Song>()
@@ -152,20 +149,20 @@ object Downloads {
     /** Downloads know what's on the phone only once their index has loaded; playback waits briefly for it. */
     suspend fun awaitReady() { withTimeoutOrNull(3_000) { ready.await() } }
 
-    fun isDownloaded(playId: String): Boolean = _items.value[playId]?.status == DownloadStatus.DONE
+    actual fun isDownloaded(playId: String): Boolean = _items.value[playId]?.status == DownloadStatus.DONE
 
     /** The song as stored with its download (it always has a videoId). */
-    fun downloadedSong(playId: String): Song? = _items.value[playId]?.takeIf { it.status == DownloadStatus.DONE }?.song
+    actual fun downloadedSong(playId: String): Song? = _items.value[playId]?.takeIf { it.status == DownloadStatus.DONE }?.song
 
     /** Space the downloads take, in bytes. */
-    fun bytesUsed(): Long = runCatching { cache?.cacheSpace ?: 0L }.getOrDefault(0L)
+    actual fun bytesUsed(): Long = runCatching { cache?.cacheSpace ?: 0L }.getOrDefault(0L)
 
     // ---- what you ask for
 
-    fun download(song: Song) = scope.launch { DaydreaminApp.instance.prefs.setSongDownloaded(song, true) }
+    actual fun download(song: Song) = scope.launch { DaydreaminApp.instance.prefs.setSongDownloaded(song, true) }
 
     /** Stops keeping [song] by itself. Returns what else still keeps it downloaded, if anything. */
-    suspend fun remove(song: Song): String? {
+    actual suspend fun remove(song: Song): String? {
         val prefs = DaydreaminApp.instance.prefs
         prefs.setSongDownloaded(song, false)
         if (prefs.downloadLiked.first() && prefs.likedSongs.first().any { it.playId == song.playId }) return "Liked songs"
@@ -173,7 +170,7 @@ object Downloads {
         return prefs.playlists.first().firstOrNull { it.id in ids && it.songs.any { s -> s.playId == song.playId } }?.name
     }
 
-    fun retryFailed() { kick.value++ }
+    actual fun retryFailed() { kick.value++ }
 
     /** The app came to the front: carry on with anything unfinished, with its notification, and retry failures. */
     fun onAppVisible() {
@@ -183,7 +180,7 @@ object Downloads {
         retryFailed()
     }
 
-    suspend fun removeAll() {
+    actual suspend fun removeAll() {
         DaydreaminApp.instance.prefs.clearAllDownloads()
         withContext(Dispatchers.Main) { manager?.removeAllDownloads() }
     }

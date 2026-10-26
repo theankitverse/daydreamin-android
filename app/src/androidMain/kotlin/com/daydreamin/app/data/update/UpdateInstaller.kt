@@ -25,17 +25,6 @@ import java.io.IOException
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
-/** Where an in-app update is. */
-sealed interface InstallState {
-    data object Idle : InstallState
-    data class Downloading(val fraction: Float?) : InstallState
-    data object Verifying : InstallState
-    /** Android needs "Install unknown apps" allowed for Daydreamin first; the settings page has been opened. */
-    data object NeedsPermission : InstallState
-    data object Installing : InstallState
-    data class Failed(val message: String) : InstallState
-}
-
 /**
  * Downloads the new APK itself and hands it straight to Android's installer, instead of sending
  * you to a browser. Updating through the browser meant downloading from GitHub, finding the file
@@ -46,11 +35,11 @@ sealed interface InstallState {
  * and that it really is the next Daydreamin — and if Android still refuses, the reason it gives is
  * shown as-is.
  */
-object UpdateInstaller {
+actual object UpdateInstaller {
     private const val TAG = "UpdateInstaller"
 
     private val _state = MutableStateFlow<InstallState>(InstallState.Idle)
-    val state: StateFlow<InstallState> = _state
+    actual val state: StateFlow<InstallState> = _state
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -59,6 +48,15 @@ object UpdateInstaller {
         .build()
 
     private var job: Job? = null
+
+    actual fun start(remote: RemoteVersion, scope: CoroutineScope) = start(com.daydreamin.app.DaydreaminApp.instance, remote, scope)
+
+    actual fun openReleasePage(remote: RemoteVersion) = openReleasePage(com.daydreamin.app.DaydreaminApp.instance, remote)
+
+    /** Android 8+ asks for "Install unknown apps" once; older versions always allow it. */
+    actual fun canInstallNow(): Boolean = com.daydreamin.app.DaydreaminApp.instance.let { context ->
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.O || context.packageManager.canRequestPackageInstalls()
+    }
 
     /** Starts (or continues, after the permission screen) updating to [remote]. */
     fun start(context: Context, remote: RemoteVersion, scope: CoroutineScope) {
@@ -178,7 +176,7 @@ object UpdateInstaller {
         }
     }
 
-    internal fun reset() { if (job?.isActive != true) _state.value = InstallState.Idle }
+    actual fun reset() { if (job?.isActive != true) _state.value = InstallState.Idle }
 
     private fun friendly(e: Throwable): String {
         val msg = e.message.orEmpty()

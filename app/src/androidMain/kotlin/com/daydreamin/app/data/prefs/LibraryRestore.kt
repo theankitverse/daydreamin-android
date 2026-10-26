@@ -2,6 +2,7 @@ package com.daydreamin.app.data.prefs
 
 import android.content.Context
 import android.net.Uri
+import com.daydreamin.app.platform.AutoBackup
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
@@ -9,8 +10,6 @@ import java.io.IOException
 
 /** A real backup is a few hundred KB even for thousands of songs (plus a small photo); anything far past this isn't one. */
 private const val MAX_BACKUP_BYTES = 10 * 1024 * 1024
-
-data class RestoreResult(val summary: ImportSummary, val profileApplied: Boolean)
 
 /**
  * Restores a backup file the user picked: merges its library in (never removing anything), applies
@@ -20,7 +19,7 @@ data class RestoreResult(val summary: ImportSummary, val profileApplied: Boolean
  * Throws [BackupFormatException] (message fit to show) for a file that isn't a usable backup,
  * [IOException] / [SecurityException] when it can't be read.
  */
-suspend fun restoreLibrary(context: Context, prefs: AppPreferences, uri: Uri, keepBackingUpHere: Boolean): RestoreResult {
+suspend fun restoreLibraryFromUri(context: Context, prefs: AppPreferences, uri: Uri, keepBackingUpHere: Boolean): RestoreResult {
     val text = withContext(Dispatchers.IO) {
         val input = context.contentResolver.openInputStream(uri) ?: throw IOException("no input stream")
         input.use {

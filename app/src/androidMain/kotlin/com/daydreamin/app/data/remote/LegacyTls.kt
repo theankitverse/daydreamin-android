@@ -15,7 +15,7 @@ import javax.net.ssl.X509TrustManager
  * every such request fails its TLS handshake. There, the system's roots plus these four are
  * trusted; nothing is skipped or loosened, and on Android 7.1.1+ clients are left untouched.
  */
-object LegacyTls {
+actual object LegacyTls {
     private val needed = Build.VERSION.SDK_INT < Build.VERSION_CODES.N_MR1
 
     private val trustManager: X509TrustManager? by lazy {
@@ -37,13 +37,13 @@ object LegacyTls {
     }
 
     /** Trusts the bundled roots too, on the Android versions that lack them. */
-    fun OkHttpClient.Builder.withLegacyRoots(): OkHttpClient.Builder = apply {
+    actual fun OkHttpClient.Builder.withLegacyRoots(): OkHttpClient.Builder = apply {
         val tm = trustManager ?: return@apply
         val context = SSLContext.getInstance("TLS").apply { init(null, arrayOf(tm), null) }
         sslSocketFactory(context.socketFactory, tm)
     }
 
-    val isNeeded: Boolean get() = needed
+    actual val isNeeded: Boolean get() = needed
 
     // ISRG Root X1 (Let's Encrypt), DigiCert Global Root G2 and G3 (Apple), USERTrust ECC (GitHub).
     private const val ROOTS = """

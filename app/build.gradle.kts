@@ -59,6 +59,8 @@ android {
 }
 
 kotlin {
+    // PlayerController, Downloads and a few others are declared once in commonMain and implemented per platform.
+    compilerOptions { freeCompilerArgs.add("-Xexpect-actual-classes") }
     androidTarget {
         compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) }
     }
@@ -66,31 +68,17 @@ kotlin {
     jvm("desktop")
 
     sourceSets {
-        androidMain.dependencies {
-            implementation("androidx.core:core-ktx:1.13.1")
-            implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
-            implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
-            implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.6")
-            implementation("androidx.activity:activity-compose:1.9.2")
-
-            // Compose UI
-            implementation("androidx.compose.ui:ui")
-            implementation("androidx.compose.ui:ui-graphics")
-            implementation("androidx.compose.ui:ui-tooling-preview")
-            implementation("androidx.compose.material:material-icons-extended")
-            implementation("androidx.compose.material3:material3")
-            implementation("androidx.compose.foundation:foundation")
-
-            // Navigation
-            implementation("androidx.navigation:navigation-compose:2.8.1")
-
-            // Media3 — playback, MediaSession, lock screen / notification controls
-            implementation("androidx.media3:media3-exoplayer:1.8.0")
-            implementation("androidx.media3:media3-session:1.8.0")
-            implementation("androidx.media3:media3-common:1.8.0")
-            // StandaloneDatabaseProvider — backs the on-disk audio cache's index (media3-datasource,
-            // which SimpleCache/CacheDataSource live in, already comes in transitively via exoplayer).
-            implementation("androidx.media3:media3-database:1.8.0")
+        // Everything that isn't tied to one platform: screens, theme, YouTube, library, recommendations.
+        commonMain.dependencies {
+            implementation(compose.runtime)
+            implementation(compose.foundation)
+            implementation(compose.ui)
+            implementation(compose.material3)
+            implementation(compose.materialIconsExtended)
+            implementation(compose.components.resources)
+            implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
+            implementation("org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose:2.8.4")
+            implementation("org.jetbrains.androidx.navigation:navigation-compose:2.8.0-alpha10")
 
             // Networking
             implementation("com.squareup.retrofit2:retrofit:2.11.0")
@@ -100,15 +88,11 @@ kotlin {
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
 
             // Image loading
-            implementation("io.coil-kt:coil-compose:2.7.0")
-            // Pulls a representative color out of album artwork for the dynamic glows (Home, mini player).
-            implementation("androidx.palette:palette-ktx:1.0.0")
+            implementation("io.coil-kt.coil3:coil-compose:3.0.4")
+            implementation("io.coil-kt.coil3:coil-network-okhttp:3.0.4")
 
-            // Preferences / settings persistence
-            implementation("androidx.datastore:datastore-preferences:1.1.1")
-
-            // Splash screen API
-            implementation("androidx.core:core-splashscreen:1.0.1")
+            // Preferences / settings persistence (the file itself is opened per platform)
+            implementation("androidx.datastore:datastore-preferences-core:1.1.1")
 
             // On-device YouTube search + stream extraction — no backend needed to resolve playable audio.
             // Pin to a recent release: YouTube's internal formats shift and older extractor versions stop working.
@@ -118,6 +102,34 @@ kotlin {
             // Real backdrop blur / frosted-glass effect (Apple Music-style "liquid glass")
             implementation("dev.chrisbanes.haze:haze:1.5.3")
             implementation("dev.chrisbanes.haze:haze-materials:1.5.3")
+        }
+        androidMain.dependencies {
+            implementation("androidx.core:core-ktx:1.13.1")
+            implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
+            implementation("androidx.activity:activity-compose:1.9.2")
+            implementation("androidx.compose.ui:ui-tooling-preview")
+
+            // Media3 — playback, MediaSession, lock screen / notification controls
+            implementation("androidx.media3:media3-exoplayer:1.8.0")
+            implementation("androidx.media3:media3-session:1.8.0")
+            implementation("androidx.media3:media3-common:1.8.0")
+            // StandaloneDatabaseProvider — backs the on-disk audio cache's index (media3-datasource,
+            // which SimpleCache/CacheDataSource live in, already comes in transitively via exoplayer).
+            implementation("androidx.media3:media3-database:1.8.0")
+
+            // Pulls a representative color out of album artwork for the dynamic glows (Home, mini player).
+            implementation("androidx.palette:palette-ktx:1.0.0")
+            // The app's existing settings file (Context.preferencesDataStore).
+            implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+            // Splash screen API
+            implementation("androidx.core:core-splashscreen:1.0.1")
+        }
+        val desktopMain by getting {
+            dependencies {
+                implementation(compose.desktop.currentOs)
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.9.0")
+            }
         }
         val androidUnitTest by getting {
             dependencies {
@@ -137,4 +149,14 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
+}
+
+compose.resources {
+    packageOfResClass = "com.daydreamin.app.resources"
+}
+
+compose.desktop {
+    application {
+        mainClass = "com.daydreamin.app.MainKt"
+    }
 }

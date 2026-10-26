@@ -1,0 +1,374 @@
+package com.daydreamin.app.data.prefs
+
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import com.daydreamin.app.data.model.Song
+
+/**
+ * Everything Daydreamin persists on-device: theme choices and the local-only "Library"
+ * (liked songs, history, playlists). There is no backend of ours to sync with — search,
+ * lyrics and playback all resolve directly against public APIs / YouTube on-device — so
+ * this is the only place any of this state lives.
+ */
+/**
+ * [dataStore] is the settings file each platform opens (Android: "daydreamin_prefs", the same file
+ * every earlier version used); [filesDir] is where the avatar photo is kept.
+ */
+@OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
+class AppPreferences(private val dataStore: DataStore<Preferences>, private val filesDir: java.io.File) {
+
+    private object Keys {
+        val ACCENT_NAME = stringPreferencesKey("accent_name")
+        val DARK_MODE = booleanPreferencesKey("dark_mode")
+        val DYNAMIC_THEMING = booleanPreferencesKey("dynamic_theming")
+        val BACKGROUND_STYLE = stringPreferencesKey("background_style")
+        val NOW_PLAYING_STYLE = stringPreferencesKey("now_playing_style")
+        val STREAMING_QUALITY = stringPreferencesKey("streaming_quality")
+        val CROSSFADE_SECONDS = intPreferencesKey("crossfade_seconds")
+        val AUDIO_NORMALIZATION = booleanPreferencesKey("audio_normalization")
+        val DOWNLOAD_WIFI_ONLY = booleanPreferencesKey("download_wifi_only")
+        val LIKED_IDS = stringSetPreferencesKey("liked_ids")
+        val LIKED_SONGS_JSON = stringSetPreferencesKey("liked_songs_json")
+        val HISTORY_JSON = stringSetPreferencesKey("history_json")
+        val PLAYLISTS_JSON = stringPreferencesKey("playlists_json")
+        val PLAYBACK_SNAPSHOT_JSON = stringPreferencesKey("playback_snapshot_json")
+        val SEARCH_HISTORY_JSON = stringPreferencesKey("search_history_json")
+        val TOTAL_PLAYS = intPreferencesKey("total_plays")
+        val DOWNLOADED_SONGS_JSON = stringPreferencesKey("downloaded_songs_json")
+        val DOWNLOAD_LIKED = booleanPreferencesKey("download_liked")
+        val DOWNLOADED_PLAYLISTS = stringSetPreferencesKey("downloaded_playlists")
+        val USAGE_STATS = booleanPreferencesKey("usage_stats")
+        val USAGE_ID = stringPreferencesKey("usage_id")
+        val USAGE_LAST_SENT_DAY = stringPreferencesKey("usage_last_sent_day")
+        val EQUALIZER_PRESET = stringPreferencesKey("equalizer_preset")
+        val USER_NAME = stringPreferencesKey("user_name")
+        val HAS_AVATAR = booleanPreferencesKey("has_avatar")
+        val ONBOARDED = booleanPreferencesKey("onboarded")
+        val ASKED_NOTIFICATIONS = booleanPreferencesKey("asked_notifications")
+        val AVATAR_STAMP = androidx.datastore.preferences.core.longPreferencesKey("avatar_stamp")
+        val AUTO_BACKUP_URI = stringPreferencesKey("auto_backup_uri")
+        val AUTO_BACKUP_AT = androidx.datastore.preferences.core.longPreferencesKey("auto_backup_at")
+        val DISMISSED_UPDATE_VERSION = intPreferencesKey("dismissed_update_version")
+    }
+
+    val accentName: Flow<String> = dataStore.data.map { it[Keys.ACCENT_NAME] ?: "Violet" }
+    suspend fun setAccentName(name: String) = edit { it[Keys.ACCENT_NAME] = name }
+
+    val darkMode: Flow<Boolean> = dataStore.data.map { it[Keys.DARK_MODE] ?: true }
+    suspend fun setDarkMode(value: Boolean) = edit { it[Keys.DARK_MODE] = value }
+
+    val dynamicTheming: Flow<Boolean> = dataStore.data.map { it[Keys.DYNAMIC_THEMING] ?: true }
+    suspend fun setDynamicTheming(value: Boolean) = edit { it[Keys.DYNAMIC_THEMING] = value }
+
+    val backgroundStyle: Flow<String> = dataStore.data.map { it[Keys.BACKGROUND_STYLE] ?: "Default" }
+    suspend fun setBackgroundStyle(value: String) = edit { it[Keys.BACKGROUND_STYLE] = value }
+
+    val nowPlayingStyle: Flow<String> = dataStore.data.map { it[Keys.NOW_PLAYING_STYLE] ?: "Classic" }
+    suspend fun setNowPlayingStyle(value: String) = edit { it[Keys.NOW_PLAYING_STYLE] = value }
+
+    val streamingQuality: Flow<String> = dataStore.data.map { it[Keys.STREAMING_QUALITY] ?: "Auto" }
+    suspend fun setStreamingQuality(value: String) = edit { it[Keys.STREAMING_QUALITY] = value }
+
+    /** Crossfade between songs that end on their own, in seconds; 0 is off. */
+    val crossfadeSeconds: Flow<Int> = dataStore.data.map { it[Keys.CROSSFADE_SECONDS] ?: 6 }
+    suspend fun setCrossfadeSeconds(value: Int) = edit { it[Keys.CROSSFADE_SECONDS] = value }
+
+    /** Off unless you turn it on: most of what plays is mastered loud already, and boosting it costs clarity. */
+    val audioNormalization: Flow<Boolean> = dataStore.data.map { it[Keys.AUDIO_NORMALIZATION] ?: false }
+    suspend fun setAudioNormalization(value: Boolean) = edit { it[Keys.AUDIO_NORMALIZATION] = value }
+
+    /** Off by default: most people listen on mobile data, and downloads should just work there. */
+    val downloadWifiOnly: Flow<Boolean> = dataStore.data.map { it[Keys.DOWNLOAD_WIFI_ONLY] ?: false }
+    suspend fun setDownloadWifiOnly(value: Boolean) = edit { it[Keys.DOWNLOAD_WIFI_ONLY] = value }
+
+    /** One of [com.daydreamin.app.player.EqPreset]'s names — stored as a plain string (not the
+     *  enum directly) so this data layer doesn't need to depend on the player package's types. */
+    val equalizerPreset: Flow<String> = dataStore.data.map { it[Keys.EQUALIZER_PRESET] ?: "Off" }
+    suspend fun setEqualizerPreset(value: String) = edit { it[Keys.EQUALIZER_PRESET] = value }
+
+    /** What the app calls you. Blank until you've told it. */
+    val userName: Flow<String> = dataStore.data.map { it[Keys.USER_NAME].orEmpty() }
+    suspend fun setUserName(value: String) = edit { it[Keys.USER_NAME] = value.trim().take(40) }
+
+    /** The picture itself lives at [avatarFile]; this flips (and so re-emits) whenever it changes. */
+    val avatarVersion: Flow<Long> = dataStore.data.map { if (it[Keys.HAS_AVATAR] == true) it[Keys.AVATAR_STAMP] ?: 1L else 0L }
+    val avatarFile: java.io.File get() = java.io.File(filesDir, "avatar.jpg")
+    suspend fun setAvatar(jpeg: ByteArray?) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            if (jpeg == null) avatarFile.delete() else avatarFile.writeBytes(jpeg)
+        }
+        edit { it[Keys.HAS_AVATAR] = jpeg != null; it[Keys.AVATAR_STAMP] = System.currentTimeMillis() }
+    }
+
+    /** First-run setup finished (or skipped). `null` until the store has been read. */
+    val onboarded: Flow<Boolean> = dataStore.data.map { it[Keys.ONBOARDED] == true }
+    suspend fun setOnboarded() = edit { it[Keys.ONBOARDED] = true }
+
+    /** The notification permission is asked for once, ever — never again after an answer. */
+    suspend fun claimNotificationAsk(): Boolean {
+        var first = false
+        dataStore.edit { if (it[Keys.ASKED_NOTIFICATIONS] != true) { first = true; it[Keys.ASKED_NOTIFICATIONS] = true } }
+        return first
+    }
+
+    /** Where the automatic backup file lives (a MediaStore or document URI), and when it was last written. */
+    val autoBackupUri: Flow<String?> = dataStore.data.map { it[Keys.AUTO_BACKUP_URI] }
+    val autoBackupAt: Flow<Long> = dataStore.data.map { it[Keys.AUTO_BACKUP_AT] ?: 0L }
+    suspend fun setAutoBackup(uri: String?, atMs: Long) = edit {
+        if (uri == null) it.remove(Keys.AUTO_BACKUP_URI) else it[Keys.AUTO_BACKUP_URI] = uri
+        it[Keys.AUTO_BACKUP_AT] = atMs
+    }
+
+    /** The versionCode of the update banner you last dismissed on Home — see [com.daydreamin.app.data.update.UpdateChecker]. */
+    val dismissedUpdateVersion: Flow<Int> = dataStore.data.map { it[Keys.DISMISSED_UPDATE_VERSION] ?: 0 }
+    suspend fun setDismissedUpdateVersion(code: Int) = edit { it[Keys.DISMISSED_UPDATE_VERSION] = code }
+
+    val likedIds: Flow<Set<String>> = dataStore.data.map { it[Keys.LIKED_IDS] ?: emptySet() }
+
+    val likedSongs: Flow<List<Song>> = dataStore.data.map { prefs ->
+        (prefs[Keys.LIKED_SONGS_JSON] ?: emptySet())
+            .mapNotNull { runCatching { Json.decodeFromString<Song>(it) }.getOrNull() }
+    }
+
+    suspend fun toggleLiked(song: Song) {
+        dataStore.edit { prefs ->
+            val ids = (prefs[Keys.LIKED_IDS] ?: emptySet()).toMutableSet()
+            val songsJson = (prefs[Keys.LIKED_SONGS_JSON] ?: emptySet()).toMutableSet()
+            if (song.playId in ids) {
+                ids.remove(song.playId)
+                songsJson.removeAll { runCatching { Json.decodeFromString<Song>(it).playId }.getOrNull() == song.playId }
+            } else {
+                ids.add(song.playId)
+                songsJson.add(Json.encodeToString(song))
+            }
+            prefs[Keys.LIKED_IDS] = ids
+            prefs[Keys.LIKED_SONGS_JSON] = songsJson
+        }
+    }
+
+    val history: Flow<List<Song>> = dataStore.data.map { prefs ->
+        (prefs[Keys.HISTORY_JSON] ?: emptySet())
+            .mapNotNull { runCatching { Json.decodeFromString<Song>(it) }.getOrNull() }
+    }
+
+    suspend fun pushHistory(song: Song) {
+        dataStore.edit { prefs ->
+            val current = (prefs[Keys.HISTORY_JSON] ?: emptySet())
+                .mapNotNull { runCatching { Json.decodeFromString<Song>(it) }.getOrNull() }
+                .filterNot { it.playId == song.playId }
+            val updated = (listOf(song) + current).take(HISTORY_LIMIT)
+            prefs[Keys.HISTORY_JSON] = updated.map { Json.encodeToString(it) }.toSet()
+        }
+    }
+
+    suspend fun clearHistory() = edit { it[Keys.HISTORY_JSON] = emptySet() }
+
+    /**
+     * Every song you've started, replays included, for as long as you've had the app. (Profile used
+     * to show the size of [history], which keeps only the last [HISTORY_LIMIT] different songs, so the
+     * count stopped at 200.) Null until [startPlayCount] has run once.
+     */
+    val totalPlays: Flow<Int?> = dataStore.data.map { it[Keys.TOTAL_PLAYS] }
+
+    /** Sets the lifetime count the first time only, from the plays already on record — existing listeners don't start from zero. */
+    suspend fun startPlayCount(onRecord: Int) = edit { if (it[Keys.TOTAL_PLAYS] == null) it[Keys.TOTAL_PLAYS] = onRecord }
+
+    suspend fun countPlay() = edit { it[Keys.TOTAL_PLAYS] = (it[Keys.TOTAL_PLAYS] ?: 0) + 1 }
+
+    // ---- downloads: what you asked to keep on the phone (the files themselves live in Downloads)
+
+    /** Songs you downloaded one by one, newest first. */
+    val downloadedSongs: Flow<List<Song>> = dataStore.data.map { prefs ->
+        prefs[Keys.DOWNLOADED_SONGS_JSON]?.let { runCatching { Json.decodeFromString<List<Song>>(it) }.getOrNull() } ?: emptyList()
+    }
+
+    suspend fun setSongDownloaded(song: Song, downloaded: Boolean) = edit { prefs ->
+        val current = prefs[Keys.DOWNLOADED_SONGS_JSON]?.let { runCatching { Json.decodeFromString<List<Song>>(it) }.getOrNull() } ?: emptyList()
+        val without = current.filterNot { it.playId == song.playId }
+        prefs[Keys.DOWNLOADED_SONGS_JSON] = Json.encodeToString(if (downloaded) listOf(song) + without else without)
+    }
+
+    /** Keep every liked song downloaded, including ones you like later. On by default. */
+    val downloadLiked: Flow<Boolean> = dataStore.data.map { it[Keys.DOWNLOAD_LIKED] ?: true }
+    suspend fun setDownloadLiked(value: Boolean) = edit { it[Keys.DOWNLOAD_LIKED] = value }
+
+    /** Playlists kept downloaded, songs added later included. */
+    val downloadedPlaylists: Flow<Set<String>> = dataStore.data.map { it[Keys.DOWNLOADED_PLAYLISTS] ?: emptySet() }
+    suspend fun setPlaylistDownloaded(id: String, downloaded: Boolean) = edit { prefs ->
+        val current = prefs[Keys.DOWNLOADED_PLAYLISTS] ?: emptySet()
+        prefs[Keys.DOWNLOADED_PLAYLISTS] = if (downloaded) current + id else current - id
+    }
+
+    // ---- anonymous usage counts (see UsageStats)
+
+    /** On by default; one switch in Settings turns it off. */
+    val usageStatsEnabled: Flow<Boolean> = dataStore.data.map { it[Keys.USAGE_STATS] ?: true }
+    suspend fun setUsageStatsEnabled(value: Boolean) = edit { it[Keys.USAGE_STATS] = value }
+
+    /** The day today's count went out (yyyy-MM-dd); null until the first one. */
+    val usageLastSentDay: Flow<String?> = dataStore.data.map { it[Keys.USAGE_LAST_SENT_DAY] }
+    suspend fun setUsageLastSentDay(day: String) = edit { it[Keys.USAGE_LAST_SENT_DAY] = day }
+
+    /** A random ID made on this phone, so one phone counts once. Hashed before it's sent. */
+    suspend fun usageId(): String {
+        dataStore.data.first()[Keys.USAGE_ID]?.let { return it }
+        val id = java.util.UUID.randomUUID().toString()
+        edit { if (it[Keys.USAGE_ID] == null) it[Keys.USAGE_ID] = id }
+        return dataStore.data.first()[Keys.USAGE_ID] ?: id
+    }
+
+    suspend fun clearAllDownloads() = edit { prefs ->
+        prefs.remove(Keys.DOWNLOADED_SONGS_JSON)
+        prefs.remove(Keys.DOWNLOADED_PLAYLISTS)
+        prefs[Keys.DOWNLOAD_LIKED] = false
+    }
+
+    val playlists: Flow<List<Playlist>> = dataStore.data.map { prefs ->
+        prefs[Keys.PLAYLISTS_JSON]?.let {
+            runCatching { Json.decodeFromString<List<Playlist>>(it) }.getOrNull()
+        } ?: emptyList()
+    }
+
+    suspend fun savePlaylists(playlists: List<Playlist>) = edit {
+        it[Keys.PLAYLISTS_JSON] = Json.encodeToString(playlists)
+    }
+
+    /**
+     * Raw JSON for the playback-restoration snapshot (current track, queue, position, shuffle,
+     * repeat) — kept as an opaque string here so this data layer doesn't need to know the
+     * player package's types; [com.daydreamin.app.player.PlayerController] owns the shape and
+     * (de)serialization.
+     */
+    val playbackSnapshotJson: Flow<String?> = dataStore.data.map { it[Keys.PLAYBACK_SNAPSHOT_JSON] }
+
+    suspend fun savePlaybackSnapshotJson(json: String) = edit { it[Keys.PLAYBACK_SNAPSHOT_JSON] = json }
+
+    suspend fun clearPlaybackSnapshot() = edit { it.remove(Keys.PLAYBACK_SNAPSHOT_JSON) }
+
+    /** What you've searched for, newest first — only searches you made, never the ones the app runs for itself. */
+    val searchHistory: Flow<List<String>> = dataStore.data.map { prefs ->
+        prefs[Keys.SEARCH_HISTORY_JSON]?.let { runCatching { Json.decodeFromString<List<String>>(it) }.getOrNull() } ?: emptyList()
+    }
+
+    suspend fun addSearch(query: String) = edit { prefs ->
+        val current = prefs[Keys.SEARCH_HISTORY_JSON]?.let { runCatching { Json.decodeFromString<List<String>>(it) }.getOrNull() } ?: emptyList()
+        prefs[Keys.SEARCH_HISTORY_JSON] = Json.encodeToString(withSearch(current, query))
+    }
+
+    suspend fun removeSearch(query: String) = edit { prefs ->
+        val current = prefs[Keys.SEARCH_HISTORY_JSON]?.let { runCatching { Json.decodeFromString<List<String>>(it) }.getOrNull() } ?: emptyList()
+        prefs[Keys.SEARCH_HISTORY_JSON] = Json.encodeToString(current.filterNot { it.equals(query, ignoreCase = true) })
+    }
+
+    suspend fun clearSearchHistory() = edit { it.remove(Keys.SEARCH_HISTORY_JSON) }
+
+    /** Everything the user has built up, read in one consistent snapshot of the store. */
+    suspend fun exportLibrary(): LibraryBackup {
+        val prefs = dataStore.data.first()
+        val avatar = if (prefs[Keys.HAS_AVATAR] == true) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching { kotlin.io.encoding.Base64.Default.encode(avatarFile.readBytes()) }.getOrNull()
+            }
+        } else null
+        return readLibrary(prefs).copy(
+            profile = ProfileBackup(
+                name = prefs[Keys.USER_NAME]?.takeIf { it.isNotBlank() },
+                accent = prefs[Keys.ACCENT_NAME],
+                equalizer = prefs[Keys.EQUALIZER_PRESET],
+                loudnessBoost = prefs[Keys.AUDIO_NORMALIZATION],
+                offlineOnWifiOnly = prefs[Keys.DOWNLOAD_WIFI_ONLY],
+                avatarJpegBase64 = avatar,
+            ),
+        )
+    }
+
+    /**
+     * Applies a backup's profile — but only onto a device that hasn't been set up with its own
+     * yet (no name), so importing someone's backup never overwrites who you are here.
+     * Returns whether it was applied.
+     */
+    suspend fun applyProfileIfFresh(profile: ProfileBackup?): Boolean {
+        if (profile == null) return false
+        val current = dataStore.data.first()
+        if (!current[Keys.USER_NAME].isNullOrBlank()) return false
+        val avatar = profile.avatarJpegBase64?.let { runCatching { kotlin.io.encoding.Base64.Mime.decode(it) }.getOrNull() }
+        if (avatar != null) setAvatar(avatar)
+        edit { p ->
+            profile.name?.takeIf { it.isNotBlank() }?.let { p[Keys.USER_NAME] = it.take(40) }
+            profile.accent?.let { p[Keys.ACCENT_NAME] = it }
+            profile.equalizer?.let { p[Keys.EQUALIZER_PRESET] = it }
+            profile.loudnessBoost?.let { p[Keys.AUDIO_NORMALIZATION] = it }
+            profile.offlineOnWifiOnly?.let { p[Keys.DOWNLOAD_WIFI_ONLY] = it }
+        }
+        return true
+    }
+
+    /**
+     * Merges [incoming] into the library in a single DataStore edit — liked ids, liked songs,
+     * history and playlists all change together or not at all, so an import interrupted partway
+     * (or racing a like/unlike) can't leave them out of step with each other. See
+     * [mergeLibraries] for the rules; nothing already here is ever removed.
+     */
+    suspend fun importLibrary(incoming: LibraryBackup): ImportSummary {
+        var summary = ImportSummary(0, 0, 0, 0)
+        dataStore.edit { prefs ->
+            val (merged, result) = mergeLibraries(readLibrary(prefs), incoming)
+            writeLibrary(prefs, merged)
+            summary = result
+        }
+        return summary
+    }
+
+    private fun readLibrary(prefs: Preferences): LibraryBackup {
+        fun decodeSongs(key: androidx.datastore.preferences.core.Preferences.Key<Set<String>>): List<Song> =
+            (prefs[key] ?: emptySet()).mapNotNull { runCatching { Json.decodeFromString<Song>(it) }.getOrNull() }
+        return emptyBackup().copy(
+            exportedAtMs = System.currentTimeMillis(),
+            likedSongs = decodeSongs(Keys.LIKED_SONGS_JSON),
+            history = decodeSongs(Keys.HISTORY_JSON),
+            playlists = prefs[Keys.PLAYLISTS_JSON]?.let { runCatching { Json.decodeFromString<List<Playlist>>(it) }.getOrNull() } ?: emptyList(),
+        )
+    }
+
+    private fun writeLibrary(prefs: androidx.datastore.preferences.core.MutablePreferences, library: LibraryBackup) {
+        prefs[Keys.LIKED_IDS] = library.likedSongs.map { it.playId }.toSet()
+        prefs[Keys.LIKED_SONGS_JSON] = library.likedSongs.map { Json.encodeToString(it) }.toSet()
+        prefs[Keys.HISTORY_JSON] = library.history.map { Json.encodeToString(it) }.toSet()
+        prefs[Keys.PLAYLISTS_JSON] = Json.encodeToString(library.playlists)
+    }
+
+    private suspend fun edit(block: (androidx.datastore.preferences.core.MutablePreferences) -> Unit) {
+        dataStore.edit(block)
+    }
+}
+
+@kotlinx.serialization.Serializable
+data class Playlist(
+    val id: String,
+    val name: String,
+    val songs: List<Song> = emptyList(),
+    /** Set when this was saved from somewhere else (a YouTube playlist, your Home mix) rather than made here. */
+    val sourceUrl: String? = null,
+    /** Who made it, for a saved playlist ("YouTube Music", a channel name). */
+    val author: String? = null,
+    val coverUrl: String? = null,
+) {
+    val isSaved: Boolean get() = sourceUrl != null
+}
+
+/** [query] moved to the front of [history]: trimmed, no case-insensitive repeats, at most [max] kept. */
+internal fun withSearch(history: List<String>, query: String, max: Int = 15): List<String> {
+    val q = query.trim().replace(Regex("\\s+"), " ")
+    if (q.isEmpty()) return history
+    return (listOf(q) + history.filterNot { it.equals(q, ignoreCase = true) }).take(max)
+}

@@ -53,44 +53,6 @@ private const val EARLY_SKIP_MAX_MS = 30_000L
 /** A song's radio shorter than this (after the per-artist cap) gets extended — see autoFillQueueFor. */
 private const val MIN_RADIO_LENGTH = 15
 
-@Serializable
-enum class RepeatMode { OFF, ALL, ONE }
-
-/** Everything needed to resume exactly where playback left off after process death or a
- *  fresh app launch — the current track, the rest of the queue, playback position, and the
- *  shuffle/repeat toggles. Persisted as JSON via [com.daydreamin.app.data.prefs.AppPreferences]. */
-@Serializable
-data class PlaybackSnapshot(
-    val currentSong: Song? = null,
-    val queue: List<Song> = emptyList(),
-    val positionMs: Long = 0L,
-    val shuffle: Boolean = false,
-    val repeatMode: RepeatMode = RepeatMode.OFF,
-)
-
-/**
- * Everything that changes rarely — song, transport state, queue. Split out from
- * [PlaybackProgress] so screens that don't render a scrubber (Home, Search, Library,
- * the bottom bar) don't recompose twice a second along with it.
- */
-data class PlaybackMeta(
-    val currentSong: Song? = null,
-    val isPlaying: Boolean = false,
-    val isBuffering: Boolean = false,
-    val shuffle: Boolean = false,
-    val repeatMode: RepeatMode = RepeatMode.OFF,
-    val queue: List<Song> = emptyList(),
-    val error: String? = null,
-    /** e.g. "Opus · 160 kbps" — the actual stream quality in use, for transparency. */
-    val streamQuality: String? = null,
-)
-
-/** Ticks every 500ms during playback — kept separate from [PlaybackMeta] on purpose. */
-data class PlaybackProgress(
-    val positionMs: Long = 0L,
-    val durationMs: Long = 0L,
-)
-
 /**
  * The single owner of playback state for the whole app. Screens read [meta] / [progress]
  * and call these functions instead of touching [MediaController] directly — it resolves a
@@ -99,7 +61,7 @@ data class PlaybackProgress(
  * manages the "Up Next" queue itself (the service only ever holds one media item at a time;
  * queue items are resolved on demand, or already warm from prefetch, as they're reached).
  */
-object PlayerController {
+actual object PlayerController {
 
     private val app get() = DaydreaminApp.instance
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -174,14 +136,19 @@ object PlayerController {
     private var pendingStartIsRestore = false
 
     private val _meta = MutableStateFlow(PlaybackMeta())
-    val meta: StateFlow<PlaybackMeta> = _meta
+    actual val meta: StateFlow<PlaybackMeta> = _meta
 
     private val _progress = MutableStateFlow(PlaybackProgress())
-    val progress: StateFlow<PlaybackProgress> = _progress
+    actual val progress: StateFlow<PlaybackProgress> = _progress
 
     /** Safe to call from anywhere, any number of times — the Service calls this itself on
      *  creation (so playback ownership, including restoration, never depends on any UI ever
      *  having opened), and the UI calls it too when it does open; whichever runs first wins. */
+    actual fun ensureConnected() = ensureConnected(com.daydreamin.app.DaydreaminApp.instance)
+
+    /** Warms the first seconds of [song] so tapping it starts at once (Home's top pick). */
+    actual suspend fun warmUp(song: Song) = SongPrecacher.precacheLeadIn(com.daydreamin.app.DaydreaminApp.instance, song)
+
     fun ensureConnected(context: Context) {
         if (controller != null || connecting) return
         connecting = true
@@ -202,7 +169,7 @@ object PlayerController {
      * controller keeps the service (and its notification) alive, so let go of it; the next launch
      * reconnects, and Play picks the song back up where it was (see [togglePlayPause]).
      */
-    fun disconnect() {
+    actual fun disconnect() {
         val c = controller ?: return
         c.currentPosition.takeIf { c.currentMediaItem?.mediaId == _meta.value.currentSong?.playId }?.let { pos ->
             _progress.update { it.copy(positionMs = pos.coerceAtLeast(0)) }
@@ -482,7 +449,7 @@ object PlayerController {
     }
 
     /** Play [song] now. If [queueContext] is empty, "Up Next" is auto-filled from YouTube's related tracks — resolved on-device, in the same call that finds the stream. */
-    fun playSong(song: Song, queueContext: List<Song> = emptyList(), autoFillQueue: Boolean = true) {
+    actual fun playSong(song: Song, queueContext: List<Song>, autoFillQueue: Boolean) {
         // Same one-entry-per-song invariant as addToQueue — a playlist containing the same song
         // twice would otherwise put a duplicate straight into the queue.
         val queueContext = queueContext.distinctBy { it.playId }
@@ -991,7 +958,7 @@ object PlayerController {
         persistSnapshotSoon()
     }
 
-    fun playFromList(songs: List<Song>, startIndex: Int) {
+    actual fun playFromList(songs: List<Song>, startIndex: Int) {
         if (songs.isEmpty()) return
         val start = startIndex.coerceIn(songs.indices)
         val target = songs[start]
@@ -999,7 +966,7 @@ object PlayerController {
         playSong(target, queueContext = rest, autoFillQueue = rest.isEmpty())
     }
 
-    fun togglePlayPause() {
+    actual fun togglePlayPause() {
         val c = controller ?: return
         if (c.isPlaying) { c.pause(); return }
         val song = _meta.value.currentSong
@@ -1016,11 +983,11 @@ object PlayerController {
     }
 
     /** Used by [SleepTimer] — pauses only if something is actually playing. */
-    fun togglePlayPauseIfPlaying() {
+    actual fun togglePlayPauseIfPlaying() {
         controller?.takeIf { it.isPlaying }?.pause()
     }
 
-    fun seekTo(ms: Long) {
+    actual fun seekTo(ms: Long) {
         controller?.seekTo(ms)
         _progress.update { it.copy(positionMs = ms) }
         persistSnapshotSoon()
@@ -1045,7 +1012,7 @@ object PlayerController {
         }
     }
 
-    fun next() {
+    actual fun next() {
         noteEarlySkip()
         val c = controller
         if (c != null && preparedAheadPlayIds.isNotEmpty() && c.mediaItemCount > c.currentMediaItemIndex + 1) {
@@ -1075,7 +1042,7 @@ object PlayerController {
         }
     }
 
-    fun previous() {
+    actual fun previous() {
         val c = controller
         if (c != null && c.currentPosition > 3000) {
             c.seekTo(0)
@@ -1089,13 +1056,13 @@ object PlayerController {
         backStack.removeLastOrNull()
     }
 
-    fun toggleShuffle() {
+    actual fun toggleShuffle() {
         _meta.update { it.copy(shuffle = !it.shuffle, queue = if (!it.shuffle) it.queue.shuffled() else it.queue) }
         prepareUpcoming()
         persistSnapshotSoon()
     }
 
-    fun cycleRepeat() {
+    actual fun cycleRepeat() {
         _meta.update {
             val next = when (it.repeatMode) {
                 RepeatMode.OFF -> RepeatMode.ALL
@@ -1110,7 +1077,7 @@ object PlayerController {
     /** Moves the queue item at [from] to [to] (e.g. a drag-reorder in the Queue screen) and
      *  reconciles the gapless pre-buffer if the reorder changed what's actually next — the
      *  player's own playlist otherwise wouldn't know the "next" song changed. */
-    fun moveQueueItem(from: Int, to: Int) {
+    actual fun moveQueueItem(from: Int, to: Int) {
         val current = _meta.value.queue
         if (from !in current.indices || to !in current.indices || from == to) return
         val reordered = current.toMutableList().apply { add(to, removeAt(from)) }
@@ -1123,26 +1090,26 @@ object PlayerController {
      *  and [onGaplessAdvance]'s media-id matching are all keyed by playId, and the Queue screen
      *  keys its list the same way — a duplicate here crashed the app outright (LazyColumn:
      *  `Key "..." was already used`). Adding something already queued is simply a no-op. */
-    fun addToQueue(song: Song) {
+    actual fun addToQueue(song: Song) {
         if (_meta.value.queue.any { it.playId == song.playId }) return
         _meta.update { it.copy(queue = it.queue + song) }
         prepareUpcoming()
         persistSnapshotSoon()
     }
 
-    fun removeFromQueue(song: Song) {
+    actual fun removeFromQueue(song: Song) {
         _meta.update { it.copy(queue = it.queue.filterNot { q -> q.playId == song.playId }) }
         prepareUpcoming()
         persistSnapshotSoon()
     }
 
-    fun clearQueue() {
+    actual fun clearQueue() {
         _meta.update { it.copy(queue = emptyList()) }
         prepareUpcoming()
         persistSnapshotSoon()
     }
 
-    fun playQueueItemAt(index: Int) {
+    actual fun playQueueItemAt(index: Int) {
         val q = _meta.value.queue
         if (index !in q.indices) return
         val target = q[index]
@@ -1150,7 +1117,7 @@ object PlayerController {
         playSong(target, queueContext = remaining, autoFillQueue = remaining.isEmpty())
     }
 
-    fun consumeError() {
+    actual fun consumeError() {
         _meta.update { it.copy(error = null) }
     }
 

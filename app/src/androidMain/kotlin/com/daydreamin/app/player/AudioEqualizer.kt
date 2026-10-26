@@ -12,16 +12,6 @@ private const val EQ_BOOST_MB = 450
  *  same preset name sound inconsistently different phone to phone. Classifying bands by their
  *  actual center frequency instead of a fixed index works the same way regardless of how many
  *  bands a given device's effect engine exposes. */
-enum class EqPreset(val label: String) {
-    OFF("Off"),
-    BASS_BOOST("Bass Boost"),
-    VOCAL_BOOST("Vocal Boost"),
-    TREBLE_BOOST("Treble Boost");
-
-    companion object {
-        fun fromLabel(label: String): EqPreset = entries.firstOrNull { it.label == label } ?: OFF
-    }
-}
 
 /** Builds an [Equalizer] on [audioSessionId] and applies [preset] to it. [PlaybackService]
  *  calls this once at startup with the player's existing session id (ExoPlayer keeps one id
