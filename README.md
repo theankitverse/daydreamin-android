@@ -1,65 +1,97 @@
-# Daydreamin — Android, Mac, Windows & Linux
+<p align="center">
+  <img src="app/desktop-icons/daydreamin.png" width="120" alt="Daydreamin">
+</p>
+
+<h1 align="center">Daydreamin</h1>
+
+<p align="center">
+  <b>Music from everywhere, played beautifully.</b><br>
+  A free music app for <b>Android, Mac, Windows and Linux</b> — no account, no ads, no subscription.
+</p>
+
+<p align="center">
+  <a href="#-download"><b>⬇ Download</b></a> ·
+  <a href="#-whats-inside">What's inside</a> ·
+  <a href="#-installing">Installing</a> ·
+  <a href="https://www.buymeacoffee.com/theankitverse">Buy me a coffee</a>
+</p>
+
+Daydreamin plays any song straight from YouTube, found and streamed right on your device — there's
+no server of ours in between, and nothing to sign up for. It learns what you like and builds your
+Home around it, shows synced lyrics, keeps songs for offline listening, and wraps it all in a dark,
+liquid-glass design. The same app runs on your phone and your computer.
+
+## ✨ What's inside
+
+- **A Home that learns you.** Your plays, likes and skips shape *Your Daydream Mix*, top picks and
+  shelves like *Because you like …* and *Fresh finds* — worked out on your device, and refreshed as
+  your listening changes. New here? It starts with what's popular in your country.
+- **Search anything** — a song, an artist, or a line from the lyrics you half remember.
+- **Synced lyrics** that follow the song line by line, Apple Music-style.
+- **Offline listening.** Download any song or whole playlist and play it with no connection. (Liked
+  songs too, if you turn that on.)
+- **Plays like a proper music app:** crossfade between songs, gapless playback, an equalizer, a
+  loudness boost, shuffle, repeat, a queue you can reorder, and a sleep timer.
+- **Your library:** liked songs, your own playlists, saved YouTube playlists, history and listening
+  stats. Export it to a file and import it on another device.
+- **Make it yours:** your name, photo and an accent colour that lights up the whole app.
+- **On your computer:** a sidebar on wide windows, keyboard shortcuts, your keyboard's media keys,
+  and the system's Now Playing controls (Control Center on Mac, media controls on Linux).
+- **Updates itself.** New versions show up right in the app.
 
 ## ⬇ Download
 
-| Your device | Download | |
-|---|---|---|
-| **Android** phone or tablet (5.0 and up) | [**Daydreamin.apk**](https://github.com/theankitverse/daydreamin-android/releases/latest/download/Daydreamin.apk) | |
-| **Mac** with Apple chip (M1 and later) | [**Daydreamin-macos-arm64.dmg**](https://github.com/theankitverse/daydreamin-android/releases/download/desktop-latest/Daydreamin-macos-arm64.dmg) | not sure? Apple menu → About This Mac → "Chip: Apple…" |
-| **Mac** with Intel chip | [**Daydreamin-macos-x64.dmg**](https://github.com/theankitverse/daydreamin-android/releases/download/desktop-latest/Daydreamin-macos-x64.dmg) | "Processor: Intel…" |
-| **Windows** 10 / 11 | [**Daydreamin-windows.msi**](https://github.com/theankitverse/daydreamin-android/releases/download/desktop-latest/Daydreamin-windows.msi) | |
-| **Linux** — Ubuntu, Debian, Mint, Pop!_OS | [**Daydreamin-linux-amd64.deb**](https://github.com/theankitverse/daydreamin-android/releases/download/desktop-latest/Daydreamin-linux-amd64.deb) | |
-| **Linux** — Fedora, openSUSE | [**Daydreamin-linux-x86_64.rpm**](https://github.com/theankitverse/daydreamin-android/releases/download/desktop-latest/Daydreamin-linux-x86_64.rpm) | |
+| Your device | Download | Size | Is this mine? |
+|---|---|---|---|
+| **Android** phone or tablet | [**Daydreamin.apk**](https://github.com/theankitverse/daydreamin-android/releases/latest/download/Daydreamin.apk) | ~5 MB | Android 5.0 or newer |
+| **Mac** with Apple chip | [**Daydreamin-macos-arm64.dmg**](https://github.com/theankitverse/daydreamin-android/releases/download/desktop-latest/Daydreamin-macos-arm64.dmg) | ~120 MB | Apple menu → About This Mac says **Chip: Apple M1, M2, M3…** |
+| **Mac** with Intel chip | [**Daydreamin-macos-x64.dmg**](https://github.com/theankitverse/daydreamin-android/releases/download/desktop-latest/Daydreamin-macos-x64.dmg) | ~125 MB | Apple menu → About This Mac says **Processor: Intel…** |
+| **Windows** | [**Daydreamin-windows.msi**](https://github.com/theankitverse/daydreamin-android/releases/download/desktop-latest/Daydreamin-windows.msi) | ~110 MB | Windows 10 or 11, 64-bit |
+| **Linux** (Debian family) | [**Daydreamin-linux-amd64.deb**](https://github.com/theankitverse/daydreamin-android/releases/download/desktop-latest/Daydreamin-linux-amd64.deb) | ~105 MB | Ubuntu, Debian, Linux Mint, Pop!_OS, Zorin — 64-bit PC |
+| **Linux** (Red Hat family) | [**Daydreamin-linux-x86_64.rpm**](https://github.com/theankitverse/daydreamin-android/releases/download/desktop-latest/Daydreamin-linux-x86_64.rpm) | ~115 MB | Fedora, openSUSE, RHEL — 64-bit PC |
 
-These links always give the newest version, and the app updates itself after that.
+These links always give you the newest version. After you install, the app keeps itself up to date.
 
-**Installing:**
-- **Android:** open the downloaded file and tap **Install** (allow installs from your browser or Files app if asked).
-- **Mac:** open the .dmg, drag Daydreamin into **Applications**, open it. The first time, go to **System Settings → Privacy & Security → Open Anyway**.
-- **Windows:** run the .msi. If you see "Windows protected your PC", click **More info → Run anyway**.
-- **Linux:** open the file with your software installer, or `sudo apt install ./Daydreamin-linux-amd64.deb` (`sudo dnf install ./Daydreamin-linux-x86_64.rpm` on Fedora).
+## 📲 Installing
 
-(The Mac and Windows warnings appear once because the app isn't signed with a paid certificate.)
+**Android**
+1. Open the downloaded **Daydreamin.apk** (from the notification or the Files app).
+2. If Android asks, allow installs from your browser or Files app, then go back.
+3. Tap **Install**, then **Open**.
 
-A music app, built in Kotlin and Compose Multiplatform, that streams music straight from YouTube —
-resolved entirely on-device, with no backend of its own. Search, gapless playback, a recommendation
-engine, downloads for offline listening, crossfade, and a liquid-glass, AMOLED-first design across
-every screen. The same code runs as the Android app and as a desktop app for macOS, Windows and Linux.
+**Mac**
+1. Open the downloaded **.dmg** and drag **Daydreamin** into **Applications**.
+2. Open Daydreamin from Applications.
+3. The first time only: macOS says it can't check the app. Go to **System Settings → Privacy &
+   Security**, scroll down and click **Open Anyway**.
 
-This is a separate project from [Daydreamin's original web app](https://github.com/theankitverse/Daydreamin).
+**Windows**
+1. Run the downloaded **.msi**.
+2. If you see *"Windows protected your PC"*, click **More info → Run anyway**.
+3. Follow the installer, then open **Daydreamin** from the Start menu.
 
-## What's inside
+**Linux**
+1. Open the downloaded file with your software installer and click **Install** — or in a terminal:
+   `sudo apt install ./Daydreamin-linux-amd64.deb` (Fedora: `sudo dnf install ./Daydreamin-linux-x86_64.rpm`).
+2. Open **Daydreamin** from your apps.
 
-- **On-device everything.** [NewPipeExtractor](https://github.com/TeamNewPipe/NewPipeExtractor)
-  resolves playable audio streams directly from YouTube — no server, no account, nothing of ours
-  in between.
-- **A Home that learns you.** Your plays, likes and early skips pick a handful of seed songs;
-  YouTube Music's radio mix for each is blended into "Your Daydream Mix", top picks, and shelves
-  like "Because you like …" and "Fresh finds" — all computed on the device, cached between
-  launches, and rebuilt as your listening changes.
-- **Playlists**: make your own, add songs from any ⋯ menu or from Now Playing, and save YouTube
-  playlists (or your mix) to your library.
-- **Search** merges iTunes and YouTube results into one ranked, typo-tolerant list, with lyrics
-  (via [LRCLIB](https://lrclib.net/)) synced Apple Music-style.
-- **Downloads for offline listening**: download any song, your liked songs or whole playlists, and
-  they play with no connection. Downloads run in the background, resume after a dropped connection,
-  and work on mobile data (or Wi-Fi only, if you choose).
-- **Crossfade** between songs (Settings → Sound), gapless playback, disk caching, stream-URL refresh,
-  retry/backoff, and audio-focus handling
-  built on Media3/ExoPlayer.
-- **Your library survives an uninstall.** A backup (liked songs, playlists, history, profile) is
-  saved automatically to `Download/Daydreamin`, which Android doesn't touch when the app is
-  removed — first-run setup can restore straight from it.
-- **First-run setup**: name, photo, and an accent colour that lights up the whole app.
+The one-time warnings on Mac and Windows appear because the app isn't signed with a paid
+developer certificate — it's a free, personal project.
 
-## On your computer
+**Bringing your library over:** on one device, **Settings → Export library**; on the other,
+**Settings → Import library**.
 
-The desktop app is the same app as on your phone, with a sidebar on wide windows, keyboard
-shortcuts (Space, Cmd/Ctrl + ←/→, Shift + ←/→, Cmd/Ctrl + F, Esc), your media keys and the
-system's Now Playing controls. It isn't on the Play Store or any app store — the links above are
-the way to get it, on every device.
+**Keyboard shortcuts on a computer:** <kbd>Space</kbd> play/pause · <kbd>Cmd/Ctrl</kbd> + <kbd>←</kbd>/<kbd>→</kbd>
+previous/next · <kbd>Shift</kbd> + <kbd>←</kbd>/<kbd>→</kbd> seek 10 s · <kbd>Cmd/Ctrl</kbd> + <kbd>F</kbd> search ·
+<kbd>Esc</kbd> back.
 
-## How it's built
+## 🛠 How it's built
+
+Kotlin and Compose Multiplatform: one codebase for the Android app and the desktop app. Songs are
+found and streamed on the device with [NewPipeExtractor](https://github.com/TeamNewPipe/NewPipeExtractor);
+lyrics come from [LRCLIB](https://lrclib.net/). This is a separate project from
+[Daydreamin's original web app](https://github.com/theankitverse/Daydreamin).
+
 
 - `app/src/commonMain` — everything shared: screens, theme, YouTube extraction, library,
   recommendations, settings.
@@ -80,13 +112,13 @@ Requires JDK 21 (a full one, with `jpackage`, for the desktop installers) and th
 (`compileSdk 35`, `minSdk 21`, so Android 5.0 and up). Desktop installers are built and published
 by `.github/workflows/desktop.yml` for every `desktop-v*` tag.
 
-## Support
+## ☕ Support
 
 Daydreamin is free, with no ads and no account required. If you'd like to support the project,
 you can [buy me a coffee](https://www.buymeacoffee.com/theankitverse) — completely optional,
 and it doesn't unlock anything, since there's nothing locked to begin with.
 
-## Privacy
+## 🔒 Privacy
 
 No account, no ads, and nothing about what you listen to ever leaves your device. To see roughly how
 many people use the app, the Android app sends one anonymous count a day to
