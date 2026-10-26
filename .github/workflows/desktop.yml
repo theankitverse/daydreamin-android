@@ -60,6 +60,7 @@ jobs:
       # must start, find songs and draw Home and Settings.
       - name: Run the packaged app
         shell: bash
+        timeout-minutes: 12
         run: |
           dir=app/build/compose/binaries/main/app
           out="$PWD/snapshots"
@@ -72,10 +73,16 @@ jobs:
           esac
           ls -la "$dir"
           status=0
-          "${app[@]}" --snapshot "$out" --onboarded --pages home,settings > /dev/null 2>&1 || status=$?
-          cp snapshots/app.log run.log 2>/dev/null || touch run.log
+          mkdir -p snapshots
+          timeout 420 "${app[@]}" --snapshot "$out" --onboarded --pages home,settings > snapshots/stdout.log 2>&1 || status=$?
+          if [ $status -eq 124 ] && [ "$RUNNER_OS" = "Windows" ]; then
+            # Still running after 7 minutes: picture the screen (an error box from the launcher shows up here).
+            powershell -NoProfile -Command "Add-Type -AssemblyName System.Windows.Forms,System.Drawing; \$b=[System.Windows.Forms.Screen]::PrimaryScreen.Bounds; \$i=New-Object System.Drawing.Bitmap \$b.Width,\$b.Height; [System.Drawing.Graphics]::FromImage(\$i).CopyFromScreen(\$b.Location,[System.Drawing.Point]::Empty,\$b.Size); \$i.Save('snapshots\\screen.png')" || true
+            tasklist | grep -i -E "daydreamin|java" || true
+          fi
+          cp snapshots/app.log run.log 2>/dev/null || cp snapshots/stdout.log run.log 2>/dev/null || touch run.log
           grep -vE "^D/" run.log | tail -40 || true
-          if [ $status -ne 0 ]; then echo "::error::the packaged app exited with $status"; exit 1; fi
+          if [ $status -ne 0 ]; then echo "::error::the packaged app exited with $status (124: still running after 7 minutes)"; exit 1; fi
           for f in home-desktop settings-desktop home-phone; do
             if [ ! -f "snapshots/$f.png" ]; then echo "::error::the packaged app didn't draw $f"; exit 1; fi
           done
@@ -89,6 +96,7 @@ jobs:
           path: |
             test.log
             run.log
+            snapshots/
             app/build/reports/tests/desktopTest/
 
       - name: Name the installers

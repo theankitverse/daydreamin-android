@@ -24,10 +24,11 @@ class LinuxMprisTest {
             DBusConnectionBuilder.forSessionBus().transportConfig().withServiceLoaderClassLoader(LinuxMpris::class.java.classLoader).back().build().use { other ->
                 val props = other.getRemoteObject("org.mpris.MediaPlayer2.daydreamin", "/org/mpris/MediaPlayer2", Properties::class.java)
                 assertEquals("Playing", props.Get<String>("org.mpris.MediaPlayer2.Player", "PlaybackStatus"))
-                @Suppress("UNCHECKED_CAST")
-                val metadata = props.Get<Map<String, Variant<*>>>("org.mpris.MediaPlayer2.Player", "Metadata")
-                assertEquals("Kesariya", metadata["xesam:title"]?.value)
-                assertEquals(268_000_000L, metadata["mpris:length"]?.value)
+                val metadata = props.Get<Map<String, Any?>>("org.mpris.MediaPlayer2.Player", "Metadata")
+                // The client side may hand values back wrapped in a Variant or already unwrapped.
+                fun value(key: String) = metadata[key].let { if (it is Variant<*>) it.value else it }
+                assertEquals("Kesariya", value("xesam:title"))
+                assertEquals(268_000_000L, value("mpris:length"))
                 val player = other.getRemoteObject("org.mpris.MediaPlayer2.daydreamin", "/org/mpris/MediaPlayer2", MprisPlayer::class.java)
                 player.PlayPause(); player.Next(); player.Previous()
                 Thread.sleep(300)
