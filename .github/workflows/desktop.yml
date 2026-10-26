@@ -136,6 +136,8 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/desktop-v')
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           pattern: installer-*
@@ -195,3 +197,9 @@ jobs:
           sed -i 's/^          //' notes.md
           gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --latest=false \
             --title "Daydreamin for Mac, Windows & Linux — $v" --notes-file notes.md
+
+      # The README's permanent links (releases/download/desktop-latest/Daydreamin-windows.msi…).
+      - name: Update the always-newest download links
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/desktop-latest.sh "$GITHUB_REF_NAME"

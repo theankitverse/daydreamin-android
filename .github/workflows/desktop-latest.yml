@@ -1,0 +1,22 @@
+# Points the permanent "desktop-latest" download links at a given desktop release. Releases do this
+# themselves (desktop.yml); this is for doing it by hand, e.g. to go back to an earlier version.
+name: Desktop download links
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Desktop release tag (desktop-v1.2.3)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  links:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/desktop-latest.sh "${{ inputs.tag }}"

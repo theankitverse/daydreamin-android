@@ -1,5 +1,26 @@
 # Daydreamin — Android, Mac, Windows & Linux
 
+## ⬇ Download
+
+| Your device | Download | |
+|---|---|---|
+| **Android** phone or tablet (5.0 and up) | [**Daydreamin.apk**](https://github.com/theankitverse/daydreamin-android/releases/latest/download/Daydreamin.apk) | |
+| **Mac** with Apple chip (M1 and later) | [**Daydreamin-macos-arm64.dmg**](https://github.com/theankitverse/daydreamin-android/releases/download/desktop-latest/Daydreamin-macos-arm64.dmg) | not sure? Apple menu → About This Mac → "Chip: Apple…" |
+| **Mac** with Intel chip | [**Daydreamin-macos-x64.dmg**](https://github.com/theankitverse/daydreamin-android/releases/download/desktop-latest/Daydreamin-macos-x64.dmg) | "Processor: Intel…" |
+| **Windows** 10 / 11 | [**Daydreamin-windows.msi**](https://github.com/theankitverse/daydreamin-android/releases/download/desktop-latest/Daydreamin-windows.msi) | |
+| **Linux** — Ubuntu, Debian, Mint, Pop!_OS | [**Daydreamin-linux-amd64.deb**](https://github.com/theankitverse/daydreamin-android/releases/download/desktop-latest/Daydreamin-linux-amd64.deb) | |
+| **Linux** — Fedora, openSUSE | [**Daydreamin-linux-x86_64.rpm**](https://github.com/theankitverse/daydreamin-android/releases/download/desktop-latest/Daydreamin-linux-x86_64.rpm) | |
+
+These links always give the newest version, and the app updates itself after that.
+
+**Installing:**
+- **Android:** open the downloaded file and tap **Install** (allow installs from your browser or Files app if asked).
+- **Mac:** open the .dmg, drag Daydreamin into **Applications**, open it. The first time, go to **System Settings → Privacy & Security → Open Anyway**.
+- **Windows:** run the .msi. If you see "Windows protected your PC", click **More info → Run anyway**.
+- **Linux:** open the file with your software installer, or `sudo apt install ./Daydreamin-linux-amd64.deb` (`sudo dnf install ./Daydreamin-linux-x86_64.rpm` on Fedora).
+
+(The Mac and Windows warnings appear once because the app isn't signed with a paid certificate.)
+
 A music app, built in Kotlin and Compose Multiplatform, that streams music straight from YouTube —
 resolved entirely on-device, with no backend of its own. Search, gapless playback, a recommendation
 engine, downloads for offline listening, crossfade, and a liquid-glass, AMOLED-first design across
@@ -31,18 +52,12 @@ This is a separate project from [Daydreamin's original web app](https://github.c
   removed — first-run setup can restore straight from it.
 - **First-run setup**: name, photo, and an accent colour that lights up the whole app.
 
-## Installing
+## On your computer
 
-**Android:** this isn't on the Play Store — grab the latest APK from
-[Releases](../../releases/latest) and install it directly (Android will ask you to allow installs
-from your browser or file manager the first time). The app checks in the background for newer
-releases and shows a banner on Home when one's available, so after this first install you won't
-need to do this manually again.
-
-**Mac, Windows, Linux:** the desktop installers are on the [Releases](../../releases) page, in the
-releases titled "Daydreamin for Mac, Windows & Linux" (`.dmg`, `.msi`, `.deb`, `.rpm`). The desktop
-app has a sidebar on wide windows, keyboard shortcuts, your media keys and the system's Now Playing
-controls, and it updates itself too.
+The desktop app is the same app as on your phone, with a sidebar on wide windows, keyboard
+shortcuts (Space, Cmd/Ctrl + ←/→, Shift + ←/→, Cmd/Ctrl + F, Esc), your media keys and the
+system's Now Playing controls. It isn't on the Play Store or any app store — the links above are
+the way to get it, on every device.
 
 ## How it's built
 
