@@ -25,6 +25,11 @@ import kotlin.test.assertTrue
  * run with `DAYDREAMIN_INTEGRATION=1 ./gradlew :app:desktopTest`.
  */
 class PlayerIntegrationTest {
+    interface ObjC : com.sun.jna.Library {
+        fun objc_getClass(name: String): com.sun.jna.Pointer?
+        fun sel_registerName(name: String): com.sun.jna.Pointer
+    }
+
     private fun log(s: String) = println("[player-test] $s")
 
     private fun waitFor(what: String, timeoutMs: Long, cond: () -> Boolean): Long {
@@ -133,6 +138,30 @@ class PlayerIntegrationTest {
         waitFor("recovery", 30_000) { meta.isPlaying && !meta.isBuffering && position > stuckAt + 1_000 }
         assertEquals(playingSong, meta.currentSong?.playId, "kept the same song")
         log("   recovered: same song, now at ${position}ms")
+
+        // 8b. The system's media controls (macOS: what a media key or AirPods press sends)
+        if (System.getProperty("os.name").lowercase().contains("mac")) {
+            com.daydreamin.app.system.SystemMedia.start()
+            val objc = com.sun.jna.Native.load("objc", ObjC::class.java)
+            val msg = com.sun.jna.Function.getFunction("objc", "objc_msgSend")
+            fun send(r: com.sun.jna.Pointer?, sel: String, vararg a: Any?) = msg.invoke(com.sun.jna.Pointer::class.java, arrayOf(r, objc.sel_registerName(sel), *a)) as com.sun.jna.Pointer?
+            val target = send(send(objc.objc_getClass("DaydreaminMediaTarget"), "alloc"), "init")
+            fun nowPlayingTitle(): String? {
+                val dict = send(send(objc.objc_getClass("MPNowPlayingInfoCenter"), "defaultCenter"), "nowPlayingInfo") ?: return null
+                val key = com.sun.jna.NativeLibrary.getInstance("/System/Library/Frameworks/MediaPlayer.framework/MediaPlayer").getGlobalVariableAddress("MPMediaItemPropertyTitle").getPointer(0)
+                return send(send(dict, "objectForKey:", key), "UTF8String")?.getString(0)
+            }
+            waitFor("Now Playing shows the song", 5_000) { nowPlayingTitle() == meta.currentSong?.title }
+            send(target, "daydreaminPause:", null)
+            waitFor("media key pauses", 3_000) { !meta.isPlaying }
+            send(target, "daydreaminPlay:", null)
+            waitFor("media key plays", 3_000) { meta.isPlaying }
+            val before = meta.currentSong?.playId
+            send(target, "daydreaminNext:", null)
+            waitFor("media key skips", 15_000) { meta.currentSong?.playId != before && meta.isPlaying }
+            waitFor("Now Playing follows", 5_000) { nowPlayingTitle() == meta.currentSong?.title }
+            log("8b. media keys: pause, play and next work; Now Playing shows '${nowPlayingTitle()}'")
+        }
 
         // 9. Download, then play from the file
         val toKeep = results[1]

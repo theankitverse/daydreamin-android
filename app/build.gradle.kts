@@ -131,6 +131,12 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.9.0")
                 // Decodes YouTube's Opus audio in plain Java — no native libraries to ship per platform.
                 implementation("io.github.jaredmdobson:concentus:1.0.2")
+                // The system's media controls: macOS's Now Playing and Windows' media keys through
+                // JNA; Linux's MPRIS over D-Bus.
+                implementation("net.java.dev.jna:jna:5.19.1")
+                implementation("net.java.dev.jna:jna-platform:5.19.1")
+                implementation("com.github.hypfvieh:dbus-java-core:5.2.2")
+                implementation("com.github.hypfvieh:dbus-java-transport-native-unixsocket:5.2.2")
             }
         }
         val desktopTest by getting {

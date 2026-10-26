@@ -72,6 +72,8 @@ fun main(args: Array<String>) {
     YouTubeExtractorService.opusOnly = true
     com.daydreamin.app.data.download.Downloads.init()
     com.daydreamin.app.player.PlayerController.ensureConnected()
+    // The system's media controls: Now Playing on macOS, MPRIS on Linux, media keys on Windows.
+    com.daydreamin.app.system.SystemMedia.start()
     // No update check yet: version.json describes the Android app. Desktop gets its own with its installers.
     AppGraph.startHomeFeed()
 
@@ -103,6 +105,7 @@ fun main(args: Array<String>) {
             onCloseRequest = {
                 WindowMemory.save(dataDir, windowState)
                 com.daydreamin.app.player.PlayerController.disconnect()
+                com.daydreamin.app.system.SystemMedia.stop()
                 exitApplication()
             },
             title = "Daydreamin",
