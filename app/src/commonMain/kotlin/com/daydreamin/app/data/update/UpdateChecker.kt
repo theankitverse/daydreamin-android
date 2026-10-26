@@ -34,7 +34,12 @@ data class RemoteVersion(
     val apkUrl: String? = null,
     val apkSize: Long? = null,
     val sha256: String? = null,
+    /** Desktop releases: one installer per system ("macos-arm64", "macos-x64", "windows", "deb", "rpm"). */
+    val downloads: Map<String, DesktopDownload> = emptyMap(),
 )
+
+@Serializable
+data class DesktopDownload(val url: String, val size: Long = 0, val sha256: String? = null)
 
 enum class UpdateStatus { IDLE, CHECKING, UP_TO_DATE, AVAILABLE, FAILED }
 
@@ -51,20 +56,9 @@ data class UpdateState(val status: UpdateStatus, val remote: RemoteVersion? = nu
  * just leaves [state] as [UpdateStatus.FAILED] rather than showing an error anywhere unasked.
  */
 object UpdateChecker {
-    // Raw file from the Android project's own repo — see /version.json there, updated on each release.
+    // This app's release file (Android: /version.json in the repo, desktop: /desktop-version.json),
+    // and its copies elsewhere — see AppInfo.updateMirrors.
     private val VERSION_URL get() = AppInfo.updateUrl
-
-    /**
-     * Where else the same file is published. Some networks in India (Jio, Airtel) block
-     * raw.githubusercontent.com, which left the update check failing for good. Each release also
-     * carries version.json as a download (the same host the APK itself downloads from), and
-     * jsDelivr mirrors the repo. All are asked at once; the newest answer wins.
-     */
-    private val MIRRORS = listOf(
-        "https://github.com/theankitverse/daydreamin-android/releases/latest/download/version.json",
-        "https://cdn.jsdelivr.net/gh/theankitverse/daydreamin-android@main/version.json",
-    )
-    private const val DEFAULT_URL = "https://raw.githubusercontent.com/theankitverse/daydreamin-android/main/version.json"
 
     /** Coming back to the app checks again after this long (the process can stay alive for days). */
     private const val RECHECK_AFTER_MS = 10 * 60 * 1000L
@@ -103,8 +97,8 @@ object UpdateChecker {
     suspend fun checkNow() {
         _state.value = UpdateState(UpdateStatus.CHECKING)
         lastCheckAtMs = com.daydreamin.app.platform.elapsedRealtime()
-        // A test build pointed at its own file asks only that file.
-        val urls = if (VERSION_URL == DEFAULT_URL) listOf(VERSION_URL) + MIRRORS else listOf(VERSION_URL)
+        val urls = (listOf(VERSION_URL) + AppInfo.updateMirrors).filter { it.isNotBlank() }.distinct()
+        if (urls.isEmpty()) { _state.value = UpdateState(UpdateStatus.FAILED); return }
         val remote = withContext(Dispatchers.IO) {
             // Each request has its own time limit (the client's), so a blocked address can't hide a good answer.
             urls.map { url -> async { fetch(url) } }.awaitAll().filterNotNull().maxByOrNull { it.versionCode }

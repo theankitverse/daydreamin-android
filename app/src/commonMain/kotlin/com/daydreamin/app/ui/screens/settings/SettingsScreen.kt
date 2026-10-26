@@ -300,8 +300,8 @@ fun SettingsScreen(onBack: () -> Unit) {
             item { SupportRow() }
             item { UpiRow() }
             item { CreatorRow() }
-            // Updates and the usage count come to the desktop app with its installers.
-            if (!isDesktop) item { UpdateRow() }
+            // The usage count is sent by the Android app only.
+            item { UpdateRow() }
             item { Hairline() }
             if (!isDesktop) item {
                 ToggleRow(

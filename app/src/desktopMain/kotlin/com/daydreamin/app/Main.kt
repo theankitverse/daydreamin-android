@@ -60,6 +60,10 @@ private fun platformName(): String = System.getProperty("os.name").lowercase().l
 fun main(args: Array<String>) {
     val startedAt = elapsedRealtime()
     AppInfo.versionName = System.getProperty("daydreamin.version") ?: "dev"
+    AppInfo.versionCode = System.getProperty("daydreamin.versionCode")?.toIntOrNull() ?: 0
+    // Desktop releases have their own file (Android's version.json describes the APK), with the same mirrors.
+    AppInfo.updateUrl = "https://raw.githubusercontent.com/theankitverse/daydreamin-android/main/desktop-version.json"
+    AppInfo.updateMirrors = listOf("https://cdn.jsdelivr.net/gh/theankitverse/daydreamin-android@main/desktop-version.json")
     AppInfo.platformName = platformName()
 
     val dataDir = appDataDir()
@@ -74,7 +78,8 @@ fun main(args: Array<String>) {
     com.daydreamin.app.player.PlayerController.ensureConnected()
     // The system's media controls: Now Playing on macOS, MPRIS on Linux, media keys on Windows.
     com.daydreamin.app.system.SystemMedia.start()
-    // No update check yet: version.json describes the Android app. Desktop gets its own with its installers.
+    // A development run (no version) never offers updates.
+    if (AppInfo.versionCode > 0) com.daydreamin.app.data.update.UpdateChecker.start(AppGraph.prefs, AppGraph.appScope)
     AppGraph.startHomeFeed()
 
     val snapshotDir = args.indexOf("--snapshot").takeIf { it >= 0 }?.let { args.getOrNull(it + 1) }

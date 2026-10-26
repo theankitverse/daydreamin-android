@@ -147,7 +147,7 @@ internal fun installLine(install: InstallState): String? = when (install) {
     is InstallState.Downloading -> install.fraction?.let { "Downloading… ${(it * 100).toInt()}%" } ?: "Downloading…"
     InstallState.Verifying -> "Checking the download…"
     InstallState.NeedsPermission -> "Allow Daydreamin to install updates (Install unknown apps), then come back."
-    InstallState.Installing -> "Installing — confirm on the next screen."
+    InstallState.Installing -> if (com.daydreamin.app.platform.isDesktop) "Opening the installer…" else "Installing — confirm on the next screen."
     is InstallState.Failed -> install.message
 }
 

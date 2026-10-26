@@ -168,8 +168,59 @@ compose.resources {
     packageOfResClass = "com.daydreamin.app.resources"
 }
 
+// The desktop app's version, numbered on its own (apart from Android's). Releases take it from their
+// tag (desktop-v1.2.3 → -PdesktopVersion=1.2.3); the update check compares the number made from it.
+val desktopVersion = (project.findProperty("desktopVersion") as String?) ?: "1.0.0"
+val desktopVersionCode = desktopVersion.split('.').map { it.toInt() }.let { (major, minor, patch) -> major * 10_000 + minor * 100 + patch }
+
 compose.desktop {
     application {
         mainClass = "com.daydreamin.app.MainKt"
+        // jpackage needs a full JDK; Android Studio's bundled one has none. -PpackagingJdk=… picks one locally; CI uses JAVA_HOME.
+        (project.findProperty("packagingJdk") as String?)?.let { javaHome = it }
+        jvmArgs += listOf("-Ddaydreamin.version=$desktopVersion", "-Ddaydreamin.versionCode=$desktopVersionCode", "-Xmx512m")
+
+        nativeDistributions {
+            targetFormats(
+                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Dmg,
+                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi,
+                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb,
+                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Rpm,
+            )
+            packageName = "Daydreamin"
+            packageVersion = desktopVersion
+            description = "Music from everywhere, played beautifully"
+            vendor = "Ankit"
+            copyright = "© 2026 Ankit"
+            // Java modules the app uses: sound and windows, networking with TLS, D-Bus on Linux, and
+            // jdk.dynalink for the JavaScript engine NewPipe runs to unlock YouTube's streams.
+            modules(
+                "java.desktop", "java.naming", "java.net.http", "java.sql", "java.management", "java.instrument",
+                "jdk.crypto.ec", "jdk.dynalink", "jdk.security.auth", "jdk.unsupported", "jdk.net", "jdk.accessibility",
+            )
+
+            macOS {
+                bundleID = "com.daydreamin.desktop"
+                iconFile.set(project.file("desktop-icons/daydreamin.icns"))
+                appCategory = "public.app-category.music"
+                dockName = "Daydreamin"
+            }
+            windows {
+                iconFile.set(project.file("desktop-icons/daydreamin.ico"))
+                menuGroup = "Daydreamin"
+                shortcut = true
+                dirChooser = true
+                perUserInstall = true
+                // Fixed for good: it's how Windows knows a newer installer is an update of this app.
+                upgradeUuid = "6F3B2A1C-8D4E-4F5A-9B7C-2E1D0A9F8C34"
+            }
+            linux {
+                iconFile.set(project.file("desktop-icons/daydreamin.png"))
+                packageName = "daydreamin"
+                appCategory = "Audio"
+                menuGroup = "AudioVideo;Audio;Player"
+                shortcut = true
+            }
+        }
     }
 }

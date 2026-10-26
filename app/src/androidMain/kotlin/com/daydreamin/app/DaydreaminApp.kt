@@ -51,6 +51,13 @@ class DaydreaminApp : Application(), coil3.SingletonImageLoader.Factory {
         AppInfo.versionName = BuildConfig.VERSION_NAME
         AppInfo.versionCode = BuildConfig.VERSION_CODE
         AppInfo.updateUrl = BuildConfig.UPDATE_URL
+        // A test build pointed at its own file (-PupdateUrl) asks only that file.
+        if (BuildConfig.UPDATE_URL == "https://raw.githubusercontent.com/theankitverse/daydreamin-android/main/version.json") {
+            AppInfo.updateMirrors = listOf(
+                "https://github.com/theankitverse/daydreamin-android/releases/latest/download/version.json",
+                "https://cdn.jsdelivr.net/gh/theankitverse/daydreamin-android@main/version.json",
+            )
+        }
         AppInfo.usageTestMode = BuildConfig.USAGE_TEST_MODE
         AppInfo.debug = BuildConfig.DEBUG
         AppInfo.platformName = "Android"

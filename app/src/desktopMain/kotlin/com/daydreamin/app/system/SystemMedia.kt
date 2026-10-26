@@ -24,7 +24,12 @@ interface MediaBridge {
 
 /** What the system's buttons, media keys and headphones can ask for. */
 object MediaCommands {
-    private fun log(what: String) = Log.d("SystemMedia", "media command: $what")
+    /** Tests listen here for the commands that came in. */
+    internal var onCommand: ((String) -> Unit)? = null
+    private fun log(what: String) {
+        Log.d("SystemMedia", "media command: $what")
+        onCommand?.invoke(what)
+    }
     fun play() { log("play"); if (!PlayerController.meta.value.isPlaying) PlayerController.togglePlayPause() }
     fun pause() { log("pause"); PlayerController.togglePlayPauseIfPlaying() }
     fun toggle() { log("toggle"); PlayerController.togglePlayPause() }
