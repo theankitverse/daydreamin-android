@@ -25,7 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
@@ -45,31 +45,52 @@ jobs:
         shell: bash
         run: |
           chmod +x gradlew
-          if [ "$RUNNER_OS" = "Linux" ]; then
-            dbus-run-session -- xvfb-run -a ./gradlew :app:desktopTest --info -PdesktopVersion=$VERSION | grep -E "\[[a-z]+-test\]|PASSED|FAILED|BUILD" || true
-            test "${PIPESTATUS[0]}" = "0"
-          else
-            ./gradlew :app:desktopTest --info -PdesktopVersion=$VERSION | grep -E "\[[a-z]+-test\]|PASSED|FAILED|BUILD" || true
-            test "${PIPESTATUS[0]}" = "0"
-          fi
+          run="./gradlew :app:desktopTest --info -PdesktopVersion=$VERSION"
+          if [ "$RUNNER_OS" = "Linux" ]; then run="dbus-run-session -- xvfb-run -a $run"; fi
+          status=0
+          $run > test.log 2>&1 || status=$?
+          grep -E "\[[a-z]+-test\]|PASSED|FAILED|BUILD" test.log || true
+          exit $status
 
       - name: Package
         shell: bash
-        run: ./gradlew ${{ matrix.package }} -PdesktopVersion=$VERSION
+        run: ./gradlew createDistributable ${{ matrix.package }} -PdesktopVersion=$VERSION
 
-      # The installed app itself, started on this system: it must find songs, build Home and draw.
+      # The installed app itself, started on this system with the Java runtime it ships with: it
+      # must start, find songs and draw Home and Settings.
       - name: Run the packaged app
         shell: bash
         run: |
+          dir=app/build/compose/binaries/main/app
+          out="$PWD/snapshots"
           case "$RUNNER_OS" in
-            macOS) app="app/build/compose/binaries/main/app/Daydreamin.app/Contents/MacOS/Daydreamin" ;;
-            Windows) app="app/build/compose/binaries/main/app/Daydreamin/Daydreamin.exe" ;;
-            Linux) app="xvfb-run -a app/build/compose/binaries/main/app/Daydreamin/bin/Daydreamin" ;;
+            macOS) app=("$dir/Daydreamin.app/Contents/MacOS/Daydreamin") ;;
+            Linux) app=(xvfb-run -a "$dir/daydreamin/bin/daydreamin") ;;
+            Windows)
+              # The .exe is a windowed program (Windows discards its output); its own runtime and
+              # jars, started directly, run the same thing with a log.
+              out="$(cygpath -w "$PWD/snapshots")"
+              app=("$dir/Daydreamin/runtime/bin/java.exe" -cp "$(cygpath -w "$PWD/$dir/Daydreamin/app")\*" com.daydreamin.app.MainKt) ;;
           esac
-          $app --snapshot "$PWD/snapshots" --onboarded --pages home,settings 2>&1 | tee run.log | grep -vE "^D/" || true
-          test -f snapshots/home-desktop.png && test -f snapshots/settings-desktop.png
+          ls -la "$dir"
+          status=0
+          "${app[@]}" --snapshot "$out" --onboarded --pages home,settings > run.log 2>&1 || status=$?
+          grep -vE "^D/" run.log | tail -40 || true
+          if [ $status -ne 0 ]; then echo "::error::the packaged app exited with $status"; exit 1; fi
+          for f in home-desktop settings-desktop home-phone; do
+            if [ ! -f "snapshots/$f.png" ]; then echo "::error::the packaged app didn't draw $f"; exit 1; fi
+          done
           # YouTube sometimes turns away datacenter addresses like this one, so songs loading is reported, not required.
-          grep -E "built popular feed|HomeFeed" run.log || echo "::warning::Home's songs didn't load on this runner (network)"
+          grep -E "built popular feed|built:" run.log || echo "::warning::Home's songs didn't load on this runner (network?)"
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: logs-${{ matrix.key }}
+          path: |
+            test.log
+            run.log
+            app/build/reports/tests/desktopTest/
 
       - name: Name the installers
         shell: bash
