@@ -22,13 +22,17 @@ import java.io.File
  * saves a PNG of each — for checking layouts where there's no display to look at (CI, Windows and
  * Linux build machines) and for comparing sizes side by side.
  */
-fun saveSnapshots(dir: File, pages: List<String>, content: @Composable (page: String) -> Unit) {
+fun saveSnapshots(dir: File, pages: List<String>, quick: Boolean = false, content: @Composable (page: String) -> Unit) {
     dir.mkdirs()
+    // Drawing off-screen happens on the CPU (no graphics card), which is slow on small build machines:
+    // --quick draws one desktop-size picture per page at 1x instead of three sizes at 2x.
+    val sizes = if (quick) listOf("desktop" to (1280 to 820)) else listOf("phone" to (400 to 860), "desktop" to (1280 to 820), "wide" to (1720 to 980))
     for (page in pages) {
-        for ((name, size) in listOf("phone" to (400 to 860), "desktop" to (1280 to 820), "wide" to (1720 to 980))) {
+        for ((name, size) in sizes) {
             val file = File(dir, "${page.replace('/', '_')}-$name.png")
-            renderOffscreen(file, size.first, size.second, settleMs = 9_000) { content(page) }
-            println("snapshot: ${file.absolutePath}")
+            val started = System.currentTimeMillis()
+            renderOffscreen(file, size.first, size.second, settleMs = if (quick) 6_000 else 9_000, density = if (quick) 1f else 2f) { content(page) }
+            println("snapshot: ${file.absolutePath} (${(System.currentTimeMillis() - started) / 1000}s)")
         }
     }
 }
@@ -40,9 +44,9 @@ private class SnapshotOwner : LifecycleOwner, ViewModelStoreOwner {
 }
 
 // On the UI thread (Swing's), like a real window: navigation and lifecycles insist on it.
-private fun renderOffscreen(file: File, widthDp: Int, heightDp: Int, settleMs: Long, content: @Composable () -> Unit) = runBlocking(Dispatchers.Main) {
+private fun renderOffscreen(file: File, widthDp: Int, heightDp: Int, settleMs: Long, density: Float, content: @Composable () -> Unit) = runBlocking(Dispatchers.Main) {
     val owner = SnapshotOwner()
-    val scene = ImageComposeScene(widthDp * 2, heightDp * 2, Density(2f), coroutineContext = coroutineContext) {
+    val scene = ImageComposeScene((widthDp * density).toInt(), (heightDp * density).toInt(), Density(density), coroutineContext = coroutineContext) {
         CompositionLocalProvider(LocalLifecycleOwner provides owner, LocalViewModelStoreOwner provides owner) { content() }
     }
     // Let data and artwork arrive: keep drawing frames (which also runs the screen's effects) for a

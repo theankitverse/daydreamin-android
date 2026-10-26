@@ -105,7 +105,7 @@ fun main(args: Array<String>) {
         }
         // --pages home,settings,now_playing (routes; default: home)
         val pages = args.indexOf("--pages").takeIf { it >= 0 }?.let { args.getOrNull(it + 1) }?.split(',') ?: listOf("home")
-        saveSnapshots(File(snapshotDir), pages) { page -> DaydreaminRoot(startRoute = page) }
+        saveSnapshots(File(snapshotDir), pages, quick = "--quick" in args) { page -> DaydreaminRoot(startRoute = page) }
         kotlin.system.exitProcess(0)
     }
 

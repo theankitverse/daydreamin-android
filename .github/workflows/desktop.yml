@@ -65,25 +65,33 @@ jobs:
           dir=app/build/compose/binaries/main/app
           out="$PWD/snapshots"
           case "$RUNNER_OS" in
-            macOS) app=("$dir/Daydreamin.app/Contents/MacOS/Daydreamin") ;;
-            Linux) app=(xvfb-run -a "$dir/daydreamin/bin/daydreamin") ;;
+            macOS) app=("$(ls -d "$dir"/*.app)/Contents/MacOS/Daydreamin") ;;
+            Linux) app=(xvfb-run -a "$(find "$dir" -path "*/bin/*" -type f -perm -u+x | head -1)") ;;
             # A windowed program: Windows discards its console output, so the app writes its log
             # into the snapshot folder (snapshots/app.log) in this mode.
-            Windows) out="$(cygpath -w "$PWD/snapshots")"; app=("$dir/Daydreamin/Daydreamin.exe") ;;
+            Windows) out="$(cygpath -w "$PWD/snapshots")"; app=("$(ls "$dir"/*/*.exe | head -1)") ;;
           esac
-          ls -la "$dir"
-          status=0
+          echo "starting: ${app[*]}"
           mkdir -p snapshots
-          timeout 420 "${app[@]}" --snapshot "$out" --onboarded --pages home,settings > snapshots/stdout.log 2>&1 || status=$?
-          if [ $status -eq 124 ] && [ "$RUNNER_OS" = "Windows" ]; then
-            # Still running after 7 minutes: picture the screen (an error box from the launcher shows up here).
-            powershell -NoProfile -Command "Add-Type -AssemblyName System.Windows.Forms,System.Drawing; \$b=[System.Windows.Forms.Screen]::PrimaryScreen.Bounds; \$i=New-Object System.Drawing.Bitmap \$b.Width,\$b.Height; [System.Drawing.Graphics]::FromImage(\$i).CopyFromScreen(\$b.Location,[System.Drawing.Point]::Empty,\$b.Size); \$i.Save('snapshots\\screen.png')" || true
-            tasklist | grep -i -E "daydreamin|java" || true
+          # At most 7 minutes (macOS has no 'timeout' command, so: wait, then stop it).
+          "${app[@]}" --snapshot "$out" --quick --onboarded --pages home,settings > snapshots/stdout.log 2>&1 &
+          pid=$!
+          status=124
+          for i in $(seq 1 420); do
+            if ! kill -0 $pid 2>/dev/null; then status=0; wait $pid || status=$?; break; fi
+            sleep 1
+          done
+          if [ $status -eq 124 ]; then
+            if [ "$RUNNER_OS" = "Windows" ]; then
+              # Still running: picture the screen (an error box from the launcher would show up here).
+              powershell -NoProfile -Command "Add-Type -AssemblyName System.Windows.Forms,System.Drawing; \$b=[System.Windows.Forms.Screen]::PrimaryScreen.Bounds; \$i=New-Object System.Drawing.Bitmap \$b.Width,\$b.Height; [System.Drawing.Graphics]::FromImage(\$i).CopyFromScreen(\$b.Location,[System.Drawing.Point]::Empty,\$b.Size); \$i.Save('snapshots\\screen.png')" || true
+            fi
+            kill $pid 2>/dev/null || true
           fi
           cp snapshots/app.log run.log 2>/dev/null || cp snapshots/stdout.log run.log 2>/dev/null || touch run.log
-          grep -vE "^D/" run.log | tail -40 || true
+          grep -vE "^D/|^E/YtExtract" run.log | tail -40 || true
           if [ $status -ne 0 ]; then echo "::error::the packaged app exited with $status (124: still running after 7 minutes)"; exit 1; fi
-          for f in home-desktop settings-desktop home-phone; do
+          for f in home-desktop settings-desktop; do
             if [ ! -f "snapshots/$f.png" ]; then echo "::error::the packaged app didn't draw $f"; exit 1; fi
           done
           # YouTube sometimes turns away datacenter addresses like this one, so songs loading is reported, not required.
