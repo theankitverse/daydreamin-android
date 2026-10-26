@@ -757,7 +757,7 @@ private fun formatMegabytes(bytes: Long): String =
 @Composable
 private fun LikedDownloadToggle() {
     val prefs = com.daydreamin.app.AppGraph.prefs
-    val on by prefs.downloadLiked.collectAsState(initial = true)
+    val on by prefs.downloadLiked.collectAsState(initial = false)
     val scope = rememberCoroutineScope()
     CollectionDownloadToggle(on, label = "liked songs") { scope.launch { prefs.setDownloadLiked(!on) } }
 }

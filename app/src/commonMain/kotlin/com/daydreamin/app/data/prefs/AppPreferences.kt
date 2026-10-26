@@ -199,7 +199,9 @@ class AppPreferences(private val dataStore: DataStore<Preferences>, private val 
     }
 
     /** Keep every liked song downloaded, including ones you like later. On by default. */
-    val downloadLiked: Flow<Boolean> = dataStore.data.map { it[Keys.DOWNLOAD_LIKED] ?: true }
+    // Off unless turned on: liking a song never downloads it by itself (it used to, and people
+    // found songs on their phone they never chose to download).
+    val downloadLiked: Flow<Boolean> = dataStore.data.map { it[Keys.DOWNLOAD_LIKED] ?: false }
     suspend fun setDownloadLiked(value: Boolean) = edit { it[Keys.DOWNLOAD_LIKED] = value }
 
     /** Playlists kept downloaded, songs added later included. */

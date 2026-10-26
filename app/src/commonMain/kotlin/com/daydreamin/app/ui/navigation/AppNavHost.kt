@@ -17,6 +17,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
@@ -186,6 +187,15 @@ fun AppNavHost() {
           val openPlayer = remember(navController) {
               {
                   PlayerSheet.requestMorphOpen()
+                  navController.navigate(Dest.NOW_PLAYING)
+              }
+          }
+          // Opened from the player notification: straight to Now Playing (if something is playing and it isn't open already).
+          val openRequested = com.daydreamin.app.ui.components.PlayerSheet.openRequested
+          LaunchedEffect(openRequested) {
+              if (!openRequested) return@LaunchedEffect
+              com.daydreamin.app.ui.components.PlayerSheet.openRequested = false
+              if (PlayerController.meta.value.currentSong != null && navController.currentDestination?.route != Dest.NOW_PLAYING) {
                   navController.navigate(Dest.NOW_PLAYING)
               }
           }

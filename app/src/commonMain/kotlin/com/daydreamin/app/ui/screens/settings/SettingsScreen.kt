@@ -206,7 +206,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                 ToggleRow(
                     icon = Icons.Rounded.Favorite,
                     title = "Download liked songs",
-                    body = "Every song you like downloads by itself, so it plays without a connection.",
+                    body = "Off: songs download only when you tap download. On: every song you like downloads by itself.",
                     checked = downloadLiked,
                     onChange = vm::setDownloadLiked,
                 )

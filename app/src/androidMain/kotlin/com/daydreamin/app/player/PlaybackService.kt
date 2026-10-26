@@ -156,7 +156,17 @@ class PlaybackService : MediaSessionService() {
         // Standard "skip to next/previous" commands (Bluetooth remote, notification, lock
         // screen, Android Auto) are routed to the session through this wrapper so they always
         // go through PlayerController's real queue logic — see QueueAwarePlayer's kdoc.
-        val session = MediaSession.Builder(this, QueueAwarePlayer(player)).build()
+        // Tapping the player notification, the lock screen player or the Dynamic Island opens Daydreamin
+        // on Now Playing. Without this, some phones (HyperOS) opened another app instead, or nothing.
+        val openPlayer = android.app.PendingIntent.getActivity(
+            this,
+            0,
+            Intent(this, com.daydreamin.app.MainActivity::class.java)
+                .setAction(com.daydreamin.app.MainActivity.ACTION_OPEN_PLAYER)
+                .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK),
+            android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val session = MediaSession.Builder(this, QueueAwarePlayer(player)).setSessionActivity(openPlayer).build()
         mediaSession = session
 
         crossfader = Crossfader(
