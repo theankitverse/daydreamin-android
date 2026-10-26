@@ -50,9 +50,6 @@ private const val PREPARE_AHEAD = 2
 private const val EARLY_SKIP_MIN_MS = 1_500L
 private const val EARLY_SKIP_MAX_MS = 30_000L
 
-/** A song's radio shorter than this (after the per-artist cap) gets extended — see autoFillQueueFor. */
-private const val MIN_RADIO_LENGTH = 15
-
 /**
  * The single owner of playback state for the whole app. Screens read [meta] / [progress]
  * and call these functions instead of touching [MediaController] directly — it resolves a
@@ -795,43 +792,9 @@ actual object PlayerController {
     }
 
     private suspend fun autoFillQueueFor(song: Song, videoId: String) {
-        val recentTitles = app.prefs.history.first().take(15)
-            .map { YouTubeExtractorService.normalizeTitleForDedup(it.title) }
-            .toSet()
+        val radioTracks = buildRadioQueue(song, videoId)
 
-        val primaryMix = YouTubeExtractorService
-            .fetchRadioMix(videoId, song.title, song.artist, recentTitles)
-            .map { it.toSong() }
-            .filterNot { it.playId == song.playId }
-
-        // No more than a few tracks per artist, no matter how narrow the radio was.
-        var radioTracks = primaryMix
-            .distinctBy { YouTubeExtractorService.normalizeTitleForDedup(it.title) }
-            .capPerArtist(max = 3)
-
-        if (radioTracks.size < MIN_RADIO_LENGTH) {
-            val songArtist = song.artist.trim().lowercase()
-            val extenders = radioTracks
-                .filter { !it.videoId.isNullOrBlank() && it.artist.trim().lowercase() != songArtist }
-                .distinctBy { it.artist.trim().lowercase() }
-                .take(2)
-            val known = recentTitles + primaryMix.map { YouTubeExtractorService.normalizeTitleForDedup(it.title) }
-            val extensions = coroutineScope {
-                extenders.map { t ->
-                    async {
-                        runCatching { YouTubeExtractorService.fetchRadioMix(t.videoId!!, t.title, t.artist, known) }
-                            .getOrDefault(emptyList())
-                            .map { it.toSong() }
-                            .filterNot { it.playId == song.playId }
-                    }
-                }.awaitAll()
-            }
-            radioTracks = interleaveMany(radioTracks, extensions)
-                .distinctBy { YouTubeExtractorService.normalizeTitleForDedup(it.title) }
-                .capPerArtist(max = 3)
-        }
-
-        Log.d(TAG, "up next for '${song.title}': ${radioTracks.size} tracks from its radio (${primaryMix.size} before per-artist cap)")
+        Log.d(TAG, "up next for '${song.title}': ${radioTracks.size} tracks from its radio")
         if (radioTracks.isNotEmpty() && _meta.value.currentSong?.playId == song.playId) {
             _meta.update { it.copy(queue = radioTracks) }
             prepareUpcoming()
@@ -1119,37 +1082,5 @@ actual object PlayerController {
 
     actual fun consumeError() {
         _meta.update { it.copy(error = null) }
-    }
-
-    /** Weaves each list in [secondaries] into [primary] every third slot instead of just appending them, so an extended radio doesn't read as "one song's radio, then a tacked-on chunk". */
-    private fun interleaveMany(primary: List<Song>, secondaries: List<List<Song>>): List<Song> {
-        if (secondaries.all { it.isEmpty() }) return primary
-        val leftovers = secondaries.map { ArrayDeque(it) }
-        val result = mutableListOf<Song>()
-        primary.forEachIndexed { index, song ->
-            result.add(song)
-            if ((index + 1) % 3 == 0) {
-                leftovers.forEach { queue -> if (queue.isNotEmpty()) result.add(queue.removeFirst()) }
-            }
-        }
-        leftovers.forEach { result.addAll(it) }
-        return result.distinctBy { it.playId }
-    }
-
-    /** Same artist (or artist-component, for collab credits like "KR$NA, Seedhe Maut") never
-     *  appears more than [max] times — the actual fix for "recommendations are just the same
-     *  one or two artists", regardless of how narrow the underlying radio mix was. */
-    private fun List<Song>.capPerArtist(max: Int): List<Song> {
-        val counts = mutableMapOf<String, Int>()
-        return filter { song ->
-            val components = song.artist.lowercase()
-                .split(Regex("""[,&/]|\bx\b|\bfeat\.?\b|\bft\.?\b|\bwith\b"""))
-                .map { it.trim() }
-                .filter { it.isNotBlank() }
-            if (components.isEmpty()) return@filter true
-            if (components.any { (counts[it] ?: 0) >= max }) return@filter false
-            components.forEach { counts[it] = (counts[it] ?: 0) + 1 }
-            true
-        }
     }
 }

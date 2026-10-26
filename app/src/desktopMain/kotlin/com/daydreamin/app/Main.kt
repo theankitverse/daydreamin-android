@@ -58,6 +58,10 @@ fun main(args: Array<String>) {
     AppGraph.init(dataDir, AppPreferences(store, dataDir), startedAt)
     Region.init(null)
     YouTubeExtractorService.init(Region.country)
+    // The desktop player decodes Opus itself (YouTube's best audio, the same stream Android plays).
+    YouTubeExtractorService.opusOnly = true
+    com.daydreamin.app.data.download.Downloads.init()
+    com.daydreamin.app.player.PlayerController.ensureConnected()
     // No update check yet: version.json describes the Android app. Desktop gets its own with its installers.
     AppGraph.startHomeFeed()
 
@@ -71,7 +75,10 @@ fun main(args: Array<String>) {
 
     application {
         Window(
-            onCloseRequest = ::exitApplication,
+            onCloseRequest = {
+                com.daydreamin.app.player.PlayerController.disconnect()
+                exitApplication()
+            },
             title = "Daydreamin",
             icon = painterResource(Res.drawable.splash_logo),
             state = rememberWindowState(size = DpSize(1200.dp, 820.dp)),

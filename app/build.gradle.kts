@@ -129,6 +129,13 @@ kotlin {
             dependencies {
                 implementation(compose.desktop.currentOs)
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.9.0")
+                // Decodes YouTube's Opus audio in plain Java — no native libraries to ship per platform.
+                implementation("io.github.jaredmdobson:concentus:1.0.2")
+            }
+        }
+        val desktopTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
             }
         }
         val androidUnitTest by getting {

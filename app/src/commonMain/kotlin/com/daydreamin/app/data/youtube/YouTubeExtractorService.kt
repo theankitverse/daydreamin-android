@@ -78,6 +78,9 @@ object YouTubeExtractorService {
      *  whose URI was baked in at prepare time; that needs its own, separate refresh. */
     const val STREAM_CACHE_TTL_MS = 20 * 60 * 1000L
 
+    /** Only Opus audio when YouTube has it — set by the desktop app, whose player decodes Opus. */
+    @Volatile var opusOnly: Boolean = false
+
     // Once a cache entry is within this long of expiring, a read still serves it (it's not
     // stale *yet*) but also kicks off a silent background re-resolve — so by the time it's
     // actually needed, there's already a fresh one, instead of only discovering the expiry at
@@ -265,6 +268,8 @@ object YouTubeExtractorService {
             val playable = info.audioStreams.orEmpty()
                 .filter { !it.content.isNullOrBlank() && it.deliveryMethod == DeliveryMethod.PROGRESSIVE_HTTP }
             val original = playable.filter { it.audioTrackType == null || it.audioTrackType == AudioTrackType.ORIGINAL }
+                // The desktop player decodes Opus itself; it gets Opus whenever YouTube has it (it nearly always does).
+                .let { streams -> if (opusOnly) streams.filter { it.format?.name?.contains("OPUS", ignoreCase = true) == true }.ifEmpty { streams } else streams }
             // Highest bitrate wins (in practice Opus ~160 kbps, the best YouTube serves without
             // Premium); Opus is more efficient than AAC per bit, so it breaks ties
             // (and near-ties — a couple kbps apart is noise, not a real quality difference).
