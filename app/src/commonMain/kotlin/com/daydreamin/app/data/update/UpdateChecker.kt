@@ -9,8 +9,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
@@ -53,9 +54,26 @@ object UpdateChecker {
     // Raw file from the Android project's own repo — see /version.json there, updated on each release.
     private val VERSION_URL get() = AppInfo.updateUrl
 
+    /**
+     * Where else the same file is published. Some networks in India (Jio, Airtel) block
+     * raw.githubusercontent.com, which left the update check failing for good. Each release also
+     * carries version.json as a download (the same host the APK itself downloads from), and
+     * jsDelivr mirrors the repo. All are asked at once; the newest answer wins.
+     */
+    private val MIRRORS = listOf(
+        "https://github.com/theankitverse/daydreamin-android/releases/latest/download/version.json",
+        "https://cdn.jsdelivr.net/gh/theankitverse/daydreamin-android@main/version.json",
+    )
+    private const val DEFAULT_URL = "https://raw.githubusercontent.com/theankitverse/daydreamin-android/main/version.json"
+
+    /** Coming back to the app checks again after this long (the process can stay alive for days). */
+    private const val RECHECK_AFTER_MS = 10 * 60 * 1000L
+    @Volatile private var lastCheckAtMs = 0L
+
     private val client = OkHttpClient.Builder()
         .connectTimeout(6, TimeUnit.SECONDS)
         .readTimeout(6, TimeUnit.SECONDS)
+        .callTimeout(9, TimeUnit.SECONDS)
         .withLegacyRoots()
         .build()
     private val json = Json { ignoreUnknownKeys = true }
@@ -74,19 +92,22 @@ object UpdateChecker {
         scope.launch { checkNow() }
     }
 
+    /** When the app comes back on screen: checks again if the last check was a while ago, or failed. */
+    fun recheckIfStale(scope: CoroutineScope) {
+        if (!started || _state.value.status == UpdateStatus.CHECKING) return
+        val stale = com.daydreamin.app.platform.elapsedRealtime() - lastCheckAtMs > RECHECK_AFTER_MS
+        if (stale || _state.value.status == UpdateStatus.FAILED) scope.launch { checkNow() }
+    }
+
     /** Also used by Settings' manual "Check for updates" row — same call, same silent-failure behaviour. */
     suspend fun checkNow() {
         _state.value = UpdateState(UpdateStatus.CHECKING)
+        lastCheckAtMs = com.daydreamin.app.platform.elapsedRealtime()
+        // A test build pointed at its own file asks only that file.
+        val urls = if (VERSION_URL == DEFAULT_URL) listOf(VERSION_URL) + MIRRORS else listOf(VERSION_URL)
         val remote = withContext(Dispatchers.IO) {
-            withTimeoutOrNull(8_000) {
-                runCatching {
-                    client.newCall(Request.Builder().url(VERSION_URL).build()).execute().use { response ->
-                        if (!response.isSuccessful) throw IOException("HTTP ${response.code}")
-                        val body = response.body?.string() ?: throw IOException("empty response")
-                        json.decodeFromString<RemoteVersion>(body)
-                    }
-                }.onFailure { com.daydreamin.app.platform.Log.w("UpdateChecker", "update check failed", it) }.getOrNull()
-            }
+            // Each request has its own time limit (the client's), so a blocked address can't hide a good answer.
+            urls.map { url -> async { fetch(url) } }.awaitAll().filterNotNull().maxByOrNull { it.versionCode }
         }
         _state.value = when {
             remote == null -> UpdateState(UpdateStatus.FAILED)
@@ -94,6 +115,16 @@ object UpdateChecker {
             else -> UpdateState(UpdateStatus.UP_TO_DATE, remote)
         }
     }
+
+    private fun fetch(url: String): RemoteVersion? = runCatching {
+        // A fresh copy, not one a cache along the way has kept.
+        val request = Request.Builder().url(url).header("Cache-Control", "no-cache").build()
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw IOException("HTTP ${response.code}")
+            val body = response.body?.string() ?: throw IOException("empty response")
+            json.decodeFromString<RemoteVersion>(body)
+        }
+    }.onFailure { com.daydreamin.app.platform.Log.w("UpdateChecker", "update check failed for $url: ${it.message}") }.getOrNull()
 
     /** Dismissing the Home banner for this version — it only reappears if a newer one is published later. */
     suspend fun dismiss(versionCode: Int) {

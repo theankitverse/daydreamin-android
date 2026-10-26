@@ -73,6 +73,8 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         com.daydreamin.app.data.download.Downloads.onAppVisible()
+        // The process can live for days (music keeps it running), so coming back checks for updates again.
+        com.daydreamin.app.data.update.UpdateChecker.recheckIfStale(DaydreaminApp.instance.appScope)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

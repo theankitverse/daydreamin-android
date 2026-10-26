@@ -1,9 +1,9 @@
 {
-  "versionCode": 19,
-  "versionName": "1.6.3",
+  "versionCode": 20,
+  "versionName": "1.6.4",
   "url": "https://github.com/theankitverse/daydreamin-android/releases/latest",
-  "notes": "Liking a song no longer downloads it. Tapping the player in notifications or the Dynamic Island opens Daydreamin's player.",
-  "apkUrl": "https://github.com/theankitverse/daydreamin-android/releases/download/v1.6.3/daydreamin-v1.6.3.apk",
-  "apkSize": 4780114,
-  "sha256": "ce407941321620fc0861b657d1bc675d418d2e8a9792918789bb714dfdd8fff7"
+  "notes": "Updates now show reliably: the app checks again when you come back to it, and still finds updates on networks that block GitHub's file server.",
+  "apkUrl": "https://github.com/theankitverse/daydreamin-android/releases/download/v1.6.4/daydreamin-v1.6.4.apk",
+  "apkSize": 4781806,
+  "sha256": "d23744a52df2159523b3e81cfe092fd8bdb389421cab20a9d06ec2110adc11ff"
 }
