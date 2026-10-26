@@ -1,12 +1,11 @@
-# Daydreamin (Android)
+# Daydreamin — Android, Mac, Windows & Linux
 
-A native Android music app, built in Kotlin and Jetpack Compose, that streams music straight from
-YouTube — resolved entirely on-device, with no backend of its own. Search, gapless playback, a
-recommendation engine, downloads for offline listening, crossfade, and a liquid-glass, AMOLED-first
-design across every screen.
+A music app, built in Kotlin and Compose Multiplatform, that streams music straight from YouTube —
+resolved entirely on-device, with no backend of its own. Search, gapless playback, a recommendation
+engine, downloads for offline listening, crossfade, and a liquid-glass, AMOLED-first design across
+every screen. The same code runs as the Android app and as a desktop app for macOS, Windows and Linux.
 
-This repo is the Android app only. It's a separate project from [Daydreamin's original web
-app](https://github.com/theankitverse/Daydreamin).
+This is a separate project from [Daydreamin's original web app](https://github.com/theankitverse/Daydreamin).
 
 ## What's inside
 
@@ -32,24 +31,39 @@ app](https://github.com/theankitverse/Daydreamin).
   removed — first-run setup can restore straight from it.
 - **First-run setup**: name, photo, and an accent colour that lights up the whole app.
 
-## Building
-
-```bash
-git clone https://github.com/theankitverse/daydreamin-android.git
-cd daydreamin-android
-./gradlew assembleDebug
-```
-
-The debug APK lands in `app/build/outputs/apk/debug/`. Requires JDK 17 and the Android SDK
-(`compileSdk 35`, `minSdk 21`, so it runs on Android 5.0 and up).
-
 ## Installing
 
-This isn't on the Play Store — grab the latest APK from
+**Android:** this isn't on the Play Store — grab the latest APK from
 [Releases](../../releases/latest) and install it directly (Android will ask you to allow installs
 from your browser or file manager the first time). The app checks in the background for newer
 releases and shows a banner on Home when one's available, so after this first install you won't
 need to do this manually again.
+
+**Mac, Windows, Linux:** the desktop installers are on the [Releases](../../releases) page, in the
+releases titled "Daydreamin for Mac, Windows & Linux" (`.dmg`, `.msi`, `.deb`, `.rpm`). The desktop
+app has a sidebar on wide windows, keyboard shortcuts, your media keys and the system's Now Playing
+controls, and it updates itself too.
+
+## How it's built
+
+- `app/src/commonMain` — everything shared: screens, theme, YouTube extraction, library,
+  recommendations, settings.
+- `app/src/androidMain` — the Android app: Media3 playback in a foreground service, downloads,
+  the APK updater.
+- `app/src/desktopMain` — the desktop app: its own Opus player (decoded in plain Java, with
+  crossfade and an equalizer), downloads, Now Playing / MPRIS / media keys, and its updater.
+
+```bash
+git clone https://github.com/theankitverse/daydreamin-android.git
+cd daydreamin-android
+./gradlew assembleDebug        # Android APK → app/build/outputs/apk/debug/
+./gradlew :app:run             # the desktop app, on this computer
+./gradlew :app:packageDmg      # or packageMsi / packageDeb / packageRpm (on that system)
+```
+
+Requires JDK 21 (a full one, with `jpackage`, for the desktop installers) and the Android SDK
+(`compileSdk 35`, `minSdk 21`, so Android 5.0 and up). Desktop installers are built and published
+by `.github/workflows/desktop.yml` for every `desktop-v*` tag.
 
 ## Support
 
@@ -59,8 +73,8 @@ and it doesn't unlock anything, since there's nothing locked to begin with.
 
 ## Privacy
 
-No account, no ads, and nothing about what you listen to ever leaves your phone. To see roughly how
-many people use the app, it sends one anonymous count a day to
+No account, no ads, and nothing about what you listen to ever leaves your device. To see roughly how
+many people use the app, the Android app sends one anonymous count a day to
 [TelemetryDeck](https://telemetrydeck.com) (a privacy-focused analytics service): a random ID made
 on the phone (hashed before sending), the app and Android version, the country, and which app
 installed Daydreamin. Never songs, searches, your name or anything else. Turn it off in
