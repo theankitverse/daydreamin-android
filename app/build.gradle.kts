@@ -136,7 +136,9 @@ kotlin {
                 implementation("net.java.dev.jna:jna:5.19.1")
                 implementation("net.java.dev.jna:jna-platform:5.19.1")
                 implementation("com.github.hypfvieh:dbus-java-core:5.2.2")
-                implementation("com.github.hypfvieh:dbus-java-transport-native-unixsocket:5.2.2")
+                // junixsocket: handles both socket files and Linux's abstract sockets (unix:abstract=…),
+                // which some desktops' session buses use; Java's own Unix sockets can't reach those.
+                implementation("com.github.hypfvieh:dbus-java-transport-junixsocket:5.2.2")
             }
         }
         val desktopTest by getting {
