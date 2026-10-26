@@ -23,6 +23,9 @@ object PlayerSheet {
     var morphInProgress by mutableStateOf(false)
         private set
 
+    /** Set when the app was opened from the player notification (or the Dynamic Island); Home opens Now Playing. */
+    var openRequested by mutableStateOf(false)
+
     /** Called by the mini player right before it opens Now Playing. */
     fun requestMorphOpen() {
         morphInProgress = miniArtworkBounds != null

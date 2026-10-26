@@ -76,6 +76,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        if (savedInstanceState == null) handleOpenPlayer(intent)
         // The system launch screen can only show the still icon, so it hands over as soon as the
         // app can draw: we note exactly where it drew the icon and draw the same icon there
         // ourselves, then LaunchIntro animates the wordmark in beneath it and waits for Home's
@@ -159,5 +160,20 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    // The app is already open (singleTop) and the player notification was tapped.
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        handleOpenPlayer(intent)
+    }
+
+    private fun handleOpenPlayer(intent: android.content.Intent?) {
+        if (intent?.action == ACTION_OPEN_PLAYER) com.daydreamin.app.ui.components.PlayerSheet.openRequested = true
+    }
+
+    companion object {
+        /** From the player notification, lock screen player and Dynamic Island: open on Now Playing. */
+        const val ACTION_OPEN_PLAYER = "com.daydreamin.app.OPEN_PLAYER"
     }
 }
