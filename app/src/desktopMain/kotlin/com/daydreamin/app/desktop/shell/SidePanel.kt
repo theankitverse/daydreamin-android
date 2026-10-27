@@ -1,5 +1,9 @@
 package com.daydreamin.app.desktop.shell
 
+import kotlin.math.roundToInt
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.derivedStateOf
@@ -172,6 +176,9 @@ private fun NowPlayingView(song: Song, queue: List<Song>) {
 @Composable
 private fun QueueView(song: Song, queue: List<Song>) {
     val state = rememberLazyListState()
+    // The row being dragged and how far it has moved.
+    var drag by remember { mutableStateOf<Pair<Int, Float>?>(null) }
+    val rowPx = with(androidx.compose.ui.platform.LocalDensity.current) { 52.dp.toPx() }
     Box(Modifier.fillMaxSize()) {
         LazyColumn(state = state, modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp), contentPadding = PaddingValues(bottom = 12.dp)) {
             item { Text("Now playing", style = DType.panelTitle, modifier = Modifier.padding(start = 8.dp, top = 8.dp, bottom = 6.dp)) }
@@ -184,7 +191,26 @@ private fun QueueView(song: Song, queue: List<Song>) {
             }
             if (queue.isEmpty()) item { Text("Nothing lined up — songs like this one will follow.", style = DType.small, modifier = Modifier.padding(8.dp)) }
             itemsIndexed(queue, key = { _, s -> "q-" + s.playId }) { i, s ->
-                QueueRow(s, onPlay = { PlayerController.playQueueItemAt(i) }, onRemove = { PlayerController.removeFromQueue(s) }, onTop = if (i > 0) ({ PlayerController.moveQueueItem(i, 0) }) else null)
+                // Drag a song up or down the queue; it follows the pointer and drops where it's let go.
+                val dragging = drag?.first == i
+                Box(
+                    Modifier
+                        .zIndex(if (dragging) 1f else 0f)
+                        .graphicsLayer { translationY = if (dragging) drag!!.second else 0f; shadowElevation = if (dragging) 16f else 0f }
+                        .pointerInput(i, queue.size) {
+                            detectDragGestures(
+                                onDragStart = { drag = i to 0f },
+                                onDrag = { change, amount -> change.consume(); drag = drag?.let { it.first to it.second + amount.y } },
+                                onDragEnd = {
+                                    drag?.let { (from, dy) -> PlayerController.moveQueueItem(from, (from + (dy / rowPx).roundToInt()).coerceIn(0, queue.lastIndex)) }
+                                    drag = null
+                                },
+                                onDragCancel = { drag = null },
+                            )
+                        },
+                ) {
+                    QueueRow(s, onPlay = { PlayerController.playQueueItemAt(i) }, onRemove = { PlayerController.removeFromQueue(s) }, onTop = if (i > 0) ({ PlayerController.moveQueueItem(i, 0) }) else null)
+                }
             }
         }
         VerticalScrollbar(rememberScrollbarAdapter(state), Modifier.align(Alignment.CenterEnd).fillMaxHeight())

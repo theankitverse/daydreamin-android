@@ -2,6 +2,10 @@ package com.daydreamin.app
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.window.MenuBar
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
@@ -61,6 +65,9 @@ private fun platformName(): String = System.getProperty("os.name").lowercase().l
 }
 
 fun main(args: Array<String>) {
+    // The menus go in the Mac's menu bar, not inside the window.
+    System.setProperty("apple.laf.useScreenMenuBar", "true")
+    System.setProperty("apple.awt.application.name", "Daydreamin")
     val startedAt = elapsedRealtime()
     // --snapshot also writes the app's log next to the pictures (on Windows the app has no console).
     args.indexOf("--snapshot").takeIf { it >= 0 }?.let { args.getOrNull(it + 1) }?.let { dir ->
@@ -139,6 +146,9 @@ fun main(args: Array<String>) {
                 // Which graphics backend draws the window (Metal / Direct3D / OpenGL, or slow software drawing).
                 com.daydreamin.app.platform.Log.i("Window", "drawing with ${window.renderApi}")
             }
+            // On a Mac, the app's menus in the menu bar at the top of the screen. (Their shortcuts are
+            // the window's own — listed in tooltips — so menu items carry none, or keys would fire twice.)
+            if (System.getProperty("os.name").lowercase().contains("mac")) AppMenuBar()
             CompositionLocalProvider(
                 com.daydreamin.app.desktop.shell.LocalWindowScope provides this,
                 com.daydreamin.app.desktop.shell.LocalTitleBarInset provides WindowChrome.titleBarInset(window),
@@ -212,7 +222,49 @@ fun DaydreaminRoot(startRoute: String = com.daydreamin.app.ui.navigation.Dest.HO
     DaydreaminTheme(accent = accentByName(accentName)) {
         Box(Modifier.fillMaxSize().background(com.daydreamin.app.ui.theme.BgBase)) {
             if (onboarded == true) com.daydreamin.app.desktop.shell.DesktopApp(routeFor(startRoute))
-            if (onboarded == false) OnboardingScreen(onDone = { scope.launch { prefs.setOnboarded() } })
+            // First-run setup is a phone-sized column; on a computer it sits in the middle of the window.
+            if (onboarded == false) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Box(Modifier.widthIn(max = 520.dp).fillMaxHeight()) { OnboardingScreen(onDone = { scope.launch { prefs.setOnboarded() } }) }
+            }
+        }
+    }
+}
+
+@androidx.compose.runtime.Composable
+private fun androidx.compose.ui.window.FrameWindowScope.AppMenuBar() {
+    val player = com.daydreamin.app.player.PlayerController
+    val ui = com.daydreamin.app.desktop.shell.DesktopUi
+    val go: (DRoute) -> Unit = { ui.navigator?.go(it) }
+    val meta by player.meta.collectAsState()
+    MenuBar {
+        Menu("Playback") {
+            Item(if (meta.isPlaying) "Pause" else "Play", enabled = meta.currentSong != null, onClick = { player.togglePlayPause() })
+            Item("Next", enabled = meta.currentSong != null, onClick = { player.next() })
+            Item("Previous", enabled = meta.currentSong != null, onClick = { player.previous() })
+            Separator()
+            CheckboxItem("Shuffle", checked = meta.shuffle, onCheckedChange = { player.toggleShuffle() })
+            Item(
+                when (meta.repeatMode) { com.daydreamin.app.player.RepeatMode.OFF -> "Repeat: Off"; com.daydreamin.app.player.RepeatMode.ALL -> "Repeat: All"; com.daydreamin.app.player.RepeatMode.ONE -> "Repeat: One" },
+                onClick = { player.cycleRepeat() },
+            )
+            Separator()
+            Item("Volume Up", onClick = { player.setVolume(player.volume.value + 0.1f) })
+            Item("Volume Down", onClick = { player.setVolume(player.volume.value - 0.1f) })
+        }
+        Menu("View") {
+            Item("Home", onClick = { go(DRoute.Home) })
+            Item("Search", onClick = { com.daydreamin.app.ui.navigation.NavCommands.openSearch?.invoke() })
+            Item("Your Library", onClick = { go(DRoute.Library) })
+            Item("Liked Songs", onClick = { go(DRoute.Liked) })
+            Separator()
+            Item("Now Playing", onClick = { ui.toggle(com.daydreamin.app.desktop.shell.PanelTab.NOW_PLAYING) })
+            Item("Queue", onClick = { ui.toggle(com.daydreamin.app.desktop.shell.PanelTab.QUEUE) })
+            Item("Lyrics", onClick = { ui.toggle(com.daydreamin.app.desktop.shell.PanelTab.LYRICS) })
+            Separator()
+            Item("Back", onClick = { ui.navigator?.goBack() })
+            Item("Forward", onClick = { ui.navigator?.goForward() })
+            Separator()
+            Item("Settings…", onClick = { go(DRoute.Settings()) })
         }
     }
 }
