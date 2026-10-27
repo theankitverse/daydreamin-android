@@ -121,6 +121,7 @@ actual object PlayerController {
         val previous = _meta.value.currentSong
         if (previous != null && previous.playId != song.playId) backStack.addLast(previous)
         val request = ++playRequest
+        earlyEnds.clear()
         // The song you're leaving stops now, not when the new one has loaded.
         engine.stop()
         dropPrepared()
@@ -262,10 +263,30 @@ actual object PlayerController {
 
     private val engineListener = object : EngineListener {
         override fun onTransition(from: Deck, to: Deck) { scope.launch { transitioned(from, to) } }
-        override fun onEnded(deck: Deck) { scope.launch { if (songOf(deck)?.playId == _meta.value.currentSong?.playId) advance(userInitiated = false) } }
+        override fun onEnded(deck: Deck) { scope.launch { ended(deck) } }
         override fun onError(deck: Deck, error: Throwable) { scope.launch { recover(deck, error) } }
         override fun onBuffering(buffering: Boolean) { _meta.update { it.copy(isBuffering = buffering) } }
     }
+
+    /**
+     * A song's audio ran out. If that's well before its end, the stream broke off (YouTube cut it, or
+     * gave back nothing) — fetch it again from there rather than skipping on, which used to run
+     * through song after song. Twice at most per song; then it counts as a song that won't play.
+     */
+    private suspend fun ended(deck: Deck) {
+        val song = songOf(deck) ?: return
+        if (song.playId != _meta.value.currentSong?.playId) return
+        val played = deck.decodedPositionMs
+        val length = deck.durationMs.takeIf { it > 0 } ?: song.durationMs()
+        if (length > 30_000 && played < length - 15_000) {
+            val tries = earlyEnds.merge(song.playId, 1, Int::plus) ?: 1
+            if (tries <= 2) recover(deck, IOException("audio ended early at ${played}ms of ${length}ms"))
+            else failed(song, IOException("audio keeps ending early"))
+            return
+        }
+        advance(userInitiated = false)
+    }
+    private val earlyEnds = HashMap<String, Int>()
 
     /** The lined-up song took over (it was in the queue's first slot). */
     private fun transitioned(from: Deck, to: Deck) {

@@ -146,7 +146,7 @@ fun HomePage() {
             }
             if (history.isNotEmpty()) item(key = "recent") {
                 val recent = history.distinctBy { it.playId }
-                Shelf("Recently played", recent, onShowAll = { nav.go(Route.History) }) { song, m -> SongCard(song, recent, playingId, m) }
+                Shelf("Recently played", recent, onShowAll = { nav.go(Route.History) }) { song, m -> SongCard(song, recent, playingId, m, withRadio = true) }
             }
             if (playlists.isNotEmpty()) item(key = "playlists") {
                 Shelf("Your playlists", playlists, onShowAll = { nav.go(Route.Library) }) { p, m ->
@@ -347,16 +347,18 @@ private fun GridSongRow(song: Song, onPlay: () -> Unit) {
 }
 
 @Composable
-internal fun SongCard(song: Song, list: List<Song>, playingId: String?, modifier: Modifier) {
+internal fun SongCard(song: Song, list: List<Song>, playingId: String?, modifier: Modifier, withRadio: Boolean = false) {
     val index = list.indexOf(song).coerceAtLeast(0)
+    // withRadio (Recently played, as on the phone): the song's radio follows, not the rest of the row.
+    val start = { if (withRadio) PlayerController.playSong(song) else PlayerController.playFromList(list, index) }
     CardTile(
         title = song.title,
         subtitle = song.artist,
-        onOpen = { PlayerController.playFromList(list, index) },
-        onPlay = { if (playingId == song.playId) PlayerController.togglePlayPause() else PlayerController.playFromList(list, index) },
+        onOpen = start,
+        onPlay = { if (playingId == song.playId) PlayerController.togglePlayPause() else start() },
         playing = playingId == song.playId,
         modifier = modifier,
-        menu = songMenuEntries(song, onPlay = { PlayerController.playFromList(list, index) }),
+        menu = songMenuEntries(song, onPlay = start),
     ) { m -> Artwork(url = song.cover.ifBlank { song.artworkUrl }, shape = RoundedCornerShape(6.dp), modifier = m) }
 }
 

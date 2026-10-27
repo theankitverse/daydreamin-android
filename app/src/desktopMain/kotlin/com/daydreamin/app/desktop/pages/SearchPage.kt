@@ -100,7 +100,8 @@ fun SearchPage(query: String) {
     LaunchedEffect(view) { if (view == SearchView.PLAYLISTS) vm.onTabChange(SearchTab.PLAYLISTS) else if (state.tab == SearchTab.PLAYLISTS) vm.onTabChange(SearchTab.SONGS) }
     val listState = rememberLazyListState()
     val table = remember(state.resultsFor) { TrackTableState() }
-    val play: (Int, List<Song>) -> Unit = { i, list -> vm.commitSearch(); PlayerController.playFromList(list, i) }
+    // As on the phone: a search result plays with its own radio as Up next, not the rest of the results.
+    val play: (Int, List<Song>) -> Unit = { i, list -> vm.commitSearch(); list.getOrNull(i)?.let { PlayerController.playSong(it) } }
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
