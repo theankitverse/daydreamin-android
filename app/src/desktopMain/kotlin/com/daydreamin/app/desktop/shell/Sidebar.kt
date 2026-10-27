@@ -58,6 +58,7 @@ import com.daydreamin.app.desktop.components.desktopGlass
 import com.daydreamin.app.desktop.components.DIconButton
 import com.daydreamin.app.desktop.components.LocalAccent
 import com.daydreamin.app.desktop.components.MenuEntry
+import com.daydreamin.app.desktop.components.songDropTarget
 import com.daydreamin.app.desktop.components.WithTooltip
 import com.daydreamin.app.desktop.components.desktopClickable
 import com.daydreamin.app.desktop.nav.LocalNavigator
@@ -67,7 +68,7 @@ import com.daydreamin.app.desktop.theme.DSize
 import com.daydreamin.app.desktop.theme.DType
 import com.daydreamin.app.player.PlayerController
 import com.daydreamin.app.ui.components.LikedTile
-import com.daydreamin.app.ui.components.NameDialog
+import com.daydreamin.app.desktop.components.NameDialog
 import com.daydreamin.app.ui.components.PlaylistCover
 import com.daydreamin.app.ui.components.SongActions
 import kotlinx.coroutines.launch
@@ -155,7 +156,10 @@ private fun LibraryList(narrow: Boolean) {
     Box(Modifier.fillMaxSize()) {
         LazyColumn(state = state, modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 8.dp)) {
             item {
-                LibraryRow(narrow, "Liked songs", "Playlist · ${liked.size} songs", current == Route.Liked, onClick = { nav.go(Route.Liked) }, onPlay = { PlayerController.playFromList(liked, 0) }.takeIf { liked.isNotEmpty() }) { LikedTile(it) }
+                LibraryRow(
+                    narrow, "Liked songs", "Playlist · ${liked.size} songs", current == Route.Liked, onClick = { nav.go(Route.Liked) }, onPlay = { PlayerController.playFromList(liked, 0) }.takeIf { liked.isNotEmpty() },
+                    drop = Modifier.songDropTarget("liked", "Liked songs") { song -> if (liked.none { it.playId == song.playId }) SongActions.toggleLiked(song, currentlyLiked = false) },
+                ) { LikedTile(it) }
             }
             item {
                 LibraryRow(narrow, "Downloads", "$downloaded on this computer", current == Route.Downloads, onClick = { nav.go(Route.Downloads) }) { IconTile(Icons.Rounded.DownloadDone, it) }
@@ -195,6 +199,7 @@ private fun PlaylistRow(p: Playlist, narrow: Boolean, selected: Boolean) {
             selected,
             onClick = { nav.go(Route.Playlist(p.id)) },
             onPlay = { PlayerController.playFromList(p.songs, 0) }.takeIf { p.songs.isNotEmpty() },
+            drop = Modifier.songDropTarget("playlist-${p.id}", p.name) { song -> SongActions.addToPlaylist(p, song) },
         ) { PlaylistCover(p, it) }
     }
 }
@@ -207,6 +212,7 @@ private fun LibraryRow(
     selected: Boolean,
     onClick: () -> Unit,
     onPlay: (() -> Unit)? = null,
+    drop: Modifier = Modifier,
     art: @Composable (Dp) -> Unit,
 ) {
     WithTooltip(if (narrow) title else null) {
@@ -214,6 +220,7 @@ private fun LibraryRow(
             Modifier
                 .fillMaxWidth()
                 .height(60.dp)
+                .then(drop)
                 .clip(RoundedCornerShape(6.dp))
                 .background(if (selected) DColors.selected else Color.Transparent)
                 .desktopClickable(RoundedCornerShape(6.dp), onClick = onClick)

@@ -25,6 +25,7 @@ import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Lyrics
+import androidx.compose.material.icons.rounded.PictureInPictureAlt
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Repeat
@@ -98,7 +99,7 @@ private fun NowPlayingInfo() {
     val nav = LocalNavigator.current
     ContextMenuArea(songMenuEntries(song, onPlay = { PlayerController.togglePlayPause() })) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            WithTooltip(if (DesktopUi.expanded) "Back to the app" else "Full-window Now playing") {
+            WithTooltip(if (DesktopUi.expanded) "Back to the app" else "Full-window Now playing and lyrics") {
                 Artwork(
                     url = song.cover.ifBlank { song.artworkUrl },
                     shape = RoundedCornerShape(6.dp),
@@ -197,11 +198,13 @@ private fun PlayButton(playing: Boolean, buffering: Boolean, enabled: Boolean) {
 private fun RightControls(compact: Boolean) {
     val accent = LocalAccent.current
     val volume by PlayerController.volume.collectAsState()
+    val hasSong = PlayerController.meta.collectAsState().value.currentSong != null
     var beforeMute by remember { mutableFloatStateOf(0.7f) }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         DIconButton(Icons.Rounded.ViewSidebar, "Now playing view", { DesktopUi.toggle(PanelTab.NOW_PLAYING) }, iconSize = 18.dp, active = DesktopUi.showing(PanelTab.NOW_PLAYING), activeColor = accent)
-        DIconButton(Icons.Rounded.Lyrics, "Lyrics", { DesktopUi.toggle(PanelTab.LYRICS) }, iconSize = 18.dp, active = DesktopUi.showing(PanelTab.LYRICS), activeColor = accent)
+        DIconButton(Icons.Rounded.Lyrics, if (DesktopUi.expanded && DesktopUi.fullView == FullView.LYRICS) "Close lyrics" else "Lyrics", { DesktopUi.toggleLyrics() }, iconSize = 18.dp, enabled = hasSong, active = DesktopUi.expanded && DesktopUi.fullView == FullView.LYRICS, activeColor = accent, shortcut = "${cmd}L")
         DIconButton(Icons.AutoMirrored.Rounded.QueueMusic, "Queue", { DesktopUi.toggle(PanelTab.QUEUE) }, iconSize = 19.dp, active = DesktopUi.showing(PanelTab.QUEUE), activeColor = accent)
+        if (!compact) DIconButton(Icons.Rounded.PictureInPictureAlt, "Mini player", { DesktopUi.miniPlayer = true }, iconSize = 18.dp, enabled = hasSong)
         Spacer(Modifier.width(4.dp))
         DIconButton(
             when { volume == 0f -> Icons.AutoMirrored.Rounded.VolumeOff; volume < 0.5f -> Icons.AutoMirrored.Rounded.VolumeDown; else -> Icons.AutoMirrored.Rounded.VolumeUp },

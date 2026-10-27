@@ -201,6 +201,7 @@ fun TrackRow(
                     },
                 )
                 .hoverable(source)
+                .songDragSource(song)
                 .combinedClickable(interactionSource = source, indication = null, onClick = onSelect, onDoubleClick = onPlay)
                 .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,

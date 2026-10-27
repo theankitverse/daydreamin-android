@@ -16,7 +16,7 @@ notes="**Always the newest Daydreamin for your computer** (now version $v). Thes
 |---|---|
 | Mac with Apple chip (M1 and later) | [Daydreamin-macos-arm64.dmg](https://github.com/$repo/releases/download/desktop-latest/Daydreamin-macos-arm64.dmg) |
 | Mac with Intel chip | [Daydreamin-macos-x64.dmg](https://github.com/$repo/releases/download/desktop-latest/Daydreamin-macos-x64.dmg) |
-| Windows 10 / 11 | [Daydreamin-windows.msi](https://github.com/$repo/releases/download/desktop-latest/Daydreamin-windows.msi) |
+| Windows 10 / 11 | [Daydreamin-windows-setup.exe](https://github.com/$repo/releases/download/desktop-latest/Daydreamin-windows-setup.exe) |
 | Ubuntu, Debian, Mint | [Daydreamin-linux-amd64.deb](https://github.com/$repo/releases/download/desktop-latest/Daydreamin-linux-amd64.deb) |
 | Fedora, openSUSE | [Daydreamin-linux-x86_64.rpm](https://github.com/$repo/releases/download/desktop-latest/Daydreamin-linux-x86_64.rpm) |
 

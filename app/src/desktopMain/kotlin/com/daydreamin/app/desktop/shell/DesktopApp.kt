@@ -82,8 +82,9 @@ fun DesktopApp(start: Route = Route.Home) {
       ProvideSharedState {
         DesktopScrollbars {
             BoxWithConstraints(Modifier.fillMaxSize()) {
-                WindowBackdrop()
-                val narrowSidebar = maxWidth < WideSidebarFrom
+                val expanded = DesktopUi.expanded && hasSong
+                WindowBackdrop(vivid = expanded)
+                val narrowSidebar = maxWidth < WideSidebarFrom || com.daydreamin.app.desktop.DesktopSettings.compactSidebar
                 val sidebarWidth = if (narrowSidebar) DSize.sidebarNarrow else DSize.sidebarWide
                 // A roomier panel on a big screen.
                 val panelWidth = if (maxWidth >= 1800.dp) 400.dp else DSize.sidePanel
@@ -93,7 +94,7 @@ fun DesktopApp(start: Route = Route.Home) {
 
                 Column(Modifier.fillMaxSize()) {
                     TopBar()
-                    if (DesktopUi.expanded && hasSong) FullNowPlaying(Modifier.weight(1f))
+                    if (expanded) FullNowPlaying(Modifier.weight(1f))
                     else Row(Modifier.weight(1f).fillMaxWidth().padding(horizontal = DSpace.gap)) {
                         Sidebar(narrowSidebar, sidebarWidth)
                         Spacer(Modifier.width(DSpace.gap))
@@ -120,6 +121,7 @@ fun DesktopApp(start: Route = Route.Home) {
                     SidePanel(Modifier.width(DSize.sidePanel).fillMaxHeight().shadow(24.dp, RoundedCornerShape(DSize.panelRadius)).background(Color(0xFF0B0B10), RoundedCornerShape(DSize.panelRadius)))
                 }
 
+                com.daydreamin.app.desktop.components.SongDragGhost()
                 ToastHost(Modifier.align(Alignment.BottomCenter).padding(bottom = DSize.playerBarHeight + 12.dp), onOpenDownloads = { nav.go(Route.Downloads) })
             }
         }

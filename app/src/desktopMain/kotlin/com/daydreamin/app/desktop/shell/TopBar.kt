@@ -58,6 +58,8 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowScope
+import com.daydreamin.app.WindowChrome
+import com.daydreamin.app.titleBarHitTest
 import com.daydreamin.app.desktop.components.DIconButton
 import com.daydreamin.app.desktop.components.MenuEntry
 import com.daydreamin.app.desktop.components.MenuPopup
@@ -72,18 +74,20 @@ import com.daydreamin.app.ui.components.UserAvatar
 
 /** The window, when there is one (not in off-screen snapshots): lets the top bar drag it. */
 val LocalWindowScope = staticCompositionLocalOf<WindowScope?> { null }
-/** Room to leave for the Mac's window buttons, drawn over the app's own top bar. */
-val LocalTitleBarInset = staticCompositionLocalOf { 0.dp }
+/** The window's title bar, when the top bar is it (the window buttons sit at its ends). */
+val LocalTitleBar = staticCompositionLocalOf<WindowChrome.TitleBar?> { null }
 
 
 @Composable
 fun TopBar(modifier: Modifier = Modifier) {
     val nav = LocalNavigator.current
     val window = LocalWindowScope.current
-    Box(modifier.fillMaxWidth().height(DSize.topBarHeight)) {
-        // The bar's empty space moves the window, as a title bar would.
-        if (window != null) with(window) { WindowDraggableArea(Modifier.fillMaxSize()) { Box(Modifier.fillMaxSize()) } }
-        Row(Modifier.fillMaxSize().padding(start = 12.dp + LocalTitleBarInset.current, end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+    val titleBar = LocalTitleBar.current
+    Box(modifier.fillMaxWidth().height(DSize.topBarHeight).then(if (titleBar != null) Modifier.titleBarHitTest(titleBar) else Modifier)) {
+        // Under the system's own title bar, the bar's empty space still moves the window.
+        if (titleBar == null && window != null) with(window) { WindowDraggableArea(Modifier.fillMaxSize()) { Box(Modifier.fillMaxSize()) } }
+        val start = titleBar?.start ?: if (window != null) WindowChrome.fallbackInset() else 0.dp
+        Row(Modifier.fillMaxSize().padding(start = 12.dp + start, end = 12.dp + (titleBar?.end ?: 0.dp)), verticalAlignment = Alignment.CenterVertically) {
             DIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Go back", { nav.goBack() }, enabled = nav.canGoBack, shortcut = "${cmd}[")
             DIconButton(Icons.AutoMirrored.Rounded.ArrowForward, "Go forward", { nav.goForward() }, enabled = nav.canGoForward, shortcut = "${cmd}]")
             Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {

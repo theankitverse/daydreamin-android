@@ -6,7 +6,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.daydreamin.app.desktop.nav.Navigator
 
-enum class PanelTab(val label: String) { NOW_PLAYING("Now playing"), QUEUE("Queue"), LYRICS("Lyrics") }
+enum class PanelTab(val label: String) { NOW_PLAYING("Now playing"), QUEUE("Queue") }
+
+/** What the full-window Now playing shows beside the artwork. */
+enum class FullView(val label: String) { LYRICS("Lyrics"), QUEUE("Queue") }
 
 /**
  * The desktop window's own state: the side panel (open, and which view), and requests from
@@ -33,8 +36,17 @@ object DesktopUi {
 
     var navigator: Navigator? = null
 
-    /** Now playing filling the window: big artwork beside the lyrics. */
+    /** Now playing filling the window: big artwork beside the lyrics (or the queue). */
     var expanded by mutableStateOf(false)
+    var fullView by mutableStateOf(FullView.LYRICS)
+
+    /** The small always-on-top player is showing (in place of the window). */
+    var miniPlayer by mutableStateOf(false)
+
+    /** The lyrics, full window; asked for again, back to the app. */
+    fun toggleLyrics() {
+        if (expanded && fullView == FullView.LYRICS) expanded = false else { fullView = FullView.LYRICS; expanded = true }
+    }
 
     /** Shows [tab]; showing the one already open closes the panel. */
     fun toggle(tab: PanelTab) {

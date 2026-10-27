@@ -21,6 +21,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import com.daydreamin.app.desktop.Backdrop
+import com.daydreamin.app.desktop.DesktopSettings
 import com.daydreamin.app.ui.components.ArtworkBackdrop
 import com.daydreamin.app.ui.theme.ArtworkLight
 import com.daydreamin.app.ui.theme.BrandPink
@@ -38,23 +42,28 @@ private val BrandLight = ArtworkLight(BrandViolet, BrandPink)
  * What the glass panels sit on: the playing song's artwork as soft light filling the window — the
  * phone app's backdrop, at window size. Drawn once and left alone (no live blur: the cover is
  * decoded at a few pixels and upscaled, which is already a soft wash), so it costs nothing while
- * the window is still.
+ * the window is still. [vivid]: the full-window lyrics, where the colours come up bright, as in
+ * Apple Music. Settings can make it the brand's colours or plain dark instead.
  */
 @Composable
-fun WindowBackdrop(modifier: Modifier = Modifier) {
+fun WindowBackdrop(modifier: Modifier = Modifier, vivid: Boolean = false) {
     val shared = LocalShared.current
     val url by remember { derivedStateOf { shared.meta.value.currentSong?.let { it.cover.ifBlank { it.artworkUrl } } } }
-    val light = rememberArtworkLight(url, BrandLight)
+    val style = if (vivid) Backdrop.ARTWORK else DesktopSettings.backdrop
+    val light = rememberArtworkLight(url.takeIf { style == Backdrop.ARTWORK }, BrandLight)
+    // Into and out of the lyrics, the colours swell and settle rather than switching.
+    val bright by animateFloatAsState(if (vivid) 1f else 0f, tween(500), label = "backdrop")
     Box(modifier.fillMaxSize().background(Color.Black)) {
-        ArtworkBackdrop(url, Modifier.fillMaxSize().alpha(0.55f), blur = 0.dp, tiny = true)
-        Box(
+        if (style == Backdrop.ARTWORK) ArtworkBackdrop(url, Modifier.fillMaxSize().alpha(0.55f + 0.45f * bright), blur = 0.dp, tiny = true)
+        if (style != Backdrop.PLAIN) Box(
             Modifier.fillMaxSize().drawBehind {
                 // Key light from the top left, fill from the bottom right, then darkened so text stays crisp.
-                drawRect(Brush.radialGradient(listOf(light.key.copy(alpha = 0.38f), Color.Transparent), center = Offset(size.width * 0.12f, 0f), radius = size.maxDimension * 0.75f))
-                drawRect(Brush.radialGradient(listOf(light.fill.copy(alpha = 0.26f), Color.Transparent), center = Offset(size.width, size.height), radius = size.maxDimension * 0.7f))
-                drawRect(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.30f), Color.Black.copy(alpha = 0.55f), Color.Black.copy(alpha = 0.72f))))
+                drawRect(Brush.radialGradient(listOf(light.key.copy(alpha = 0.38f + 0.2f * bright), Color.Transparent), center = Offset(size.width * 0.12f, 0f), radius = size.maxDimension * 0.75f))
+                drawRect(Brush.radialGradient(listOf(light.fill.copy(alpha = 0.26f + 0.2f * bright), Color.Transparent), center = Offset(size.width, size.height), radius = size.maxDimension * 0.7f))
+                val dim = 1f - 0.55f * bright
+                drawRect(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.30f * dim), Color.Black.copy(alpha = 0.55f * dim), Color.Black.copy(alpha = 0.72f * dim + 0.1f * bright))))
             },
-        )
+        ) else Box(Modifier.fillMaxSize().background(Color(0xFF07070A)))
     }
 }
 

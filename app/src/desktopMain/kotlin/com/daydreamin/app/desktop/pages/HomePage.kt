@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.daydreamin.app.data.model.Song
 import com.daydreamin.app.data.recommend.HomeFeed
+import com.daydreamin.app.desktop.components.songDragSource
 import com.daydreamin.app.desktop.components.CardTile
 import com.daydreamin.app.desktop.components.ContextMenuArea
 import com.daydreamin.app.desktop.components.PlayingBars
@@ -323,6 +324,7 @@ private fun GridSongRow(song: Song, onPlay: () -> Unit) {
                 .background(if (hovered) DColors.hover else Color.Transparent)
                 .hoverable(source)
                 .pointerHoverIcon(PointerIcon.Hand)
+                .songDragSource(song)
                 .combinedClickable(interactionSource = source, indication = null, onClick = onPlay)
                 .padding(horizontal = 6.dp),
             verticalAlignment = Alignment.CenterVertically,

@@ -59,7 +59,7 @@ import com.daydreamin.app.desktop.theme.DSpace
 import com.daydreamin.app.desktop.theme.DType
 import com.daydreamin.app.player.PlayerController
 import com.daydreamin.app.ui.components.LikedTile
-import com.daydreamin.app.ui.components.NameDialog
+import com.daydreamin.app.desktop.components.NameDialog
 import com.daydreamin.app.ui.components.PlaylistCover
 import com.daydreamin.app.ui.components.SongActions
 import kotlinx.coroutines.launch

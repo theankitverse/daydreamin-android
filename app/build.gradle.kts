@@ -136,6 +136,9 @@ kotlin {
                 implementation("io.github.jaredmdobson:concentus:1.0.2")
                 // The system's media controls: macOS's Now Playing and Windows' media keys through
                 // JNA; Linux's MPRIS over D-Bus.
+                // The window's own title bar (window buttons inside the app's top bar), on the
+                // JetBrains Runtime the app ships with; elsewhere the system's frame stays.
+                implementation("org.jetbrains.runtime:jbr-api:1.5.0")
                 implementation("net.java.dev.jna:jna:5.19.1")
                 implementation("net.java.dev.jna:jna-platform:5.19.1")
                 implementation("com.github.hypfvieh:dbus-java-core:5.2.2")

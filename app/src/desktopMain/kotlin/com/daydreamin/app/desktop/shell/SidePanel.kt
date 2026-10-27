@@ -79,7 +79,6 @@ import com.daydreamin.app.desktop.theme.DType
 import com.daydreamin.app.player.PlayerController
 import com.daydreamin.app.ui.components.Artwork
 import com.daydreamin.app.ui.components.SongActions
-import com.daydreamin.app.ui.screens.lyrics.LyricsViewModel
 import com.daydreamin.app.ui.theme.ArtworkLight
 import com.daydreamin.app.ui.theme.BrandViolet
 import com.daydreamin.app.ui.theme.rememberArtworkLight
@@ -87,7 +86,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel as composeViewModel
 
 private val DefaultLight = ArtworkLight(BrandViolet, Color(0xFF3D3A9E))
 
-/** The panel beside the page: Now playing, the queue, or the lyrics. */
+/** The panel beside the page: Now playing or the queue. (The lyrics have the whole window: [FullNowPlaying].) */
 @Composable
 fun SidePanel(modifier: Modifier = Modifier) {
     val meta by PlayerController.meta.collectAsState()
@@ -109,7 +108,6 @@ fun SidePanel(modifier: Modifier = Modifier) {
                 } else when (DesktopUi.panelTab) {
                     PanelTab.NOW_PLAYING -> NowPlayingView(song, meta.queue)
                     PanelTab.QUEUE -> QueueView(song, meta.queue)
-                    PanelTab.LYRICS -> LyricsView(song)
                 }
             }
         }
@@ -174,7 +172,7 @@ private fun NowPlayingView(song: Song, queue: List<Song>) {
 }
 
 @Composable
-private fun QueueView(song: Song, queue: List<Song>) {
+internal fun QueueView(song: Song, queue: List<Song>) {
     val state = rememberLazyListState()
     // The row being dragged and how far it has moved.
     var drag by remember { mutableStateOf<Pair<Int, Float>?>(null) }
@@ -254,64 +252,3 @@ private fun QueueRow(song: Song, onPlay: () -> Unit, onRemove: (() -> Unit)?, on
         }
     }
 }
-
-@Composable
-internal fun LyricsView(song: Song) {
-    val vm: LyricsViewModel = composeViewModel { LyricsViewModel() }
-    val state by vm.state.collectAsState()
-    val progress = PlayerController.progress.collectAsState()
-    LaunchedEffect(song.playId) { vm.load(song.artist, song.title) }
-    val lines = state.syncedLines
-    // Only the line changing redraws the lyrics, not every tick of the clock.
-    val active by remember(lines) { derivedStateOf { lines.indexOfLast { it.timeMs <= progress.value.positionMs + 250 } } }
-    val list = rememberLazyListState()
-    LaunchedEffect(active) { if (active >= 0) list.animateScrollToItem((active - 2).coerceAtLeast(0)) }
-    Box(Modifier.fillMaxSize()) {
-        when {
-            state.loading -> Text("Finding the lyrics…", style = DType.body, modifier = Modifier.align(Alignment.Center))
-            lines.isNotEmpty() -> LazyColumn(state = list, modifier = Modifier.fillMaxSize().fadeEdges().padding(horizontal = 20.dp), contentPadding = PaddingValues(top = 24.dp, bottom = 200.dp)) {
-                itemsIndexed(lines) { i, line ->
-                    val (source, hovered) = rememberHover()
-                    val color = when {
-                        i == active -> Color.White
-                        hovered -> Color.White.copy(alpha = 0.8f)
-                        i < active -> Color.White.copy(alpha = 0.5f)
-                        else -> Color.White.copy(alpha = 0.32f)
-                    }
-                    Text(
-                        line.text.ifBlank { "♪" },
-                        style = DType.section.copy(fontSize = 19.sp, lineHeight = 26.sp, color = color),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .hoverable(source)
-                            .pointerHoverIcon(PointerIcon.Hand)
-                            .combinedClickableNoIndication { PlayerController.seekTo(line.timeMs) }
-                            .padding(vertical = 7.dp),
-                    )
-                }
-            }
-            state.plainText != null -> LazyColumn(Modifier.fillMaxSize().padding(horizontal = 20.dp), contentPadding = PaddingValues(vertical = 12.dp)) {
-                item { Text(state.plainText!!, style = DType.body.copy(color = Color.White.copy(alpha = 0.85f), fontSize = 15.sp, lineHeight = 24.sp)) }
-            }
-            state.offline -> Text("Lyrics need a connection.", style = DType.body, modifier = Modifier.align(Alignment.Center))
-            else -> Text("No lyrics for this one.", style = DType.body, modifier = Modifier.align(Alignment.Center))
-        }
-    }
-}
-
-/** Lines fade out at the top and bottom of the lyrics instead of being cut off. */
-private fun Modifier.fadeEdges() = this
-    .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
-    .drawWithContent {
-        drawContent()
-        val edge = 40.dp.toPx() / size.height
-        drawRect(
-            Brush.verticalGradient(0f to Color.Transparent, edge to Color.Black, 1f - edge to Color.Black, 1f to Color.Transparent),
-            blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
-        )
-    }
-
-@OptIn(ExperimentalFoundationApi::class)
-private fun Modifier.combinedClickableNoIndication(onClick: () -> Unit) = this.then(
-    Modifier.combinedClickable(interactionSource = null, indication = null, onClick = onClick),
-)

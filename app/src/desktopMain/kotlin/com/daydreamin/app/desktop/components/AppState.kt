@@ -16,7 +16,6 @@ import com.daydreamin.app.data.model.Song
 import com.daydreamin.app.desktop.nav.LocalNavigator
 import com.daydreamin.app.player.PlaybackMeta
 import com.daydreamin.app.player.PlayerController
-import com.daydreamin.app.ui.components.NewPlaylistDialog
 
 /**
  * What every song row needs to know — what's playing, what you've liked — collected once for the

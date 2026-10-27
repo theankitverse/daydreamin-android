@@ -45,7 +45,8 @@ actual object UpdateInstaller {
 
     actual fun start(remote: RemoteVersion, scope: CoroutineScope) {
         if (job?.isActive == true) return
-        val download = downloadKey()?.let { remote.downloads[it] }
+        // Windows: the setup wizard (from 1.1); an older release only has the .msi.
+        val download = downloadKey()?.let { key -> (if (key == "windows") remote.downloads["windows-setup"] else null) ?: remote.downloads[key] }
         if (download == null) { openReleasePage(remote); return }
         job = scope.launch {
             runCatching {
@@ -105,7 +106,8 @@ actual object UpdateInstaller {
         when {
             "win" in os -> {
                 // The installer replaces the app's files, so the app steps aside for it.
-                ProcessBuilder("msiexec", "/i", file.absolutePath).start()
+                if (file.name.endsWith(".exe", ignoreCase = true)) ProcessBuilder(file.absolutePath).start()
+                else ProcessBuilder("msiexec", "/i", file.absolutePath).start()
                 exitProcess(0)
             }
             "mac" in os -> ProcessBuilder("open", file.absolutePath).start()

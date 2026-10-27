@@ -25,10 +25,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The JetBrains Runtime: the app ships with it, for its own title bar (the window buttons in
+      # the app's top bar) on Windows and macOS. Its SDK has jpackage and the jmods to build with.
       - uses: actions/setup-java@v5
         with:
-          distribution: temurin
+          distribution: jetbrains
           java-version: "21"
+          java-package: jdk
           cache: gradle
 
       - name: Version
@@ -97,6 +100,58 @@ jobs:
           # YouTube sometimes turns away datacenter addresses like this one, so songs loading is reported, not required.
           grep -E "built popular feed|built:" run.log || echo "::warning::Home's songs didn't load on this runner (network?)"
 
+      # The real window, title bar and all, as a picture (Windows and macOS runners have a screen).
+      - name: Picture the window
+        if: runner.os != 'Linux'
+        shell: bash
+        timeout-minutes: 3
+        run: |
+          dir=app/build/compose/binaries/main/app
+          shot="$PWD/snapshots/window.png"; data="$PWD/window-data"
+          case "$RUNNER_OS" in
+            macOS) app="$(ls -d "$dir"/*.app)/Contents/MacOS/Daydreamin" ;;
+            Windows) shot="$(cygpath -w "$shot")"; data="$(cygpath -w "$data")"; app="$(ls "$dir"/*/*.exe | head -1)" ;;
+          esac
+          "$app" --data-dir "$data" --onboarded --window-shot "$shot" > snapshots/window.log 2>&1 &
+          pid=$!
+          for i in $(seq 1 90); do kill -0 $pid 2>/dev/null || break; sleep 1; done
+          kill $pid 2>/dev/null || true
+          grep -E "I/Window|W/Window" snapshots/window.log || true
+          ls -la snapshots/window.png || echo "::warning::no window picture"
+
+      # Windows: the setup wizard in Daydreamin's colours (Inno Setup), alongside the .msi that
+      # copies of 1.0 still update with.
+      - name: Setup wizard (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
+          $app = Resolve-Path "app\build\compose\binaries\main\app\Daydreamin"
+          New-Item -ItemType Directory -Force -Path setup | Out-Null
+          & $iscc "/DAppVersion=$env:VERSION" "/DAppDir=$app" "/DOutDir=$PWD\setup" desktop-installer\daydreamin.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-ChildItem setup
+
+      # macOS: the disk image with Daydreamin's background and a drag-to-Applications arrow. If
+      # Finder can't be scripted on the runner, the plain disk image from jpackage is used.
+      - name: Disk image (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          brew install create-dmg >/dev/null
+          app="$(ls -d app/build/compose/binaries/main/app/*.app)"
+          mkdir -p dmg-src branded && cp -R "$app" dmg-src/
+          tiffutil -cathidpicheck desktop-installer/dmg-background.png desktop-installer/dmg-background@2x.png -out dmg-background.tiff
+          for attempt in 1 2; do
+            rm -f branded/Daydreamin.dmg
+            create-dmg --volname "Daydreamin" --volicon app/desktop-icons/daydreamin.icns \
+              --background dmg-background.tiff --window-pos 200 120 --window-size 660 422 \
+              --icon-size 112 --text-size 13 --icon "Daydreamin.app" 180 222 --hide-extension "Daydreamin.app" \
+              --app-drop-link 480 222 branded/Daydreamin.dmg dmg-src && break
+          done
+          ls -la branded || true
+
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -116,6 +171,12 @@ jobs:
             linux)
               cp deb/*.deb "$GITHUB_WORKSPACE/dist/Daydreamin-$VERSION-linux-amd64.deb"
               cp rpm/*.rpm "$GITHUB_WORKSPACE/dist/Daydreamin-$VERSION-linux-x86_64.rpm" ;;
+            windows)
+              cp msi/*.msi "$GITHUB_WORKSPACE/dist/Daydreamin-$VERSION-windows.msi"
+              cp "$GITHUB_WORKSPACE"/setup/Daydreamin-setup.exe "$GITHUB_WORKSPACE/dist/Daydreamin-$VERSION-windows-setup.exe" ;;
+            macos-*)
+              if [ -f "$GITHUB_WORKSPACE/branded/Daydreamin.dmg" ]; then src="$GITHUB_WORKSPACE/branded/Daydreamin.dmg"; else echo "::warning::plain disk image"; src=$(ls dmg/*.dmg); fi
+              cp "$src" "$GITHUB_WORKSPACE/dist/Daydreamin-$VERSION-${{ matrix.key }}.dmg" ;;
             *) cp ${{ matrix.file }} "$GITHUB_WORKSPACE/dist/Daydreamin-$VERSION-${{ matrix.key }}.${{ matrix.ext }}" ;;
           esac
           ls -la "$GITHUB_WORKSPACE/dist"
@@ -162,6 +223,7 @@ jobs:
             echo "    $(entry macos-arm64 macos-arm64.dmg),"
             echo "    $(entry macos-x64 macos-x64.dmg),"
             echo "    $(entry windows windows.msi),"
+            echo "    $(entry windows-setup windows-setup.exe),"
             echo "    $(entry deb linux-amd64.deb),"
             echo "    $(entry rpm linux-x86_64.rpm)"
             echo "  }"
@@ -182,12 +244,12 @@ jobs:
           |---|---|
           | Mac with Apple chip (M1 and later) | \`Daydreamin-$v-macos-arm64.dmg\` |
           | Mac with Intel chip | \`Daydreamin-$v-macos-x64.dmg\` |
-          | Windows 10 / 11 | \`Daydreamin-$v-windows.msi\` |
+          | Windows 10 / 11 | \`Daydreamin-$v-windows-setup.exe\` |
           | Ubuntu, Debian, Mint, Pop!_OS | \`Daydreamin-$v-linux-amd64.deb\` |
           | Fedora, openSUSE | \`Daydreamin-$v-linux-x86_64.rpm\` |
 
           **Mac:** open the .dmg and drag Daydreamin into Applications. The first time, macOS says it can't check the app — open **System Settings → Privacy & Security**, scroll down and click **Open Anyway** (the app isn't signed with a paid Apple certificate).
-          **Windows:** run the .msi. If Windows shows "Windows protected your PC", click **More info → Run anyway**.
+          **Windows:** run Daydreamin-$v-windows-setup.exe. If Windows shows "Windows protected your PC", click **More info → Run anyway**. (The .msi is the same app, for copies of Daydreamin 1.0 updating themselves.)
           **Linux:** open the file with your software installer, or \`sudo apt install ./Daydreamin-$v-linux-amd64.deb\` (or \`sudo dnf install ./Daydreamin-$v-linux-x86_64.rpm\`).
 
           Space plays and pauses, Cmd/Ctrl + ←/→ skip, Shift + ←/→ seek, Cmd/Ctrl + F searches, Esc goes back. Your keyboard's media keys work too. Later updates show up inside the app.

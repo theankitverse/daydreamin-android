@@ -41,6 +41,8 @@ actual object Downloads {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val json = Json { ignoreUnknownKeys = true }
     private val dir: File get() = File(AppGraph.filesDir, "downloads").apply { mkdirs() }
+    /** Where the songs are kept (Settings opens it). */
+    val folder: File get() = dir
     private val indexFile: File get() = File(dir, "index.json")
     private val indexLock = Mutex()
     private val running = HashMap<String, Job>()

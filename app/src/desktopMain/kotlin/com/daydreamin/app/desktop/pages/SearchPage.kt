@@ -52,6 +52,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.daydreamin.app.data.model.Song
+import com.daydreamin.app.desktop.components.songDragSource
 import com.daydreamin.app.desktop.components.CardTile
 import com.daydreamin.app.desktop.components.ContextMenuArea
 import com.daydreamin.app.desktop.components.DButton
@@ -240,6 +241,7 @@ private fun CompactSongRow(song: Song, onPlay: () -> Unit) {
                 .clip(RoundedCornerShape(6.dp))
                 .background(if (hovered) DColors.hover else Color.Transparent)
                 .hoverable(source)
+                .songDragSource(song)
                 .combinedClickable(interactionSource = source, indication = null, onClick = {}, onDoubleClick = onPlay)
                 .padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,

@@ -35,10 +35,15 @@ import com.daydreamin.app.platform.elapsedRealtime
 import com.daydreamin.app.resources.Res
 import com.daydreamin.app.resources.splash_logo
 import com.daydreamin.app.ui.navigation.AppNavHost
-import com.daydreamin.app.ui.screens.onboarding.OnboardingScreen
 import com.daydreamin.app.ui.theme.DaydreaminTheme
 import com.daydreamin.app.ui.theme.accentByName
+import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import androidx.compose.ui.window.Tray
+import com.daydreamin.app.desktop.shell.MiniPlayerWindow
+import androidx.compose.runtime.setValue
 import com.daydreamin.app.desktop.nav.Route as DRoute
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
@@ -87,7 +92,8 @@ fun main(args: Array<String>) {
     AppInfo.updateMirrors = listOf("https://cdn.jsdelivr.net/gh/theankitverse/daydreamin-android@main/desktop-version.json")
     AppInfo.platformName = platformName()
 
-    val dataDir = appDataDir()
+    // --data-dir <dir> (for development): a separate library, e.g. a fresh one to see first-run setup.
+    val dataDir = args.indexOf("--data-dir").takeIf { it >= 0 }?.let { args.getOrNull(it + 1) }?.let { File(it).apply { mkdirs() } } ?: appDataDir()
     val store = PreferenceDataStoreFactory.create { File(dataDir, "daydreamin.preferences_pb") }
     TasteProfile.init(dataDir)
     AppGraph.init(dataDir, AppPreferences(store, dataDir), startedAt)
@@ -109,16 +115,19 @@ fun main(args: Array<String>) {
             YouTubeExtractorService.search(query, limit = 1).firstOrNull()?.let { com.daydreamin.app.player.PlayerController.playSong(it.toSong()) }
         }
     }
+    // --onboarded (for development and CI): skip first-run setup, to see Home and the rest.
+    if ("--onboarded" in args) kotlinx.coroutines.runBlocking { AppGraph.prefs.setOnboarded() }
     val snapshotDir = args.indexOf("--snapshot").takeIf { it >= 0 }?.let { args.getOrNull(it + 1) }
     if (snapshotDir != null) {
-        // --onboarded: skip first-run setup, to see Home and the rest with whatever library is here.
-        if ("--onboarded" in args) kotlinx.coroutines.runBlocking { AppGraph.prefs.setOnboarded() }
         // --pages home,settings,now_playing (routes; default: home)
         val pages = args.indexOf("--pages").takeIf { it >= 0 }?.let { args.getOrNull(it + 1) }?.split(',') ?: listOf("home")
         saveSnapshots(File(snapshotDir), pages, quick = "--quick" in args) { page -> DaydreaminRoot(startRoute = page) }
         kotlin.system.exitProcess(0)
     }
 
+    // --now-playing (for development): opens on the full-window Now playing and lyrics.
+    if ("--now-playing" in args) com.daydreamin.app.desktop.shell.DesktopUi.expanded = true
+    if ("--mini" in args) com.daydreamin.app.desktop.shell.DesktopUi.miniPlayer = true
     val saved = WindowMemory.load(dataDir)
     application {
         val windowState = rememberWindowState(
@@ -127,31 +136,63 @@ fun main(args: Array<String>) {
             position = saved?.takeIf { WindowMemory.isOnScreen(it) }?.let { WindowPosition(it.x.dp, it.y.dp) } ?: WindowPosition.PlatformDefault,
             size = saved?.let { DpSize(it.width.dp, it.height.dp) } ?: DpSize(1200.dp, 820.dp),
         )
+        val ui = com.daydreamin.app.desktop.shell.DesktopUi
+        val settings = com.daydreamin.app.desktop.DesktopSettings
+        // Closed with "keep playing" on: the music goes on, the tray icon (or the Dock) brings it back.
+        var closedToTray by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+        val quit = {
+            WindowMemory.save(dataDir, windowState)
+            com.daydreamin.app.player.PlayerController.disconnect()
+            com.daydreamin.app.system.SystemMedia.stop()
+            exitApplication()
+        }
+        val show = { closedToTray = false; ui.miniPlayer = false }
+        androidx.compose.runtime.DisposableEffect(Unit) {
+            // A Mac: clicking Daydreamin in the Dock with no window open brings the window back.
+            runCatching { java.awt.Desktop.getDesktop().addAppEventListener(java.awt.desktop.AppReopenedListener { if (closedToTray) show() }) }
+            onDispose { }
+        }
+        val trayState = androidx.compose.ui.window.rememberTrayState()
+        if (settings.trayIcon) TrayIcon(trayState, onShow = show, onMini = { closedToTray = false; ui.miniPlayer = true }, onQuit = quit)
+        SongNotifications(trayState)
+        val wrap: @androidx.compose.runtime.Composable (@androidx.compose.runtime.Composable () -> Unit) -> Unit = { content ->
+            val accentName by AppGraph.prefs.accentName.collectAsState(initial = "Violet")
+            DaydreaminTheme(accent = accentByName(accentName)) {
+                CompositionLocalProvider(com.daydreamin.app.desktop.components.LocalAccent provides accentByName(accentName)) { content() }
+            }
+        }
+        if (ui.miniPlayer) MiniPlayerWindow(onExpand = show, onQuit = quit, wrap = wrap)
         Window(
-            onCloseRequest = {
-                WindowMemory.save(dataDir, windowState)
-                com.daydreamin.app.player.PlayerController.disconnect()
-                com.daydreamin.app.system.SystemMedia.stop()
-                exitApplication()
-            },
+            onCloseRequest = { if (settings.trayIcon && settings.keepPlayingWhenClosed) closedToTray = true else quit() },
+            visible = !closedToTray && !ui.miniPlayer,
             title = "Daydreamin",
             icon = painterResource(Res.drawable.splash_logo),
             state = windowState,
             onKeyEvent = ::handleShortcut,
         ) {
+            val titleBar = androidx.compose.runtime.remember { WindowChrome.install(window, com.daydreamin.app.desktop.theme.DSize.topBarHeight) }
             androidx.compose.runtime.LaunchedEffect(Unit) {
                 // Small enough for half a laptop screen; below this the layout would have to drop things.
                 window.minimumSize = java.awt.Dimension(720, 520)
-                WindowChrome.applyDarkTitleBar(window)
+                if (titleBar == null) WindowChrome.systemFrame(window) else titleBar.refresh()
                 // Which graphics backend draws the window (Metal / Direct3D / OpenGL, or slow software drawing).
                 com.daydreamin.app.platform.Log.i("Window", "drawing with ${window.renderApi}")
+                // --window-shot <file.png> (for checking the real window, title bar and all): a picture of it, then quit.
+                args.indexOf("--window-shot").takeIf { it >= 0 }?.let { args.getOrNull(it + 1) }?.let { file ->
+                    kotlinx.coroutines.delay(14_000)
+                    // Whichever window is showing (the mini player stands in for this one).
+                    val shown = java.awt.Window.getWindows().firstOrNull { it.isShowing } ?: window
+                    runCatching { javax.imageio.ImageIO.write(java.awt.Robot().createScreenCapture(shown.bounds), "png", File(file)) }
+                        .onFailure { com.daydreamin.app.platform.Log.w("Window", "window shot failed", it) }
+                    quit()
+                }
             }
             // On a Mac, the app's menus in the menu bar at the top of the screen. (Their shortcuts are
             // the window's own — listed in tooltips — so menu items carry none, or keys would fire twice.)
             if (System.getProperty("os.name").lowercase().contains("mac")) AppMenuBar()
             CompositionLocalProvider(
                 com.daydreamin.app.desktop.shell.LocalWindowScope provides this,
-                com.daydreamin.app.desktop.shell.LocalTitleBarInset provides WindowChrome.titleBarInset(window),
+                com.daydreamin.app.desktop.shell.LocalTitleBar provides titleBar,
             ) { DaydreaminRoot() }
         }
     }
@@ -172,6 +213,7 @@ internal fun handleShortcut(event: androidx.compose.ui.input.key.KeyEvent): Bool
         event.key == Key.DirectionRight && event.isShiftPressed -> { seekBy(10_000); true }
         event.key == Key.DirectionLeft && event.isShiftPressed -> { seekBy(-10_000); true }
         (event.key == Key.F || event.key == Key.K) && command -> { com.daydreamin.app.ui.navigation.NavCommands.openSearch?.invoke(); true }
+        event.key == Key.L && command -> { com.daydreamin.app.desktop.shell.DesktopUi.toggleLyrics(); true }
         event.key == Key.Comma && command -> { com.daydreamin.app.desktop.shell.DesktopUi.navigator?.go(com.daydreamin.app.desktop.nav.Route.Settings()); true }
         event.key == Key.LeftBracket && command -> com.daydreamin.app.desktop.shell.DesktopUi.navigator?.goBack() ?: false
         event.key == Key.RightBracket && command -> com.daydreamin.app.desktop.shell.DesktopUi.navigator?.goForward() ?: false
@@ -202,6 +244,9 @@ private fun routeFor(name: String): com.daydreamin.app.desktop.nav.Route {
         "profile" -> DRoute.Profile
         "stats" -> DRoute.Stats
         "settings" -> DRoute.Settings()
+        "settings-lyrics" -> DRoute.Settings("LYRICS")
+        "settings-window" -> DRoute.Settings("WINDOW")
+        "settings-shortcuts" -> DRoute.Settings("SHORTCUTS")
         "nowplaying" -> { com.daydreamin.app.desktop.shell.DesktopUi.expanded = true; DRoute.Home }
         // Home's top songs as a collection page (a full list, for checking the song table).
         "picks" -> kotlinx.coroutines.runBlocking {
@@ -223,10 +268,7 @@ fun DaydreaminRoot(startRoute: String = com.daydreamin.app.ui.navigation.Dest.HO
     DaydreaminTheme(accent = accentByName(accentName)) {
         Box(Modifier.fillMaxSize().background(com.daydreamin.app.ui.theme.BgBase)) {
             if (onboarded == true) com.daydreamin.app.desktop.shell.DesktopApp(routeFor(startRoute))
-            // First-run setup is a phone-sized column; on a computer it sits in the middle of the window.
-            if (onboarded == false) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Box(Modifier.widthIn(max = 520.dp).fillMaxHeight()) { OnboardingScreen(onDone = { scope.launch { prefs.setOnboarded() } }) }
-            }
+            if (onboarded == false) com.daydreamin.app.desktop.shell.DesktopOnboarding(onDone = { scope.launch { prefs.setOnboarded() } })
         }
     }
 }
@@ -260,12 +302,56 @@ private fun androidx.compose.ui.window.FrameWindowScope.AppMenuBar() {
             Separator()
             Item("Now Playing", onClick = { ui.toggle(com.daydreamin.app.desktop.shell.PanelTab.NOW_PLAYING) })
             Item("Queue", onClick = { ui.toggle(com.daydreamin.app.desktop.shell.PanelTab.QUEUE) })
-            Item("Lyrics", onClick = { ui.toggle(com.daydreamin.app.desktop.shell.PanelTab.LYRICS) })
+            Item("Lyrics", onClick = { ui.toggleLyrics() })
+            Item("Mini Player", enabled = meta.currentSong != null, onClick = { ui.miniPlayer = true })
             Separator()
             Item("Back", onClick = { ui.navigator?.goBack() })
             Item("Forward", onClick = { ui.navigator?.goForward() })
             Separator()
             Item("Settings…", onClick = { go(DRoute.Settings()) })
         }
+    }
+}
+
+/** Daydreamin in the menu bar (Mac) or notification area: what's playing, the transport, and the way back. */
+@androidx.compose.runtime.Composable
+private fun androidx.compose.ui.window.ApplicationScope.TrayIcon(state: androidx.compose.ui.window.TrayState, onShow: () -> Unit, onMini: () -> Unit, onQuit: () -> Unit) {
+    val player = com.daydreamin.app.player.PlayerController
+    val meta by player.meta.collectAsState()
+    val song = meta.currentSong
+    Tray(
+        icon = painterResource(Res.drawable.splash_logo),
+        state = state,
+        tooltip = song?.let { "${it.title} · ${it.artist}" } ?: "Daydreamin",
+        onAction = onShow,
+        menu = {
+            if (song != null) Item("${song.title} — ${song.artist}".take(60), enabled = false, onClick = {})
+            Item(if (meta.isPlaying) "Pause" else "Play", enabled = song != null, onClick = { player.togglePlayPause() })
+            Item("Next", enabled = song != null, onClick = { player.next() })
+            Item("Previous", enabled = song != null, onClick = { player.previous() })
+            Separator()
+            Item("Show Daydreamin", onClick = onShow)
+            Item("Mini player", enabled = song != null, onClick = onMini)
+            Separator()
+            Item("Quit Daydreamin", onClick = onQuit)
+        },
+    )
+}
+
+/** A notification as each new song starts, while Daydreamin isn't the app in front (Settings → Window & system). */
+@androidx.compose.runtime.Composable
+private fun SongNotifications(tray: androidx.compose.ui.window.TrayState) {
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        com.daydreamin.app.player.PlayerController.meta
+            .map { it.currentSong }
+            .distinctUntilChangedBy { it?.playId }
+            .drop(1)
+            .collect { song ->
+                val settings = com.daydreamin.app.desktop.DesktopSettings
+                val inFront = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().activeWindow != null
+                if (song != null && settings.songNotifications && settings.trayIcon && !inFront) {
+                    tray.sendNotification(androidx.compose.ui.window.Notification(song.title, song.artist, androidx.compose.ui.window.Notification.Type.None))
+                }
+            }
     }
 }
