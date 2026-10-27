@@ -33,6 +33,7 @@ import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -72,7 +73,6 @@ import com.daydreamin.app.desktop.theme.DColors
 import com.daydreamin.app.desktop.theme.DType
 import com.daydreamin.app.ui.components.SongActions
 import com.daydreamin.app.ui.components.Toaster
-import com.daydreamin.app.ui.components.rememberDownload
 import com.daydreamin.app.ui.components.toggleDownload
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
@@ -192,21 +192,27 @@ private object BesideProvider : PopupPositionProvider {
 /**
  * Everything you can do with a song, for its right-click menu and ⋯ button. [onPlay] plays it in
  * its list's context; [extra] adds what only that place can do ("Remove from this playlist").
+ * Cheap: the menu is only built when it opens, from state collected once for the window.
  */
 @Composable
 fun songMenuEntries(song: Song, onPlay: () -> Unit, extra: List<MenuEntry?> = emptyList()): () -> List<MenuEntry?> {
-    val likedIds by AppGraph.prefs.likedIds.collectAsState(initial = emptySet())
-    val playlists by AppGraph.prefs.playlists.collectAsState(initial = emptyList())
-    val download = rememberDownload(song)
-    val scope = rememberCoroutineScope()
-    val nav = LocalNavigator.current
-    var naming by remember { mutableStateOf(false) }
-    if (naming) {
-        com.daydreamin.app.ui.components.NewPlaylistDialog(song, onDismiss = { naming = false }, onCreated = { naming = false })
-    }
-    return {
-        val liked = song.playId in likedIds
-        buildList {
+    val menus = LocalShared.current.menus
+    return { menus.entries(song, onPlay, extra) }
+}
+
+/** Builds song menus from the window's shared state (see [ProvideSharedState]). */
+class SongMenus(
+    private val likedIds: State<Set<String>>,
+    private val playlists: State<List<com.daydreamin.app.data.prefs.Playlist>>,
+    private val downloads: State<Map<String, com.daydreamin.app.data.download.DownloadInfo>>,
+    private val nav: com.daydreamin.app.desktop.nav.Navigator,
+    private val scope: kotlinx.coroutines.CoroutineScope,
+    private val newPlaylistFor: (Song) -> Unit,
+) {
+    fun entries(song: Song, onPlay: () -> Unit, extra: List<MenuEntry?> = emptyList()): List<MenuEntry?> {
+        val liked = song.playId in likedIds.value
+        val download = downloads.value[song.playId]
+        return buildList {
             add(MenuEntry("Play", Icons.Rounded.PlayArrow, onClick = onPlay))
             add(MenuEntry("Play next", Icons.Rounded.SkipNext) { SongActions.playNext(song) })
             add(MenuEntry("Add to queue", Icons.AutoMirrored.Rounded.QueueMusic) { SongActions.addToQueue(song) })
@@ -215,9 +221,9 @@ fun songMenuEntries(song: Song, onPlay: () -> Unit, extra: List<MenuEntry?> = em
             add(
                 MenuEntry("Add to playlist", Icons.AutoMirrored.Rounded.PlaylistAdd, submenu = {
                     buildList {
-                        add(MenuEntry("New playlist…", Icons.Rounded.Add) { naming = true })
-                        if (playlists.isNotEmpty()) add(null)
-                        playlists.forEach { p -> add(MenuEntry(p.name) { SongActions.addToPlaylist(p, song) }) }
+                        add(MenuEntry("New playlist…", Icons.Rounded.Add) { newPlaylistFor(song) })
+                        if (playlists.value.isNotEmpty()) add(null)
+                        playlists.value.forEach { p -> add(MenuEntry(p.name) { SongActions.addToPlaylist(p, song) }) }
                     }
                 }),
             )

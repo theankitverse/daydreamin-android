@@ -54,6 +54,7 @@ import com.daydreamin.app.data.download.DownloadStatus
 import com.daydreamin.app.data.download.Downloads
 import com.daydreamin.app.data.prefs.Playlist
 import com.daydreamin.app.desktop.components.ContextMenuArea
+import com.daydreamin.app.desktop.components.desktopGlass
 import com.daydreamin.app.desktop.components.DIconButton
 import com.daydreamin.app.desktop.components.LocalAccent
 import com.daydreamin.app.desktop.components.MenuEntry
@@ -74,7 +75,7 @@ import kotlinx.coroutines.launch
 /** A panel: the rounded dark surface the sidebar, page and side panel each sit on. */
 @Composable
 fun Panel(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    Box(modifier.clip(RoundedCornerShape(DSize.panelRadius)).background(DColors.panel)) { content() }
+    Box(modifier.desktopGlass(RoundedCornerShape(DSize.panelRadius))) { content() }
 }
 
 /**

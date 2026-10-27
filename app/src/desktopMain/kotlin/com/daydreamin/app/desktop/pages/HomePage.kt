@@ -53,6 +53,9 @@ import com.daydreamin.app.data.model.Song
 import com.daydreamin.app.data.recommend.HomeFeed
 import com.daydreamin.app.desktop.components.CardTile
 import com.daydreamin.app.desktop.components.ContextMenuArea
+import com.daydreamin.app.desktop.components.PlayingBars
+import com.daydreamin.app.desktop.components.rememberIsCurrent
+import com.daydreamin.app.desktop.components.rememberIsPlaying
 import com.daydreamin.app.desktop.components.DIconButton
 import com.daydreamin.app.desktop.components.LocalAccent
 import com.daydreamin.app.desktop.components.SectionHeader
@@ -69,7 +72,6 @@ import com.daydreamin.app.desktop.theme.DSpace
 import com.daydreamin.app.desktop.theme.DType
 import com.daydreamin.app.player.PlayerController
 import com.daydreamin.app.ui.components.Artwork
-import com.daydreamin.app.ui.components.EqualizerBars
 import com.daydreamin.app.ui.components.LikedTile
 import com.daydreamin.app.ui.components.Mosaic
 import com.daydreamin.app.ui.components.PlaylistCover
@@ -305,9 +307,8 @@ private fun SongGrid(title: String, subtitle: String?, songs: List<Song>, onShow
 @Composable
 private fun GridSongRow(song: Song, onPlay: () -> Unit) {
     val (source, hovered) = rememberHover()
-    val meta by PlayerController.meta.collectAsState()
     val accent = LocalAccent.current
-    val isCurrent = meta.currentSong?.playId == song.playId
+    val isCurrent = rememberIsCurrent(song)
     ContextMenuArea(songMenuEntries(song, onPlay = onPlay)) {
         Row(
             Modifier
@@ -325,7 +326,7 @@ private fun GridSongRow(song: Song, onPlay: () -> Unit) {
                 Artwork(url = song.cover.ifBlank { song.artworkUrl }, shape = RoundedCornerShape(4.dp), modifier = Modifier.size(44.dp))
                 if (hovered || isCurrent) {
                     Box(Modifier.size(44.dp).clip(RoundedCornerShape(4.dp)).background(Color.Black.copy(alpha = 0.45f)), contentAlignment = Alignment.Center) {
-                        if (isCurrent && meta.isPlaying && !hovered) EqualizerBars(playing = true, color = accent, modifier = Modifier.size(16.dp))
+                        if (isCurrent && !hovered && rememberIsPlaying()) PlayingBars(accent, Modifier.size(16.dp))
                         else Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
                     }
                 }

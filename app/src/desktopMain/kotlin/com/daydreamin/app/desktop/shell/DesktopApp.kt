@@ -24,15 +24,19 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.daydreamin.app.AppGraph
 import com.daydreamin.app.desktop.components.DesktopScrollbars
+import com.daydreamin.app.desktop.components.ProvideSharedState
+import com.daydreamin.app.desktop.components.WindowBackdrop
 import com.daydreamin.app.desktop.components.LocalAccent
 import com.daydreamin.app.desktop.nav.LocalNavigator
 import com.daydreamin.app.desktop.nav.Navigator
@@ -61,7 +65,7 @@ private val PageMinWidth = 600.dp
 fun DesktopApp(start: Route = Route.Home) {
     val nav = remember { Navigator(start) }
     val accentName by AppGraph.prefs.accentName.collectAsState(initial = "Violet")
-    val meta by PlayerController.meta.collectAsState()
+    val hasSong by remember { derivedStateOf { PlayerController.meta.value.currentSong != null } }
     DisposableEffect(nav) {
         DesktopUi.navigator = nav
         NavCommands.goBack = { nav.goBack() }
@@ -69,15 +73,17 @@ fun DesktopApp(start: Route = Route.Home) {
         onDispose { DesktopUi.navigator = null; NavCommands.goBack = null; NavCommands.openSearch = null }
     }
     CompositionLocalProvider(LocalNavigator provides nav, LocalAccent provides accentByName(accentName)) {
+      ProvideSharedState {
         DesktopScrollbars {
-            BoxWithConstraints(Modifier.fillMaxSize().background(DColors.window)) {
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                WindowBackdrop()
                 val narrowSidebar = maxWidth < WideSidebarFrom
                 val sidebarWidth = if (narrowSidebar) DSize.sidebarNarrow else DSize.sidebarWide
                 // A roomier panel on a big screen.
                 val panelWidth = if (maxWidth >= 1800.dp) 400.dp else DSize.sidePanel
                 val panelFits = maxWidth - sidebarWidth - panelWidth - DSpace.gap * 4 >= PageMinWidth
                 SideEffect { DesktopUi.panelFits = panelFits }
-                val showPanel = panelFits && DesktopUi.panelOpen && meta.currentSong != null
+                val showPanel = panelFits && DesktopUi.panelOpen && hasSong
 
                 Column(Modifier.fillMaxSize()) {
                     TopBar()
@@ -97,17 +103,19 @@ fun DesktopApp(start: Route = Route.Home) {
 
                 // Too narrow for the panel beside the page: it floats over the page when asked for.
                 AnimatedVisibility(
-                    visible = !panelFits && DesktopUi.overlayOpen && meta.currentSong != null,
+                    visible = !panelFits && DesktopUi.overlayOpen && hasSong,
                     enter = fadeIn() + slideInHorizontally { it / 4 },
                     exit = fadeOut() + slideOutHorizontally { it / 4 },
                     modifier = Modifier.align(Alignment.TopEnd).padding(top = DSize.topBarHeight, end = DSpace.gap, bottom = DSize.playerBarHeight),
                 ) {
-                    SidePanel(Modifier.width(DSize.sidePanel).fillMaxHeight().shadow(24.dp, RoundedCornerShape(DSize.panelRadius)))
+                    // Over the page it needs a solid base, or the page would show through its glass.
+                    SidePanel(Modifier.width(DSize.sidePanel).fillMaxHeight().shadow(24.dp, RoundedCornerShape(DSize.panelRadius)).background(Color(0xFF0B0B10), RoundedCornerShape(DSize.panelRadius)))
                 }
 
                 ToastHost(Modifier.align(Alignment.BottomCenter).padding(bottom = DSize.playerBarHeight + 12.dp), onOpenDownloads = { nav.go(Route.Downloads) })
             }
         }
+      }
     }
 }
 

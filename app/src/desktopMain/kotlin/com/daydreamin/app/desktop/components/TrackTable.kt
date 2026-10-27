@@ -58,7 +58,6 @@ import com.daydreamin.app.desktop.theme.DType
 import com.daydreamin.app.player.PlayerController
 import com.daydreamin.app.ui.components.Artwork
 import com.daydreamin.app.ui.components.DownloadedMark
-import com.daydreamin.app.ui.components.EqualizerBars
 import com.daydreamin.app.ui.components.SongActions
 
 enum class SortBy { NONE, TITLE, ARTIST, ALBUM, DURATION }
@@ -180,11 +179,9 @@ fun TrackRow(
     onPlay: () -> Unit,
     extraMenu: List<MenuEntry?> = emptyList(),
 ) {
-    val meta by PlayerController.meta.collectAsState()
-    val likedIds by AppGraph.prefs.likedIds.collectAsState(initial = emptySet())
     val accent = LocalAccent.current
-    val isCurrent = meta.currentSong?.playId == song.playId
-    val liked = song.playId in likedIds
+    val isCurrent = rememberIsCurrent(song)
+    val liked = rememberLiked(song)
     val source = remember { MutableInteractionSource() }
     val hovered by source.collectIsHoveredAsState()
     var menuOpen by remember { mutableStateOf(false) }
@@ -217,7 +214,7 @@ fun TrackRow(
                         tint = Color.White,
                         modifier = Modifier.size(20.dp).pointerHoverIcon(PointerIcon.Hand).combinedClickable(onClick = onPlay),
                     )
-                    isCurrent && meta.isPlaying -> EqualizerBars(playing = true, color = accent, modifier = Modifier.size(14.dp))
+                    isCurrent && rememberIsPlaying() -> PlayingBars(accent)
                     else -> Text("${index + 1}", style = DType.numeric.copy(color = if (isCurrent) accent else DType.numeric.color), textAlign = TextAlign.Center)
                 }
             }

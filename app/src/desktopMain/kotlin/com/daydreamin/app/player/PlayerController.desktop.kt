@@ -134,7 +134,8 @@ actual object PlayerController {
         if (request != playRequest) { loaded.deck.close(); return }
         consecutiveFailures = 0
         engine.play(loaded.deck)
-        _meta.update { it.copy(streamQuality = loaded.quality, isPlaying = true) }
+        // Loaded: from here the engine itself reports any wait for audio (a slow connection).
+        _meta.update { it.copy(streamQuality = loaded.quality, isPlaying = true, isBuffering = false) }
         _progress.update { it.copy(durationMs = loaded.deck.durationMs) }
 
         if (queue.isEmpty() && autoFillQueue) {
@@ -304,7 +305,7 @@ actual object PlayerController {
         val loaded = load(song, position, request) ?: return
         if (request != playRequest) { loaded.deck.close(); return }
         engine.play(loaded.deck)
-        _meta.update { it.copy(error = null, streamQuality = loaded.quality, isPlaying = true) }
+        _meta.update { it.copy(error = null, streamQuality = loaded.quality, isPlaying = true, isBuffering = false) }
         prepareNext()
     }
 

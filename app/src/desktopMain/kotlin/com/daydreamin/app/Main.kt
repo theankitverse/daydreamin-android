@@ -96,16 +96,16 @@ fun main(args: Array<String>) {
     if (AppInfo.versionCode > 0) com.daydreamin.app.data.update.UpdateChecker.start(AppGraph.prefs, AppGraph.appScope)
     AppGraph.startHomeFeed()
 
+    // --play "<search>" (for development): starts with something playing.
+    args.indexOf("--play").takeIf { it >= 0 }?.let { args.getOrNull(it + 1) }?.let { query ->
+        kotlinx.coroutines.runBlocking {
+            YouTubeExtractorService.search(query, limit = 1).firstOrNull()?.let { com.daydreamin.app.player.PlayerController.playSong(it.toSong()) }
+        }
+    }
     val snapshotDir = args.indexOf("--snapshot").takeIf { it >= 0 }?.let { args.getOrNull(it + 1) }
     if (snapshotDir != null) {
         // --onboarded: skip first-run setup, to see Home and the rest with whatever library is here.
         if ("--onboarded" in args) kotlinx.coroutines.runBlocking { AppGraph.prefs.setOnboarded() }
-        // --play "<search>": something playing, to see the player bar and Now Playing.
-        args.indexOf("--play").takeIf { it >= 0 }?.let { args.getOrNull(it + 1) }?.let { query ->
-            kotlinx.coroutines.runBlocking {
-                YouTubeExtractorService.search(query, limit = 1).firstOrNull()?.let { com.daydreamin.app.player.PlayerController.playSong(it.toSong()) }
-            }
-        }
         // --pages home,settings,now_playing (routes; default: home)
         val pages = args.indexOf("--pages").takeIf { it >= 0 }?.let { args.getOrNull(it + 1) }?.split(',') ?: listOf("home")
         saveSnapshots(File(snapshotDir), pages, quick = "--quick" in args) { page -> DaydreaminRoot(startRoute = page) }
@@ -136,6 +136,8 @@ fun main(args: Array<String>) {
                 // Small enough for half a laptop screen; below this the layout would have to drop things.
                 window.minimumSize = java.awt.Dimension(720, 520)
                 WindowChrome.applyDarkTitleBar(window)
+                // Which graphics backend draws the window (Metal / Direct3D / OpenGL, or slow software drawing).
+                com.daydreamin.app.platform.Log.i("Window", "drawing with ${window.renderApi}")
             }
             CompositionLocalProvider(
                 com.daydreamin.app.desktop.shell.LocalWindowScope provides this,
