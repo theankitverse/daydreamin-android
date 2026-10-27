@@ -33,6 +33,9 @@ object DesktopUi {
 
     var navigator: Navigator? = null
 
+    /** Now playing filling the window: big artwork beside the lyrics. */
+    var expanded by mutableStateOf(false)
+
     /** Shows [tab]; showing the one already open closes the panel. */
     fun toggle(tab: PanelTab) {
         val showing = if (panelFits) panelOpen else overlayOpen

@@ -150,7 +150,7 @@ private fun NowPlayingView(song: Song, queue: List<Song>) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(song.title, style = DType.section.copy(fontSize = 20.sp), maxLines = 2, overflow = TextOverflow.Ellipsis)
-                LinkText(song.artist, DType.body) { nav.go(Route.Search(song.artist)) }
+                LinkText(song.artist, DType.body) { nav.go(Route.Artist(com.daydreamin.app.data.recommend.Recommender.primaryArtist(song.artist))) }
             }
             DIconButton(if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, if (liked) "Remove from Liked songs" else "Save to Liked songs", { SongActions.toggleLiked(song, liked) }, tint = if (liked) accent else null)
             Box {
@@ -256,7 +256,7 @@ private fun QueueRow(song: Song, onPlay: () -> Unit, onRemove: (() -> Unit)?, on
 }
 
 @Composable
-private fun LyricsView(song: Song) {
+internal fun LyricsView(song: Song) {
     val vm: LyricsViewModel = composeViewModel { LyricsViewModel() }
     val state by vm.state.collectAsState()
     val progress = PlayerController.progress.collectAsState()

@@ -98,16 +98,16 @@ private fun NowPlayingInfo() {
     val nav = LocalNavigator.current
     ContextMenuArea(songMenuEntries(song, onPlay = { PlayerController.togglePlayPause() })) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            WithTooltip("Show Now playing") {
+            WithTooltip(if (DesktopUi.expanded) "Back to the app" else "Full-window Now playing") {
                 Artwork(
                     url = song.cover.ifBlank { song.artworkUrl },
                     shape = RoundedCornerShape(6.dp),
-                    modifier = Modifier.size(56.dp).pointerHoverIcon(PointerIcon.Hand).clickable { DesktopUi.open(PanelTab.NOW_PLAYING) },
+                    modifier = Modifier.size(56.dp).pointerHoverIcon(PointerIcon.Hand).clickable { DesktopUi.expanded = !DesktopUi.expanded },
                 )
             }
             Column(Modifier.padding(start = 12.dp).weight(1f, fill = false)) {
                 LinkText(song.title, DType.itemTitleStrong) { DesktopUi.open(PanelTab.NOW_PLAYING) }
-                LinkText(song.artist, DType.itemSubtitle) { nav.go(Route.Search(song.artist)) }
+                LinkText(song.artist, DType.itemSubtitle) { nav.go(Route.Artist(com.daydreamin.app.data.recommend.Recommender.primaryArtist(song.artist))) }
             }
             Spacer(Modifier.width(8.dp))
             DIconButton(

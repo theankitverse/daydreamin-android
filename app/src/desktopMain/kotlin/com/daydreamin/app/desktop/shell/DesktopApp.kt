@@ -93,7 +93,8 @@ fun DesktopApp(start: Route = Route.Home) {
 
                 Column(Modifier.fillMaxSize()) {
                     TopBar()
-                    Row(Modifier.weight(1f).fillMaxWidth().padding(horizontal = DSpace.gap)) {
+                    if (DesktopUi.expanded && hasSong) FullNowPlaying(Modifier.weight(1f))
+                    else Row(Modifier.weight(1f).fillMaxWidth().padding(horizontal = DSpace.gap)) {
                         Sidebar(narrowSidebar, sidebarWidth)
                         Spacer(Modifier.width(DSpace.gap))
                         Panel(Modifier.weight(1f).fillMaxHeight()) {

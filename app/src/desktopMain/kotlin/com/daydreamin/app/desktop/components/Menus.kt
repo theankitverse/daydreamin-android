@@ -239,7 +239,7 @@ class SongMenus(
                 ) { toggleDownload(song, download, scope) },
             )
             add(null)
-            add(MenuEntry("Go to artist", Icons.Rounded.Person) { nav.go(Route.Search(song.artist)) })
+            add(MenuEntry("Go to artist", Icons.Rounded.Person) { nav.go(Route.Artist(com.daydreamin.app.data.recommend.Recommender.primaryArtist(song.artist))) })
             song.videoId?.takeIf { it.isNotBlank() }?.let { id ->
                 add(MenuEntry("Copy song link", Icons.Rounded.Link) {
                     runCatching { Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection("https://music.youtube.com/watch?v=$id"), null) }
