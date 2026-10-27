@@ -135,6 +135,8 @@ class AudioEngine(private val listener: EngineListener) {
     @Volatile private var eqChanged = true
     /** "Loudness boost": +3 dB, with a soft limiter so peaks round off instead of clipping. */
     @Volatile var boost = false
+    /** Output level, 0–1, as a gain (the player maps the slider onto a curve that sounds even). */
+    @Volatile var volume = 1f
 
     private val a = ShortArray(STEP_FRAMES * CHANNELS)
     private val b = ShortArray(STEP_FRAMES * CHANNELS)
@@ -336,7 +338,7 @@ class AudioEngine(private val listener: EngineListener) {
                 val i = f * CHANNELS + c
                 var x = buf[i]
                 for (filter in fs) x = filter.process(x, c)
-                buf[i] = softLimit(x * gain)
+                buf[i] = softLimit(x * gain) * volume
             }
         }
     }

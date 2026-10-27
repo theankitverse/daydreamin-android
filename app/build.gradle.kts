@@ -126,6 +126,9 @@ kotlin {
             implementation("androidx.core:core-splashscreen:1.0.1")
         }
         val desktopMain by getting {
+            // The desktop interface uses Compose's desktop click/hover APIs (double-click, right-click).
+            languageSettings.optIn("androidx.compose.foundation.ExperimentalFoundationApi")
+            languageSettings.optIn("androidx.compose.ui.ExperimentalComposeUiApi")
             dependencies {
                 implementation(compose.desktop.currentOs)
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.9.0")

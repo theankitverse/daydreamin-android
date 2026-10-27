@@ -68,6 +68,21 @@ actual object PlayerController {
 
     private val json = Json { ignoreUnknownKeys = true }
 
+    // ---- volume (desktop only: phones have their own volume buttons)
+
+    private val settings = java.util.prefs.Preferences.userRoot().node("daydreamin")
+    private val _volume = MutableStateFlow(settings.getFloat("volume", 1f).coerceIn(0f, 1f))
+    /** The volume slider's position, 0–1. */
+    val volume: StateFlow<Float> = _volume
+
+    fun setVolume(level: Float) {
+        val v = level.coerceIn(0f, 1f)
+        _volume.value = v
+        // Loudness is heard on a curve: squaring the slider makes its middle sound like the middle.
+        engine.volume = v * v
+        settings.putFloat("volume", v)
+    }
+
     actual fun ensureConnected() {
         scope.launch {
             if (started) return@launch
@@ -76,6 +91,7 @@ actual object PlayerController {
             launch { prefs.crossfadeSeconds.collect { engine.crossfadeMs = it * 1000L } }
             launch { prefs.equalizerPreset.collect { engine.eqPreset = EqPreset.fromLabel(it) } }
             launch { prefs.audioNormalization.collect { engine.boost = it } }
+            engine.volume = _volume.value * _volume.value
             restore()
             tick()
         }

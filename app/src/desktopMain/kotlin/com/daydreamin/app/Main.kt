@@ -3,6 +3,7 @@ package com.daydreamin.app
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
@@ -33,6 +34,8 @@ import com.daydreamin.app.ui.navigation.AppNavHost
 import com.daydreamin.app.ui.screens.onboarding.OnboardingScreen
 import com.daydreamin.app.ui.theme.DaydreaminTheme
 import com.daydreamin.app.ui.theme.accentByName
+import kotlinx.coroutines.flow.first
+import com.daydreamin.app.desktop.nav.Route as DRoute
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 import java.io.File
@@ -129,9 +132,15 @@ fun main(args: Array<String>) {
             state = windowState,
             onKeyEvent = ::handleShortcut,
         ) {
-            // Narrower than a phone, the phone layout itself would start to squeeze.
-            androidx.compose.runtime.LaunchedEffect(Unit) { window.minimumSize = java.awt.Dimension(380, 560) }
-            DaydreaminRoot()
+            androidx.compose.runtime.LaunchedEffect(Unit) {
+                // Small enough for half a laptop screen; below this the layout would have to drop things.
+                window.minimumSize = java.awt.Dimension(720, 520)
+                WindowChrome.applyDarkTitleBar(window)
+            }
+            CompositionLocalProvider(
+                com.daydreamin.app.desktop.shell.LocalWindowScope provides this,
+                com.daydreamin.app.desktop.shell.LocalTitleBarInset provides WindowChrome.titleBarInset(window),
+            ) { DaydreaminRoot() }
         }
     }
 }
@@ -150,7 +159,9 @@ internal fun handleShortcut(event: androidx.compose.ui.input.key.KeyEvent): Bool
         event.key == Key.DirectionLeft && command -> { player.previous(); true }
         event.key == Key.DirectionRight && event.isShiftPressed -> { seekBy(10_000); true }
         event.key == Key.DirectionLeft && event.isShiftPressed -> { seekBy(-10_000); true }
-        event.key == Key.F && command -> { com.daydreamin.app.ui.navigation.NavCommands.openSearch?.invoke(); true }
+        (event.key == Key.F || event.key == Key.K) && command -> { com.daydreamin.app.ui.navigation.NavCommands.openSearch?.invoke(); true }
+        event.key == Key.LeftBracket && command -> com.daydreamin.app.desktop.shell.DesktopUi.navigator?.goBack() ?: false
+        event.key == Key.RightBracket && command -> com.daydreamin.app.desktop.shell.DesktopUi.navigator?.goForward() ?: false
         event.key == Key.Escape -> com.daydreamin.app.platform.DesktopBack.handle()
         else -> false
     }
@@ -164,6 +175,23 @@ private fun seekBy(deltaMs: Long) {
     player.seekTo(target)
 }
 
+/** A page by name, for --snapshot --pages (home, liked, playlist, downloads, history, search, library). */
+private fun routeFor(name: String): com.daydreamin.app.desktop.nav.Route {
+    return when (name) {
+        "liked" -> DRoute.Liked
+        "downloads" -> DRoute.Downloads
+        "history" -> DRoute.History
+        "library" -> DRoute.Library
+        "search" -> DRoute.Search()
+        // Home's top songs as a collection page (a full list, for checking the song table).
+        "picks" -> kotlinx.coroutines.runBlocking {
+            kotlinx.coroutines.withTimeoutOrNull(20_000) { AppGraph.homeFeed.feed.first { it != null } }
+        }?.let { DRoute.Collection("Top songs", "Daydreamin", it.topPicks + it.shelves.flatMap { s -> s.songs }.take(10), "Playlist") } ?: DRoute.Home
+        "playlist" -> kotlinx.coroutines.runBlocking { AppGraph.prefs.playlists.first().firstOrNull() }?.let { DRoute.Playlist(it.id) } ?: DRoute.Liked
+        else -> DRoute.Home
+    }
+}
+
 /** The whole app: first-run setup until it's done, then Home and everything reachable from it. */
 @androidx.compose.runtime.Composable
 fun DaydreaminRoot(startRoute: String = com.daydreamin.app.ui.navigation.Dest.HOME) {
@@ -174,7 +202,7 @@ fun DaydreaminRoot(startRoute: String = com.daydreamin.app.ui.navigation.Dest.HO
     val scope = rememberCoroutineScope()
     DaydreaminTheme(accent = accentByName(accentName)) {
         Box(Modifier.fillMaxSize().background(com.daydreamin.app.ui.theme.BgBase)) {
-            if (onboarded == true) AppNavHost(startRoute)
+            if (onboarded == true) com.daydreamin.app.desktop.shell.DesktopApp(routeFor(startRoute))
             if (onboarded == false) OnboardingScreen(onDone = { scope.launch { prefs.setOnboarded() } })
         }
     }

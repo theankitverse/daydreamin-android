@@ -26,12 +26,12 @@ fun saveSnapshots(dir: File, pages: List<String>, quick: Boolean = false, conten
     dir.mkdirs()
     // Drawing off-screen happens on the CPU (no graphics card), which is slow on small build machines:
     // --quick draws one desktop-size picture per page at 1x instead of three sizes at 2x.
-    val sizes = if (quick) listOf("desktop" to (1280 to 820)) else listOf("phone" to (400 to 860), "desktop" to (1280 to 820), "wide" to (1720 to 980))
+    val sizes = if (quick) listOf("desktop" to (1280 to 820)) else listOf("900x600" to (900 to 600), "1280x800" to (1280 to 800), "1920x1080" to (1920 to 1080), "2560x1440" to (2560 to 1440))
     for (page in pages) {
         for ((name, size) in sizes) {
             val file = File(dir, "${page.replace('/', '_')}-$name.png")
             val started = System.currentTimeMillis()
-            renderOffscreen(file, size.first, size.second, settleMs = if (quick) 6_000 else 9_000, density = if (quick) 1f else 2f) { content(page) }
+            renderOffscreen(file, size.first, size.second, settleMs = if (quick) 6_000 else 8_000, density = 1f) { content(page) }
             println("snapshot: ${file.absolutePath} (${(System.currentTimeMillis() - started) / 1000}s)")
         }
     }
