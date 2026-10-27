@@ -131,6 +131,8 @@ private fun SearchBox(modifier: Modifier) {
     val focus = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
     val (source, hovered) = rememberHover()
+    // The same one the Search page shows results from: Enter saves the search to your history.
+    val searchVm: com.daydreamin.app.ui.screens.search.SearchViewModel = androidx.lifecycle.viewmodel.compose.viewModel { com.daydreamin.app.ui.screens.search.SearchViewModel() }
     LaunchedEffect(DesktopUi.focusSearch) { if (DesktopUi.focusSearch > 0) runCatching { focus.requestFocus() } }
     // Leaving the search page (or arriving with a query, "Go to artist") keeps the box in step.
     LaunchedEffect(current) {
@@ -162,7 +164,7 @@ private fun SearchBox(modifier: Modifier) {
                 textStyle = DType.body.copy(color = Color.White),
                 cursorBrush = SolidColor(Color.White),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
+                keyboardActions = KeyboardActions(onSearch = { searchVm.commitSearch(); focusManager.clearFocus() }),
                 modifier = Modifier
                     .fillMaxWidth()
                     .focusRequester(focus)

@@ -20,6 +20,10 @@ sealed interface Route {
     data class Collection(val title: String, val subtitle: String?, val songs: List<Song>, val kind: String = "Collection") : Route
     /** A mood from Home: its songs are looked up when it opens. */
     data class Mood(val title: String, val query: String) : Route
+    /** An artist's songs, looked up when it opens. */
+    data class Artist(val name: String) : Route
+    /** A YouTube playlist from Search: its tracks are loaded when it opens. */
+    data class YtPlaylist(val url: String, val title: String, val author: String, val thumbnail: String) : Route
     data object Profile : Route
     data object Stats : Route
 }

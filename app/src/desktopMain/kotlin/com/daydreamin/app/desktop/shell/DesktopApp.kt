@@ -43,6 +43,7 @@ import com.daydreamin.app.desktop.nav.Navigator
 import com.daydreamin.app.desktop.nav.Route
 import com.daydreamin.app.desktop.pages.CollectionPage
 import com.daydreamin.app.desktop.pages.HomePage
+import com.daydreamin.app.desktop.pages.SearchPage
 import com.daydreamin.app.desktop.theme.DColors
 import com.daydreamin.app.desktop.theme.DSize
 import com.daydreamin.app.desktop.theme.DSpace
@@ -91,7 +92,8 @@ fun DesktopApp(start: Route = Route.Home) {
                         Sidebar(narrowSidebar, sidebarWidth)
                         Spacer(Modifier.width(DSpace.gap))
                         Panel(Modifier.weight(1f).fillMaxHeight()) {
-                            key(nav.current) { Page(nav.current) }
+                            // Typing a search replaces the route on every key; the page itself stays.
+                            key(if (nav.current is Route.Search) "search" else nav.current) { Page(nav.current) }
                         }
                         if (showPanel) {
                             Spacer(Modifier.width(DSpace.gap))
@@ -123,8 +125,8 @@ fun DesktopApp(start: Route = Route.Home) {
 private fun Page(route: Route) {
     when (route) {
         Route.Home -> HomePage()
-        Route.Liked, Route.Downloads, Route.History, is Route.Playlist, is Route.Collection, is Route.Mood -> CollectionPage(route)
-        is Route.Search -> Placeholder("Search", "Search results are the next step of the redesign.")
+        Route.Liked, Route.Downloads, Route.History, is Route.Playlist, is Route.Collection, is Route.Mood, is Route.Artist, is Route.YtPlaylist -> CollectionPage(route)
+        is Route.Search -> SearchPage(route.query)
         Route.Library -> Placeholder("Your Library", "The full Library page is the next step of the redesign.")
         Route.Profile -> Placeholder("Profile", "The Profile page is the next step of the redesign.")
         Route.Stats -> Placeholder("Your stats", "The Statistics page is the next step of the redesign.")

@@ -1,5 +1,8 @@
 package com.daydreamin.app.desktop.shell
 
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -230,16 +233,17 @@ private fun QueueRow(song: Song, onPlay: () -> Unit, onRemove: (() -> Unit)?, on
 private fun LyricsView(song: Song) {
     val vm: LyricsViewModel = composeViewModel { LyricsViewModel() }
     val state by vm.state.collectAsState()
-    val progress by PlayerController.progress.collectAsState()
+    val progress = PlayerController.progress.collectAsState()
     LaunchedEffect(song.playId) { vm.load(song.artist, song.title) }
     val lines = state.syncedLines
-    val active = lines.indexOfLast { it.timeMs <= progress.positionMs + 250 }
+    // Only the line changing redraws the lyrics, not every tick of the clock.
+    val active by remember(lines) { derivedStateOf { lines.indexOfLast { it.timeMs <= progress.value.positionMs + 250 } } }
     val list = rememberLazyListState()
     LaunchedEffect(active) { if (active >= 0) list.animateScrollToItem((active - 2).coerceAtLeast(0)) }
     Box(Modifier.fillMaxSize()) {
         when {
             state.loading -> Text("Finding the lyrics…", style = DType.body, modifier = Modifier.align(Alignment.Center))
-            lines.isNotEmpty() -> LazyColumn(state = list, modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp), contentPadding = PaddingValues(top = 12.dp, bottom = 200.dp)) {
+            lines.isNotEmpty() -> LazyColumn(state = list, modifier = Modifier.fillMaxSize().fadeEdges().padding(horizontal = 20.dp), contentPadding = PaddingValues(top = 24.dp, bottom = 200.dp)) {
                 itemsIndexed(lines) { i, line ->
                     val (source, hovered) = rememberHover()
                     val color = when {
@@ -268,6 +272,18 @@ private fun LyricsView(song: Song) {
         }
     }
 }
+
+/** Lines fade out at the top and bottom of the lyrics instead of being cut off. */
+private fun Modifier.fadeEdges() = this
+    .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+    .drawWithContent {
+        drawContent()
+        val edge = 40.dp.toPx() / size.height
+        drawRect(
+            Brush.verticalGradient(0f to Color.Transparent, edge to Color.Black, 1f - edge to Color.Black, 1f to Color.Transparent),
+            blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
+        )
+    }
 
 @OptIn(ExperimentalFoundationApi::class)
 private fun Modifier.combinedClickableNoIndication(onClick: () -> Unit) = this.then(

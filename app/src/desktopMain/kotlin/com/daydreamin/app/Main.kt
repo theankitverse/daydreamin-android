@@ -179,12 +179,17 @@ private fun seekBy(deltaMs: Long) {
 
 /** A page by name, for --snapshot --pages (home, liked, playlist, downloads, history, search, library). */
 private fun routeFor(name: String): com.daydreamin.app.desktop.nav.Route {
+    // search=<query>, artist=<name>: a page with something in it.
+    if (name.startsWith("search=")) return DRoute.Search(name.removePrefix("search="))
+    if (name.startsWith("artist=")) return DRoute.Artist(name.removePrefix("artist="))
     return when (name) {
         "liked" -> DRoute.Liked
         "downloads" -> DRoute.Downloads
         "history" -> DRoute.History
         "library" -> DRoute.Library
         "search" -> DRoute.Search()
+        "profile" -> DRoute.Profile
+        "stats" -> DRoute.Stats
         // Home's top songs as a collection page (a full list, for checking the song table).
         "picks" -> kotlinx.coroutines.runBlocking {
             kotlinx.coroutines.withTimeoutOrNull(20_000) { AppGraph.homeFeed.feed.first { it != null } }

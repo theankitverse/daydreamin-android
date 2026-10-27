@@ -36,7 +36,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -103,12 +105,12 @@ fun HomePage() {
     val history by vm.history.collectAsState()
     val liked by vm.liked.collectAsState()
     val playlists by vm.playlists.collectAsState()
-    val meta by PlayerController.meta.collectAsState()
+    val shared = com.daydreamin.app.desktop.components.LocalShared.current
     val nav = LocalNavigator.current
     val lead = feed?.let { it.mix.ifEmpty { it.topPicks } }?.firstOrNull()
     val light = rememberArtworkLight(lead?.let { it.cover.ifBlank { it.artworkUrl } }, DefaultPageLight)
     val state = rememberLazyListState()
-    val playingId = meta.currentSong?.playId.takeIf { meta.isPlaying }
+    val playingId by remember { derivedStateOf { shared.meta.value.let { m -> m.currentSong?.playId.takeIf { m.isPlaying } } } }
 
     Box(Modifier.fillMaxSize()) {
         PageGlow(light)
@@ -340,7 +342,7 @@ private fun GridSongRow(song: Song, onPlay: () -> Unit) {
 }
 
 @Composable
-private fun SongCard(song: Song, list: List<Song>, playingId: String?, modifier: Modifier) {
+internal fun SongCard(song: Song, list: List<Song>, playingId: String?, modifier: Modifier) {
     val index = list.indexOf(song).coerceAtLeast(0)
     CardTile(
         title = song.title,
@@ -354,7 +356,7 @@ private fun SongCard(song: Song, list: List<Song>, playingId: String?, modifier:
 }
 
 @Composable
-private fun MoodTile(title: String, color: Color, modifier: Modifier, onClick: () -> Unit) {
+internal fun MoodTile(title: String, color: Color, modifier: Modifier, onClick: () -> Unit) {
     val (source, hovered) = rememberHover()
     Box(
         modifier

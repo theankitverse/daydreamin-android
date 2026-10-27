@@ -1,5 +1,11 @@
 package com.daydreamin.app.desktop.pages
 
+import androidx.compose.runtime.produceState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.rounded.Bookmark
+import androidx.compose.material.icons.rounded.BookmarkBorder
+import androidx.compose.material.icons.rounded.Person
+import com.daydreamin.app.ui.components.Artwork
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -93,6 +99,9 @@ private class Collection(
     val art: @Composable (Dp) -> Unit,
     val playlistId: String? = null,
     val emptyText: String = "Nothing here yet.",
+    /** A YouTube playlist: can be saved to your library. */
+    val sourceUrl: String? = null,
+    val coverUrl: String? = null,
 )
 
 /**
@@ -189,6 +198,16 @@ private fun ActionRow(c: Collection, shown: List<Song>, playingThis: Boolean, fi
                 DIconButton(if (downloadLiked) Icons.Rounded.DownloadDone else Icons.Rounded.Download, if (downloadLiked) "Stop keeping liked songs downloaded" else "Download liked songs", { scope.launch { AppGraph.prefs.setDownloadLiked(!downloadLiked) } }, size = 40.dp, iconSize = 24.dp, active = downloadLiked, activeColor = com.daydreamin.app.desktop.components.LocalAccent.current)
             }
         }
+        if (c.sourceUrl != null) {
+            val library by AppGraph.prefs.playlists.collectAsState(initial = emptyList())
+            val saved = library.any { it.sourceUrl == c.sourceUrl }
+            DIconButton(
+                if (saved) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
+                if (saved) "In your library" else "Save to your library",
+                { if (!saved && shown.isNotEmpty()) SongActions.savePlaylist(c.title, shown, c.sourceUrl, c.owner, c.coverUrl) },
+                size = 40.dp, iconSize = 24.dp, active = saved, activeColor = com.daydreamin.app.desktop.components.LocalAccent.current,
+            )
+        }
         if (c.playlistId != null) {
             Box {
                 DIconButton(Icons.Rounded.MoreHoriz, "More options for ${c.title}", { menuOpen = true }, size = 40.dp, iconSize = 26.dp)
@@ -254,6 +273,19 @@ private fun collectionFor(route: Route): Collection {
             LaunchedEffect(route) { vm.openMood(MoodCard(route.title, route.query, 0xFF8B7CF6)) }
             val songs = browse?.takeIf { it.mood.title == route.title && !it.loading }?.songs
             Collection("Mood", route.title, "Songs for this mood", songs, { s -> songs?.let { Mosaic(it, s) } ?: IconTile(Icons.Rounded.Shuffle, s) }, emptyText = browse?.error ?: "Nothing found for this mood right now.")
+        }
+        is Route.Artist -> {
+            val songs by produceState<List<Song>?>(null, route) {
+                val all = AppGraph.repository.smartSearch(route.name).getOrDefault(emptyList())
+                val name = route.name.trim().lowercase()
+                // Their own songs first; if the search found none credited to them, what it found.
+                value = all.filter { name in it.artist.lowercase() }.ifEmpty { all }
+            }
+            Collection("Artist", route.name, null, songs, { s -> songs?.firstOrNull()?.let { Artwork(url = it.cover.ifBlank { it.artworkUrl }, shape = CircleShape, modifier = Modifier.size(s)) } ?: IconTile(Icons.Rounded.Person, s) }, emptyText = "Couldn’t find songs by ${route.name} right now.")
+        }
+        is Route.YtPlaylist -> {
+            val songs by produceState<List<Song>?>(null, route) { value = AppGraph.repository.playlistTracks(route.url).getOrDefault(emptyList()) }
+            Collection("Playlist", route.title, route.author, songs, { s -> Artwork(url = route.thumbnail, shape = RoundedCornerShape(6.dp), modifier = Modifier.size(s)) }, emptyText = "Couldn’t open this playlist right now.", sourceUrl = route.url, coverUrl = route.thumbnail)
         }
         else -> Collection("", "", null, emptyList(), { })
     }
