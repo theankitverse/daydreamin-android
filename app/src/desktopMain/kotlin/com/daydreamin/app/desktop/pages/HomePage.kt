@@ -109,12 +109,15 @@ fun HomePage() {
     val nav = LocalNavigator.current
     val lead = feed?.let { it.mix.ifEmpty { it.topPicks } }?.firstOrNull()
     val light = rememberArtworkLight(lead?.let { it.cover.ifBlank { it.artworkUrl } }, DefaultPageLight)
+    val update by com.daydreamin.app.data.update.UpdateChecker.state.collectAsState()
     val state = rememberLazyListState()
     val playingId by remember { derivedStateOf { shared.meta.value.let { m -> m.currentSong?.playId.takeIf { m.isPlaying } } } }
 
     Box(Modifier.fillMaxSize()) {
         PageGlow(light)
         LazyColumn(state = state, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 20.dp, bottom = 40.dp), verticalArrangement = Arrangement.spacedBy(DSpace.sectionGap)) {
+            // A newer desktop version has been published: the same card the phone shows, installing in place.
+            if (update.status == com.daydreamin.app.data.update.UpdateStatus.AVAILABLE) item(key = "update") { com.daydreamin.app.ui.components.UpdateBanner(Modifier.padding(horizontal = DSpace.pagePad - 16.dp)) }
             item(key = "greeting") {
                 Column(Modifier.padding(horizontal = DSpace.pagePad)) {
                     Text(greeting(), style = DType.pageTitle)

@@ -162,6 +162,7 @@ internal fun handleShortcut(event: androidx.compose.ui.input.key.KeyEvent): Bool
         event.key == Key.DirectionRight && event.isShiftPressed -> { seekBy(10_000); true }
         event.key == Key.DirectionLeft && event.isShiftPressed -> { seekBy(-10_000); true }
         (event.key == Key.F || event.key == Key.K) && command -> { com.daydreamin.app.ui.navigation.NavCommands.openSearch?.invoke(); true }
+        event.key == Key.Comma && command -> { com.daydreamin.app.desktop.shell.DesktopUi.navigator?.go(com.daydreamin.app.desktop.nav.Route.Settings()); true }
         event.key == Key.LeftBracket && command -> com.daydreamin.app.desktop.shell.DesktopUi.navigator?.goBack() ?: false
         event.key == Key.RightBracket && command -> com.daydreamin.app.desktop.shell.DesktopUi.navigator?.goForward() ?: false
         event.key == Key.Escape -> com.daydreamin.app.platform.DesktopBack.handle()
@@ -190,6 +191,7 @@ private fun routeFor(name: String): com.daydreamin.app.desktop.nav.Route {
         "search" -> DRoute.Search()
         "profile" -> DRoute.Profile
         "stats" -> DRoute.Stats
+        "settings" -> DRoute.Settings()
         // Home's top songs as a collection page (a full list, for checking the song table).
         "picks" -> kotlinx.coroutines.runBlocking {
             kotlinx.coroutines.withTimeoutOrNull(20_000) { AppGraph.homeFeed.feed.first { it != null } }

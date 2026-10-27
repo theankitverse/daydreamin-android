@@ -75,10 +75,6 @@ val LocalWindowScope = staticCompositionLocalOf<WindowScope?> { null }
 /** Room to leave for the Mac's window buttons, drawn over the app's own top bar. */
 val LocalTitleBarInset = staticCompositionLocalOf { 0.dp }
 
-/** Opens Settings (its own window). Set by the app. */
-var openSettings: () -> Unit = {}
-/** Opens Theme, set by the app. */
-var openTheme: () -> Unit = {}
 
 @Composable
 fun TopBar(modifier: Modifier = Modifier) {
@@ -196,9 +192,9 @@ private fun ProfileButton() {
             listOf(
                 MenuEntry("Profile", Icons.Rounded.Person) { nav.go(Route.Profile) },
                 MenuEntry("Your stats", Icons.Rounded.BarChart) { nav.go(Route.Stats) },
-                MenuEntry("Theme", Icons.Rounded.Palette) { openTheme() },
+                MenuEntry("Theme", Icons.Rounded.Palette) { nav.go(Route.Settings("APPEARANCE")) },
                 null,
-                MenuEntry("Settings", Icons.Rounded.Settings, shortcut = "$cmd,") { openSettings() },
+                MenuEntry("Settings", Icons.Rounded.Settings, shortcut = "$cmd,") { nav.go(Route.Settings()) },
             ),
             onDismiss = { open = false },
         )

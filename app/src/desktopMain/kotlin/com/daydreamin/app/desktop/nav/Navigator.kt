@@ -26,6 +26,8 @@ sealed interface Route {
     data class YtPlaylist(val url: String, val title: String, val author: String, val thumbnail: String) : Route
     data object Profile : Route
     data object Stats : Route
+    /** Settings, scrolled to [section] (a [com.daydreamin.app.desktop.pages.SettingsSection] name) if given. */
+    data class Settings(val section: String? = null) : Route
 }
 
 /**

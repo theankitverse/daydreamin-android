@@ -404,7 +404,7 @@ private fun ToggleRow(icon: ImageVector, title: String, body: String, checked: B
 
 /** Off: a glass track with a pale thumb. On: the track fills with light and the thumb springs across. */
 @Composable
-private fun GlassSwitch(checked: Boolean) {
+internal fun GlassSwitch(checked: Boolean) {
     val x by animateDpAsState(if (checked) 22.dp else 2.dp, spring(dampingRatio = 0.62f, stiffness = 520f), label = "thumbX")
     val fill by animateFloatAsState(if (checked) 1f else 0f, Motion.settle(), label = "switchFill")
     val thumb by animateColorAsState(if (checked) Color.Black else Color.White.copy(alpha = 0.9f), Motion.settle(), label = "thumbColor")
@@ -463,13 +463,13 @@ private fun GlassSegments(labels: List<String>, selected: Int, descriptions: Lis
     }
 }
 
-private val CROSSFADE_CHOICES = listOf(0, 3, 6, 9, 12)
+internal val CROSSFADE_CHOICES = listOf(0, 3, 6, 9, 12)
 
-private fun crossfadeDescription(seconds: Int) =
+internal fun crossfadeDescription(seconds: Int) =
     if (seconds <= 0) "Off — each song plays to its very end before the next begins."
     else "The next song fades in over the last $seconds seconds of the one playing, when a song ends on its own."
 
-private fun eqDescription(p: EqPreset) = when (p) {
+internal fun eqDescription(p: EqPreset) = when (p) {
     EqPreset.OFF -> "Flat — the song as it was mixed."
     EqPreset.BASS_BOOST -> "More weight in the low end."
     EqPreset.VOCAL_BOOST -> "Voices forward, a little clearer."
@@ -512,7 +512,7 @@ private fun StorageRow(storage: SettingsViewModel.Storage?) {
 }
 
 @Composable
-private fun AboutCard() {
+internal fun AboutCard() {
     Row(
         Modifier.padding(horizontal = Space.gutter).fillMaxWidth().glass(Radius.panelShape, Glass.Clear).padding(18.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -533,7 +533,7 @@ private fun AboutCard() {
 
 /** The maker's credit — the whole row opens his Instagram profile. */
 @Composable
-private fun CreatorRow() {
+internal fun CreatorRow() {
     Row(
         Modifier
             .fillMaxWidth()
@@ -565,7 +565,7 @@ private fun CreatorRow() {
 
 /** The maker's optional, unrelated "buy me a coffee" — the app itself stays free either way. */
 @Composable
-private fun SupportRow() {
+internal fun SupportRow() {
     Row(
         Modifier
             .fillMaxWidth()
@@ -594,7 +594,7 @@ private fun SupportRow() {
 /** UPI, for whoever would rather pay that way than through Buy Me a Coffee. The row opens a UPI
  * app with the ID filled in; the small copy glyph next to the ID is for pasting it in by hand. */
 @Composable
-private fun UpiRow() {
+internal fun UpiRow() {
     Row(
         Modifier
             .fillMaxWidth()
@@ -622,7 +622,7 @@ private fun UpiRow() {
 
 /** The same background check Home's banner reads from, a manual "Check" — and, when there's a new version, "Update" right here. */
 @Composable
-private fun UpdateRow() {
+internal fun UpdateRow() {
     val state by com.daydreamin.app.data.update.UpdateChecker.state.collectAsState()
     val install by com.daydreamin.app.data.update.UpdateInstaller.state.collectAsState()
     val scope = rememberCoroutineScope()
@@ -674,7 +674,7 @@ private fun UpdateRow() {
 
 /** A real check: runs a tiny on-device YouTube search, which fails when YouTube changes its internals. */
 @Composable
-private fun ExtractorRow(state: ExtractorState, onCheck: () -> Unit) {
+internal fun ExtractorRow(state: ExtractorState, onCheck: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(horizontal = Space.gutter, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.align(Alignment.Top)) { RowIcon(Icons.Rounded.Sensors) }
         Column(Modifier.weight(1f).padding(start = 14.dp)) {
@@ -752,7 +752,7 @@ private fun TopBar(haze: HazeState, statusTop: Dp, scrollY: () -> Float, onBack:
 
 /** The app's glass confirmation card, for anything that removes something. */
 @Composable
-private fun ConfirmDialog(title: String, body: String, confirm: String, onDismiss: () -> Unit, onConfirm: () -> Unit) {
+internal fun ConfirmDialog(title: String, body: String, confirm: String, onDismiss: () -> Unit, onConfirm: () -> Unit) {
     Dialog(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(24.dp), Glass.Regular, tint = Color(0xF2141418)).padding(22.dp)) {
             Text(title, style = MaterialTheme.typography.titleLarge, color = Color.White)
@@ -773,7 +773,7 @@ private fun ConfirmDialog(title: String, body: String, confirm: String, onDismis
     }
 }
 
-private fun formatBytes(bytes: Long): String {
+internal fun formatBytes(bytes: Long): String {
     val mb = bytes / (1024.0 * 1024.0)
     return when {
         mb >= 1024 -> String.format(Locale.US, "%.1f GB", mb / 1024)
@@ -784,7 +784,7 @@ private fun formatBytes(bytes: Long): String {
     }
 }
 
-private fun relativeTime(atMs: Long): String {
+internal fun relativeTime(atMs: Long): String {
     val mins = (System.currentTimeMillis() - atMs) / 60_000
     return when {
         mins < 1 -> "just now"

@@ -43,6 +43,11 @@ import com.daydreamin.app.desktop.nav.Navigator
 import com.daydreamin.app.desktop.nav.Route
 import com.daydreamin.app.desktop.pages.CollectionPage
 import com.daydreamin.app.desktop.pages.HomePage
+import com.daydreamin.app.desktop.pages.LibraryPage
+import com.daydreamin.app.desktop.pages.ProfilePage
+import com.daydreamin.app.desktop.pages.StatsPage
+import com.daydreamin.app.desktop.pages.SettingsPage
+import com.daydreamin.app.desktop.pages.SettingsSection
 import com.daydreamin.app.desktop.pages.SearchPage
 import com.daydreamin.app.desktop.theme.DColors
 import com.daydreamin.app.desktop.theme.DSize
@@ -127,16 +132,10 @@ private fun Page(route: Route) {
         Route.Home -> HomePage()
         Route.Liked, Route.Downloads, Route.History, is Route.Playlist, is Route.Collection, is Route.Mood, is Route.Artist, is Route.YtPlaylist -> CollectionPage(route)
         is Route.Search -> SearchPage(route.query)
-        Route.Library -> Placeholder("Your Library", "The full Library page is the next step of the redesign.")
-        Route.Profile -> Placeholder("Profile", "The Profile page is the next step of the redesign.")
-        Route.Stats -> Placeholder("Your stats", "The Statistics page is the next step of the redesign.")
+        Route.Library -> LibraryPage()
+        Route.Profile -> ProfilePage()
+        Route.Stats -> StatsPage()
+        is Route.Settings -> SettingsPage(route.section?.let { runCatching { SettingsSection.valueOf(it) }.getOrNull() })
     }
 }
 
-@Composable
-private fun Placeholder(title: String, body: String) {
-    Column(Modifier.fillMaxSize().padding(DSpace.pagePad)) {
-        Text(title, style = DType.pageTitle)
-        Text(body, style = DType.body, modifier = Modifier.padding(top = 8.dp))
-    }
-}

@@ -257,7 +257,7 @@ private fun Header() {
 
 /** Change name and photo — the same glass card language as the app's other dialogs. */
 @Composable
-private fun EditProfileDialog(initialName: String, onDismiss: () -> Unit) {
+internal fun EditProfileDialog(initialName: String, onDismiss: () -> Unit) {
     val prefs = AppGraph.prefs
     val scope = rememberCoroutineScope()
     var name by remember { mutableStateOf(initialName) }
