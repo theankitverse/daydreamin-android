@@ -75,9 +75,12 @@ fun DesktopApp(start: Route = Route.Home) {
     DisposableEffect(nav) {
         DesktopUi.navigator = nav
         NavCommands.goBack = { nav.goBack() }
-        NavCommands.openSearch = { if (nav.current !is Route.Search) nav.go(Route.Search()); DesktopUi.requestSearchFocus() }
+        NavCommands.openSearch = { DesktopUi.expanded = false; if (nav.current !is Route.Search) nav.go(Route.Search()); DesktopUi.requestSearchFocus() }
         onDispose { DesktopUi.navigator = null; NavCommands.goBack = null; NavCommands.openSearch = null }
     }
+    // Going anywhere (the profile menu, a link) leaves the full-window lyrics to show it.
+    val firstRoute = remember { nav.current }
+    LaunchedEffect(nav.current) { if (nav.current != firstRoute) DesktopUi.expanded = false }
     CompositionLocalProvider(LocalNavigator provides nav, LocalAccent provides accentByName(accentName)) {
       ProvideSharedState {
         DesktopScrollbars {

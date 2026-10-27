@@ -46,7 +46,7 @@ liquid-glass design. The same app runs on your phone and your computer.
 | **Android** phone or tablet | [**Daydreamin.apk**](https://github.com/theankitverse/daydreamin-android/releases/latest/download/Daydreamin.apk) | ~5 MB | Android 5.0 or newer |
 | **Mac** with Apple chip | [**Daydreamin-macos-arm64.dmg**](https://github.com/theankitverse/daydreamin-android/releases/download/desktop-latest/Daydreamin-macos-arm64.dmg) | ~120 MB | Apple menu → About This Mac says **Chip: Apple M1, M2, M3…** |
 | **Mac** with Intel chip | [**Daydreamin-macos-x64.dmg**](https://github.com/theankitverse/daydreamin-android/releases/download/desktop-latest/Daydreamin-macos-x64.dmg) | ~125 MB | Apple menu → About This Mac says **Processor: Intel…** |
-| **Windows** | [**Daydreamin-windows.msi**](https://github.com/theankitverse/daydreamin-android/releases/download/desktop-latest/Daydreamin-windows.msi) | ~110 MB | Windows 10 or 11, 64-bit |
+| **Windows** | [**Daydreamin-windows-setup.exe**](https://github.com/theankitverse/daydreamin-android/releases/download/desktop-latest/Daydreamin-windows-setup.exe) | ~100 MB | Windows 10 or 11, 64-bit |
 | **Linux** (Debian family) | [**Daydreamin-linux-amd64.deb**](https://github.com/theankitverse/daydreamin-android/releases/download/desktop-latest/Daydreamin-linux-amd64.deb) | ~105 MB | Ubuntu, Debian, Linux Mint, Pop!_OS, Zorin — 64-bit PC |
 | **Linux** (Red Hat family) | [**Daydreamin-linux-x86_64.rpm**](https://github.com/theankitverse/daydreamin-android/releases/download/desktop-latest/Daydreamin-linux-x86_64.rpm) | ~115 MB | Fedora, openSUSE, RHEL — 64-bit PC |
 
@@ -66,7 +66,7 @@ These links always give you the newest version. After you install, the app keeps
    Security**, scroll down and click **Open Anyway**.
 
 **Windows**
-1. Run the downloaded **.msi**.
+1. Run the downloaded **Daydreamin-windows-setup.exe**.
 2. If you see *"Windows protected your PC"*, click **More info → Run anyway**.
 3. Follow the installer, then open **Daydreamin** from the Start menu.
 

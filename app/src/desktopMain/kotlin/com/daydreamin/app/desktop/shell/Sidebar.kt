@@ -119,7 +119,8 @@ fun Sidebar(narrow: Boolean, width: Dp, modifier: Modifier = Modifier) {
                     }
                     DIconButton(Icons.Rounded.Add, "New playlist", { naming = true }, iconSize = 20.dp)
                 }
-                LibraryList(narrow)
+                Box(Modifier.weight(1f)) { LibraryList(narrow) }
+                if (!narrow) com.daydreamin.app.desktop.components.MadeBy(Modifier.padding(start = 16.dp, end = 8.dp, top = 6.dp, bottom = 12.dp))
             }
         }
     }

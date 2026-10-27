@@ -383,6 +383,7 @@ private fun AboutSettings() {
     Column(Modifier.desktopGlass(RoundedCornerShape(10.dp), tint = Color.White.copy(alpha = 0.03f)).padding(vertical = 8.dp)) {
         AboutCard(); SupportRow(); UpiRow(); CreatorRow(); UpdateRow(); ExtractorRow(extractor, onCheck = vm::testExtractor)
     }
+    com.daydreamin.app.desktop.components.MadeBy(Modifier.padding(top = 14.dp, start = 4.dp))
 }
 
 /** Settings that belong together, on one card. */

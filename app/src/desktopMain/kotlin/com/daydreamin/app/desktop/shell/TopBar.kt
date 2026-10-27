@@ -88,11 +88,12 @@ fun TopBar(modifier: Modifier = Modifier) {
         if (titleBar == null && window != null) with(window) { WindowDraggableArea(Modifier.fillMaxSize()) { Box(Modifier.fillMaxSize()) } }
         val start = titleBar?.start ?: if (window != null) WindowChrome.fallbackInset() else 0.dp
         Row(Modifier.fillMaxSize().padding(start = 12.dp + start, end = 12.dp + (titleBar?.end ?: 0.dp)), verticalAlignment = Alignment.CenterVertically) {
-            DIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Go back", { nav.goBack() }, enabled = nav.canGoBack, shortcut = "${cmd}[")
-            DIconButton(Icons.AutoMirrored.Rounded.ArrowForward, "Go forward", { nav.goForward() }, enabled = nav.canGoForward, shortcut = "${cmd}]")
+            // Over the full-window lyrics, Back leaves them first.
+            DIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Go back", { if (DesktopUi.expanded) DesktopUi.expanded = false else nav.goBack() }, enabled = nav.canGoBack || DesktopUi.expanded, shortcut = "${cmd}[")
+            DIconButton(Icons.AutoMirrored.Rounded.ArrowForward, "Go forward", { DesktopUi.expanded = false; nav.goForward() }, enabled = nav.canGoForward, shortcut = "${cmd}]")
             Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    HomeButton(selected = nav.current == Route.Home) { nav.go(Route.Home) }
+                    HomeButton(selected = nav.current == Route.Home && !DesktopUi.expanded) { DesktopUi.expanded = false; nav.go(Route.Home) }
                     Spacer(Modifier.width(8.dp))
                     SearchBox(Modifier.widthIn(max = 460.dp).fillMaxWidth())
                 }
@@ -157,6 +158,7 @@ private fun SearchBox(modifier: Modifier) {
                 value = text,
                 onValueChange = { v ->
                     text = v
+                    DesktopUi.expanded = false
                     // Results follow the typing; history only gets one entry for the whole search.
                     if (current is Route.Search) nav.replace(Route.Search(v)) else nav.go(Route.Search(v))
                 },
@@ -168,7 +170,7 @@ private fun SearchBox(modifier: Modifier) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .focusRequester(focus)
-                    .onFocusChanged { focused = it.isFocused }
+                    .onFocusChanged { focused = it.isFocused; if (it.isFocused) DesktopUi.expanded = false }
                     .onPreviewKeyEvent { e ->
                         if (e.type == KeyEventType.KeyDown && e.key == Key.Escape) { focusManager.clearFocus(); true } else false
                     },
