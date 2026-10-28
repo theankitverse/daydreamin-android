@@ -44,13 +44,15 @@ fun SongListRow(
     extra: List<SongMenuAction> = emptyList(),
 ) {
     var menuOpen by remember { mutableStateOf(false) }
+    val anchor = rememberContextAnchor()
     Row(
         modifier
             .fillMaxWidth()
             .height(66.dp)
             .padding(horizontal = 10.dp)
             .then(if (isCurrent) Modifier.glass(Radius.cardShape, Glass.Clear) else Modifier)
-            .pressable(onLongClick = { menuOpen = true }, onClick = onClick)
+            .contextAnchor(anchor)
+            .pressable(onLongClick = { SongContextMenu.show(song, anchor.bounds, extra) }, onClick = onClick)
             .padding(start = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

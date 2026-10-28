@@ -6,6 +6,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
+import com.daydreamin.app.ui.components.SwipeToRemove
 import com.daydreamin.app.ui.components.uniqueKeys
 import com.daydreamin.app.platform.BackHandler
 import androidx.compose.animation.animateColorAsState
@@ -426,17 +427,19 @@ private fun LazyListScope.playlistDetail(
     val songKeys = playlist.songs.uniqueKeys { "pd-" + it.playId }
     itemsIndexed(playlist.songs, key = { i, _ -> songKeys[i] }) { index, s ->
         val np = nowPlaying()
-        SongListRow(
-            s,
-            isCurrent = np.playId == s.playId,
-            isPlaying = np.isPlaying,
-            onClick = { play(playlist.songs, index, s) },
-            extra = listOf(SongMenuAction("Remove from this playlist", Icons.Rounded.RemoveCircleOutline, destructive = true) {
-                SongActions.removeFromPlaylist(playlist.id, s)
-                Toaster.show("Removed from “${playlist.name}”")
-            }),
-            modifier = Modifier.animateItem(),
-        )
+        val remove = {
+            SongActions.removeFromPlaylist(playlist.id, s)
+            Toaster.show("Removed from “${playlist.name}”")
+        }
+        SwipeToRemove(key = s.playId, onRemove = remove, modifier = Modifier.animateItem()) {
+            SongListRow(
+                s,
+                isCurrent = np.playId == s.playId,
+                isPlaying = np.isPlaying,
+                onClick = { play(playlist.songs, index, s) },
+                extra = listOf(SongMenuAction("Remove from this playlist", Icons.Rounded.RemoveCircleOutline, destructive = true, onClick = remove)),
+            )
+        }
     }
 }
 
@@ -484,6 +487,7 @@ private fun LargeTitle(showCounts: Boolean, liked: Int, played: Int, playlists: 
 @Composable
 private fun Segmented(tab: LibraryTab, onTab: (LibraryTab) -> Unit, modifier: Modifier = Modifier) {
     val tabs = LibraryTab.entries
+    val haptic = com.daydreamin.app.platform.rememberHaptics()
     BoxWithConstraints(modifier.fillMaxWidth().height(44.dp).glass(Radius.pill, Glass.Clear).padding(4.dp)) {
         val w = maxWidth / tabs.size
         val x by animateDpAsState(w * tab.ordinal, spring(dampingRatio = 0.75f, stiffness = 480f), label = "segLens")
@@ -500,7 +504,7 @@ private fun Segmented(tab: LibraryTab, onTab: (LibraryTab) -> Unit, modifier: Mo
                 val selected = t == tab
                 val color by animateColorAsState(if (selected) Color.Black else Color.White.copy(alpha = 0.75f), Motion.settle(), label = "segText")
                 Box(
-                    Modifier.weight(1f).fillMaxHeight().pressable(role = androidx.compose.ui.semantics.Role.Tab, onClick = { onTab(t) }),
+                    Modifier.weight(1f).fillMaxHeight().pressable(role = androidx.compose.ui.semantics.Role.Tab, onClick = { if (!selected) haptic(com.daydreamin.app.platform.Haptic.Tick); onTab(t) }),
                     contentAlignment = Alignment.Center,
                 ) { Text(t.label, style = MaterialTheme.typography.labelLarge, color = color, maxLines = 1, softWrap = false) }
             }

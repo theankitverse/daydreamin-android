@@ -1,5 +1,7 @@
 package com.daydreamin.app.ui.screens.nowplaying
 
+import androidx.compose.ui.draw.blur
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -146,7 +148,10 @@ private fun SyncedLyrics(lines: List<LyricLine>, position: () -> Long, onSeek: (
             listState.scrollToItem(target) // opening lyrics mid-song: be there, don't travel there
             firstPositioning = false
         } else {
-            listState.animateScrollToItem(target)
+            // A slow, soft glide to the next line (like a page being drawn up), not a snap.
+            val shown = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == target }
+            if (shown != null) listState.animateScrollBy(shown.offset.toFloat(), spring(dampingRatio = 1f, stiffness = 55f))
+            else listState.animateScrollToItem(target)
         }
     }
 
@@ -178,6 +183,8 @@ private fun SyncedLyrics(lines: List<LyricLine>, position: () -> Long, onSeek: (
                     line = line,
                     isActive = index == active,
                     isPast = index < active,
+                    // Lines further from the one being sung sink out of focus — but not while you're reading around yourself.
+                    depth = if (following && !dragged) kotlin.math.abs(index - active).coerceAtMost(4) else 0,
                     onClick = {
                         onSeek(line.timeMs)
                         following = true
@@ -212,13 +219,15 @@ private fun SyncedLyrics(lines: List<LyricLine>, position: () -> Long, onSeek: (
 }
 
 @Composable
-private fun LyricRow(line: LyricLine, isActive: Boolean, isPast: Boolean, onClick: () -> Unit) {
+private fun LyricRow(line: LyricLine, isActive: Boolean, isPast: Boolean, depth: Int, onClick: () -> Unit) {
     val alpha by animateFloatAsState(
         when { isActive -> 1f; isPast -> 0.26f; else -> 0.38f },
         tween(420),
         label = "lyricAlpha",
     )
     val scale by animateFloatAsState(if (isActive) 1f else 0.94f, spring(dampingRatio = 0.8f, stiffness = 260f), label = "lyricScale")
+    // (Blur draws on Android 12+; earlier, lines simply stay sharp.)
+    val blur by androidx.compose.animation.core.animateDpAsState((depth * 1.4f).dp, tween(500), label = "lyricBlur")
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -228,7 +237,8 @@ private fun LyricRow(line: LyricLine, isActive: Boolean, isPast: Boolean, onClic
                 this.alpha = alpha
                 scaleX = scale; scaleY = scale
                 transformOrigin = TransformOrigin(0f, 0.5f)
-            },
+            }
+            .then(if (blur > 0.2.dp) Modifier.blur(blur, androidx.compose.ui.draw.BlurredEdgeTreatment.Unbounded) else Modifier),
     ) {
         if (line.text.isEmpty()) BreathingDots(isActive) else Text(line.text, style = LyricStyle, color = Color.White)
     }

@@ -608,6 +608,7 @@ private fun LikeButton(liked: Boolean, onClick: () -> Unit, size: androidx.compo
     val pop = remember { Animatable(1f) }
     val ring = remember { Animatable(0f) }
     var initialized by remember { mutableStateOf(false) }
+    val haptic = com.daydreamin.app.platform.rememberHaptics()
     LaunchedEffect(liked) {
         if (!initialized) { initialized = true; return@LaunchedEffect }
         if (liked) {
@@ -620,7 +621,7 @@ private fun LikeButton(liked: Boolean, onClick: () -> Unit, size: androidx.compo
         }
     }
     Box(
-        modifier = Modifier.size(size).pressable(onClick = onClick),
+        modifier = Modifier.size(size).pressable(onClick = { haptic(if (liked) com.daydreamin.app.platform.Haptic.Toggle else com.daydreamin.app.platform.Haptic.Confirm); onClick() }),
         contentAlignment = Alignment.Center,
     ) {
         Box(

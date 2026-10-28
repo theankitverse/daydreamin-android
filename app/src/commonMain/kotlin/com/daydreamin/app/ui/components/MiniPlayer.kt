@@ -175,8 +175,9 @@ fun MiniPlayer(
 
 @Composable
 private fun MiniControl(icon: androidx.compose.ui.graphics.vector.ImageVector, description: String, onClick: () -> Unit, morph: Boolean = false) {
+    val haptic = com.daydreamin.app.platform.rememberHaptics()
     Box(
-        modifier = Modifier.size(46.dp).clip(Radius.pill).pressable(onClick = onClick),
+        modifier = Modifier.size(46.dp).clip(Radius.pill).pressable(onClick = { haptic(com.daydreamin.app.platform.Haptic.Tap); onClick() }),
         contentAlignment = Alignment.Center,
     ) {
         if (morph) {

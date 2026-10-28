@@ -69,6 +69,7 @@ private val LensHeight = 52.dp
  */
 @Composable
 fun DaydreaminBottomBar(currentRoute: String?, onSelect: (String) -> Unit) {
+    val haptic = com.daydreamin.app.platform.rememberHaptics()
     val selectedIndex = tabs.indexOfFirst { it.route == currentRoute }
     BoxWithConstraints(
         modifier = Modifier
@@ -104,7 +105,7 @@ fun DaydreaminBottomBar(currentRoute: String?, onSelect: (String) -> Unit) {
                         .weight(1f)
                         .fillMaxHeight()
                         .semantics { this.selected = selected }
-                        .pressable(role = Role.Tab, onClick = { onSelect(tab.route) }),
+                        .pressable(role = Role.Tab, onClick = { if (!selected) haptic(com.daydreamin.app.platform.Haptic.Tick); onSelect(tab.route) }),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {

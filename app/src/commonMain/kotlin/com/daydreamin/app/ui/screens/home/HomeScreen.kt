@@ -2,6 +2,8 @@ package com.daydreamin.app.ui.screens.home
 
 import com.daydreamin.app.resources.Res
 import com.daydreamin.app.resources.splash_logo
+import com.daydreamin.app.ui.components.contextAnchor
+import com.daydreamin.app.ui.components.SongContextMenu
 import com.daydreamin.app.ui.components.uniqueKeys
 import com.daydreamin.app.platform.BackHandler
 import androidx.compose.animation.AnimatedContent
@@ -110,7 +112,6 @@ import com.daydreamin.app.ui.components.PlaylistCover
 import com.daydreamin.app.ui.components.SectionTitle
 import com.daydreamin.app.ui.components.SolidPillButton
 import com.daydreamin.app.ui.components.SongActions
-import com.daydreamin.app.ui.components.SongMenu
 import com.daydreamin.app.ui.components.StaggeredAppear
 import com.daydreamin.app.ui.components.pressable
 import com.daydreamin.app.ui.components.shimmer
@@ -182,14 +183,21 @@ fun HomeScreen(
     val scrollTracker = remember { ScrollTracker(scrollY) }
     val homeHaze = remember { HazeState() }
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    // Pulling down at the top builds a new mix, like the mix's own refresh button.
+    val pull = com.daydreamin.app.ui.components.rememberPullToRefresh(refreshing = refreshing, onRefresh = vm::refreshMix)
 
     Box(modifier = Modifier.fillMaxSize().background(BgBase)) {
         // Everything the top bar blurs — including the glow — lives in this one source.
         Box(modifier = Modifier.fillMaxSize().hazeSource(homeHaze)) {
             AmbientGlow(light = light, scrollY = { if (listState.canScrollBackward) scrollY.floatValue else 0f })
+            com.daydreamin.app.ui.components.PullIndicator(pull, Modifier.align(Alignment.TopCenter).padding(top = statusTop + TopBarHeight))
             LazyColumn(
                 state = listState,
-                modifier = Modifier.fillMaxSize().nestedScroll(scrollTracker),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .nestedScroll(pull.connection)
+                    .nestedScroll(scrollTracker)
+                    .graphicsLayer { translationY = pull.offset },
                 contentPadding = PaddingValues(
                     top = statusTop + TopBarHeight,
                     bottom = contentPadding.calculateBottomPadding() + Space.l,
@@ -640,13 +648,13 @@ private fun QuickPicksGrid(songs: List<Song>, nowPlaying: () -> NowPlaying, onPl
 @Composable
 private fun QuickPickRow(song: Song, isCurrent: Boolean, isPlaying: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     // Long-press for the song menu (play next, add to queue, like, playlists) — same as everywhere else.
-    var menuOpen by remember { mutableStateOf(false) }
+    val anchor = com.daydreamin.app.ui.components.rememberContextAnchor()
     val openPlayer = com.daydreamin.app.ui.components.LocalOpenPlayer.current
     Row(
-        modifier = modifier.fillMaxWidth().height(QuickPickRowHeight).pressable(onLongClick = { menuOpen = true }, onClick = { if (isCurrent) openPlayer() else onClick() }),
+        modifier = modifier.fillMaxWidth().height(QuickPickRowHeight).contextAnchor(anchor)
+            .pressable(onLongClick = { SongContextMenu.show(song, anchor.bounds) }, onClick = { if (isCurrent) openPlayer() else onClick() }),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (menuOpen) SongMenu(song = song, onDismiss = { menuOpen = false })
         Artwork(url = song.cover.ifBlank { song.artworkUrl }, shape = Radius.thumbShape, modifier = Modifier.size(52.dp))
         Column(modifier = Modifier.weight(1f).padding(horizontal = Space.s + 2.dp)) {
             Text(
@@ -678,10 +686,9 @@ private fun CardRow(songs: List<Song>, cardSize: Dp, nowPlaying: () -> NowPlayin
 
 @Composable
 private fun ArtCard(song: Song, size: Dp, isCurrent: Boolean, isPlaying: Boolean, onClick: () -> Unit) {
-    var menuOpen by remember { mutableStateOf(false) }
+    val anchor = com.daydreamin.app.ui.components.rememberContextAnchor()
     val openPlayer = com.daydreamin.app.ui.components.LocalOpenPlayer.current
-    Column(modifier = Modifier.width(size).pressable(onLongClick = { menuOpen = true }, onClick = { if (isCurrent) openPlayer() else onClick() })) {
-        if (menuOpen) SongMenu(song = song, onDismiss = { menuOpen = false })
+    Column(modifier = Modifier.width(size).contextAnchor(anchor).pressable(onLongClick = { SongContextMenu.show(song, anchor.bounds) }, onClick = { if (isCurrent) openPlayer() else onClick() })) {
         Box {
             Artwork(url = song.artworkUrl, shape = Radius.cardShape, modifier = Modifier.size(size))
             if (isCurrent) {

@@ -132,6 +132,7 @@ fun Scrubber(
 ) {
     var dragging by remember { mutableStateOf(false) }
     var dragFraction by remember { mutableFloatStateOf(0f) }
+    val haptic = com.daydreamin.app.platform.rememberHaptics()
     val barHeight by animateDpAsState(if (dragging) 10.dp else 5.dp, spring(dampingRatio = 0.7f, stiffness = 600f), label = "barHeight")
     val duration = durationMs.coerceAtLeast(1L)
     val fraction = { if (dragging) dragFraction else (position().toFloat() / duration).coerceIn(0f, 1f) }
@@ -147,8 +148,8 @@ fun Scrubber(
                 }
                 .pointerInput(duration) {
                     detectHorizontalDragGestures(
-                        onDragStart = { o -> dragging = true; dragFraction = (o.x / size.width).coerceIn(0f, 1f) },
-                        onDragEnd = { onSeek((dragFraction * duration).toLong()); dragging = false },
+                        onDragStart = { o -> haptic(com.daydreamin.app.platform.Haptic.Tick); dragging = true; dragFraction = (o.x / size.width).coerceIn(0f, 1f) },
+                        onDragEnd = { haptic(com.daydreamin.app.platform.Haptic.Tick); onSeek((dragFraction * duration).toLong()); dragging = false },
                         onDragCancel = { dragging = false },
                         onHorizontalDrag = { change, _ ->
                             change.consume()
@@ -193,6 +194,7 @@ fun Transport(
     onNext: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val haptic = com.daydreamin.app.platform.rememberHaptics()
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceEvenly,
@@ -202,7 +204,7 @@ fun Transport(
         Box(
             modifier = Modifier
                 .size(80.dp)
-                .pressable(onClick = onPlayPause)
+                .pressable(onClick = { haptic(com.daydreamin.app.platform.Haptic.Tap); onPlayPause() })
                 .glass(Radius.pill, Glass.Frosted, tint = Color.White.copy(alpha = 0.04f)),
             contentAlignment = Alignment.Center,
         ) {
@@ -233,10 +235,12 @@ private fun SkipButton(icon: ImageVector, description: String, nudge: Float, onC
     val scope = rememberCoroutineScope()
     val offset = remember { Animatable(0f) }
     val density = LocalDensity.current
+    val haptic = com.daydreamin.app.platform.rememberHaptics()
     Box(
         modifier = Modifier
             .size(64.dp)
             .pressable(onClick = {
+                haptic(com.daydreamin.app.platform.Haptic.Tap)
                 onClick()
                 scope.launch {
                     offset.animateTo(nudge * with(density) { 7.dp.toPx() }, tween(90))
@@ -305,8 +309,9 @@ fun ActionRow(
 private fun ToggleAction(icon: ImageVector, description: String, on: Boolean, onClick: () -> Unit) {
     val lens by animateFloatAsState(if (on) 1f else 0f, Motion.settle(), label = "lens")
     val tint by animateColorAsState(if (on) Color.White else Color.White.copy(alpha = 0.6f), Motion.settle(), label = "actionTint")
+    val haptic = com.daydreamin.app.platform.rememberHaptics()
     Box(
-        modifier = Modifier.size(width = 60.dp, height = 44.dp).pressable(onClick = onClick),
+        modifier = Modifier.size(width = 60.dp, height = 44.dp).pressable(onClick = { haptic(com.daydreamin.app.platform.Haptic.Toggle); onClick() }),
         contentAlignment = Alignment.Center,
     ) {
         Box(

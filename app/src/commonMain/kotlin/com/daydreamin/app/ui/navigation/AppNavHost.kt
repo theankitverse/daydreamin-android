@@ -165,6 +165,7 @@ private fun AppNavHost(wide: Boolean, startRoute: String) {
             )
         },
     ) {
+     Box(Modifier.fillMaxSize()) {
       Row(Modifier.fillMaxSize()) {
         if (wide) {
             AppDrawerContent(
@@ -406,6 +407,9 @@ private fun AppNavHost(wide: Boolean, startRoute: String) {
           }
         }
       }
+      // Long-press song menus lift over everything, the bottom bar included.
+      com.daydreamin.app.ui.components.SongContextMenuHost(hazeState)
+     }
     }
 }
 

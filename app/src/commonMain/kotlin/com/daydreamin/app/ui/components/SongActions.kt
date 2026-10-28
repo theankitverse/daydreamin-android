@@ -254,33 +254,40 @@ fun SongMenuButton(song: Song, modifier: Modifier = Modifier, extra: List<SongMe
  */
 @Composable
 fun SongMenu(song: Song, onDismiss: () -> Unit, extra: List<SongMenuAction> = emptyList()) {
-    val prefs = AppGraph.prefs
-    val likedIds by prefs.likedIds.collectAsState(initial = emptySet())
-    var page by remember { mutableStateOf(0) }
-    var naming by remember { mutableStateOf(false) }
     val density = LocalDensity.current
-    val liked = song.playId in likedIds
-
     Popup(
         alignment = Alignment.TopEnd,
         offset = with(density) { IntOffset(0, 40.dp.roundToPx()) },
         onDismissRequest = onDismiss,
         properties = PopupProperties(focusable = true),
-    ) {
-        AnimatedContent(
-            targetState = page,
-            transitionSpec = {
-                val dir = if (targetState > initialState) 1 else -1
-                (fadeIn(tween(180)) + slideInHorizontally(tween(220)) { it / 5 * dir }) togetherWith
-                    (fadeOut(tween(120)) + slideOutHorizontally(tween(180)) { -it / 5 * dir })
-            },
-            label = "songMenuPage",
-            modifier = Modifier
-                .width(264.dp)
-                .glass(RoundedCornerShape(20.dp), Glass.Regular, tint = Color(0xF2141418)),
-        ) { p ->
-            Column(Modifier.padding(vertical = 6.dp)) {
-                if (p == 0) {
+    ) { SongMenuCard(song, onDismiss, extra) }
+}
+
+/** The song menu itself (song, then its actions; "Add to playlist" opens a second page): in [SongMenu]'s popup and in the long-press menu. */
+@Composable
+internal fun SongMenuCard(song: Song, onDismiss: () -> Unit, extra: List<SongMenuAction> = emptyList(), modifier: Modifier = Modifier, showSong: Boolean = true) {
+    val prefs = AppGraph.prefs
+    val likedIds by prefs.likedIds.collectAsState(initial = emptySet())
+    var page by remember { mutableStateOf(0) }
+    var naming by remember { mutableStateOf(false) }
+    val liked = song.playId in likedIds
+
+    AnimatedContent(
+        targetState = page,
+        transitionSpec = {
+            val dir = if (targetState > initialState) 1 else -1
+            (fadeIn(tween(180)) + slideInHorizontally(tween(220)) { it / 5 * dir }) togetherWith
+                (fadeOut(tween(120)) + slideOutHorizontally(tween(180)) { -it / 5 * dir })
+        },
+        label = "songMenuPage",
+        modifier = modifier
+            .width(264.dp)
+            .glass(RoundedCornerShape(20.dp), Glass.Regular, tint = Color(0xF2141418)),
+    ) { p ->
+        Column(Modifier.padding(vertical = 6.dp)) {
+            if (p == 0) {
+                // (The long-press menu shows the song itself, lifted, right beside it.)
+                if (showSong) {
                     Row(Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                         Artwork(url = song.artworkUrl, shape = Radius.thumbShape, modifier = Modifier.size(40.dp))
                         Column(Modifier.padding(start = 12.dp)) {
@@ -289,29 +296,29 @@ fun SongMenu(song: Song, onDismiss: () -> Unit, extra: List<SongMenuAction> = em
                         }
                     }
                     Divider()
-                    MenuRow(Icons.Rounded.SkipNext, "Play next") { SongActions.playNext(song); onDismiss() }
-                    MenuRow(Icons.AutoMirrored.Rounded.QueueMusic, "Add to queue") { SongActions.addToQueue(song); onDismiss() }
-                    MenuRow(if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, if (liked) "Remove from Liked" else "Add to Liked") {
-                        SongActions.toggleLiked(song, liked); onDismiss()
-                    }
-                    MenuRow(Icons.AutoMirrored.Rounded.PlaylistAdd, "Add to playlist", trailing = Icons.Rounded.ChevronRight) { page = 1 }
-                    val download = rememberDownload(song)
-                    val downloadScope = androidx.compose.runtime.rememberCoroutineScope()
-                    MenuRow(
-                        if (download?.status == com.daydreamin.app.data.download.DownloadStatus.DONE) Icons.Rounded.DownloadDone else Icons.Rounded.Download,
-                        when (download?.status) {
-                            null -> "Download"
-                            com.daydreamin.app.data.download.DownloadStatus.DONE -> "Remove download"
-                            com.daydreamin.app.data.download.DownloadStatus.FAILED -> "Try download again"
-                            else -> "Cancel download"
-                        },
-                    ) { toggleDownload(song, download, downloadScope); onDismiss() }
-                    extra.forEach { a -> MenuRow(a.icon, a.label, destructive = a.destructive) { a.onClick(); onDismiss() } }
-                } else {
-                    MenuRow(Icons.Rounded.ChevronLeft, "Add to playlist", dim = true) { page = 0 }
-                    Divider()
-                    PlaylistPickerRows(song, onNewPlaylist = { naming = true }, onPicked = onDismiss)
                 }
+                MenuRow(Icons.Rounded.SkipNext, "Play next") { SongActions.playNext(song); onDismiss() }
+                MenuRow(Icons.AutoMirrored.Rounded.QueueMusic, "Add to queue") { SongActions.addToQueue(song); onDismiss() }
+                MenuRow(if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, if (liked) "Remove from Liked" else "Add to Liked") {
+                    SongActions.toggleLiked(song, liked); onDismiss()
+                }
+                MenuRow(Icons.AutoMirrored.Rounded.PlaylistAdd, "Add to playlist", trailing = Icons.Rounded.ChevronRight) { page = 1 }
+                val download = rememberDownload(song)
+                val downloadScope = androidx.compose.runtime.rememberCoroutineScope()
+                MenuRow(
+                    if (download?.status == com.daydreamin.app.data.download.DownloadStatus.DONE) Icons.Rounded.DownloadDone else Icons.Rounded.Download,
+                    when (download?.status) {
+                        null -> "Download"
+                        com.daydreamin.app.data.download.DownloadStatus.DONE -> "Remove download"
+                        com.daydreamin.app.data.download.DownloadStatus.FAILED -> "Try download again"
+                        else -> "Cancel download"
+                    },
+                ) { toggleDownload(song, download, downloadScope); onDismiss() }
+                extra.forEach { a -> MenuRow(a.icon, a.label, destructive = a.destructive) { a.onClick(); onDismiss() } }
+            } else {
+                MenuRow(Icons.Rounded.ChevronLeft, "Add to playlist", dim = true) { page = 0 }
+                Divider()
+                PlaylistPickerRows(song, onNewPlaylist = { naming = true }, onPicked = onDismiss)
             }
         }
     }

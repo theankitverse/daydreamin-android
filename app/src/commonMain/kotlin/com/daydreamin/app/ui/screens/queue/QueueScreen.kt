@@ -488,6 +488,7 @@ private fun QueueRow(
     var menuOpen by remember { mutableStateOf(false) }
     var rowWidth by remember { mutableFloatStateOf(1f) }
     val density = LocalDensity.current
+    val haptic = com.daydreamin.app.platform.rememberHaptics()
 
     Box(
         modifier = modifier
@@ -533,7 +534,9 @@ private fun QueueRow(
                     detectHorizontalDragGestures(
                         onHorizontalDrag = { change, dx ->
                             change.consume()
+                            val wasPast = swipeX < -size.width * 0.35f
                             swipeX = (swipeX + dx).coerceIn(-size.width.toFloat(), 0f)
+                            if (wasPast != swipeX < -size.width * 0.35f) haptic(com.daydreamin.app.platform.Haptic.Threshold)
                         },
                         onDragEnd = {
                             scope.launch {
