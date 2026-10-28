@@ -1,9 +1,9 @@
 {
-  "versionCode": 20,
-  "versionName": "1.6.4",
+  "versionCode": 21,
+  "versionName": "1.7.0",
   "url": "https://github.com/theankitverse/daydreamin-android/releases/latest",
-  "notes": "Updates now show reliably: the app checks again when you come back to it, and still finds updates on networks that block GitHub's file server.",
-  "apkUrl": "https://github.com/theankitverse/daydreamin-android/releases/download/v1.6.4/daydreamin-v1.6.4.apk",
-  "apkSize": 4781806,
-  "sha256": "d23744a52df2159523b3e81cfe092fd8bdb389421cab20a9d06ec2110adc11ff"
+  "notes": "Smoother and more alive: Now Playing opens over your page like a card, back swipes follow your finger, long-press a song for a lifted menu, pull Home down for a new mix, swipe songs out of playlists, lyrics that glide, and a faster start.",
+  "apkUrl": "https://github.com/theankitverse/daydreamin-android/releases/download/v1.7.0/Daydreamin.apk",
+  "apkSize": 5069505,
+  "sha256": "c74c942db4f76cc0c35372a9ad5cf6ef2ba98a801f0c5f83ef8d1818777f52d4"
 }

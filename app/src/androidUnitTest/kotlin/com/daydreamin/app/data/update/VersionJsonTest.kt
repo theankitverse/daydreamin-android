@@ -18,8 +18,9 @@ class VersionJsonTest {
         assertEquals(BuildConfig.VERSION_CODE, remote.versionCode)
         assertEquals(BuildConfig.VERSION_NAME, remote.versionName)
         // The in-app updater downloads this exact file and checks it against the size and fingerprint.
+        // Each release has one APK, Daydreamin.apk (also the README's permanent download link).
         assertEquals(
-            "https://github.com/theankitverse/daydreamin-android/releases/download/v${BuildConfig.VERSION_NAME}/daydreamin-v${BuildConfig.VERSION_NAME}.apk",
+            "https://github.com/theankitverse/daydreamin-android/releases/download/v${BuildConfig.VERSION_NAME}/Daydreamin.apk",
             remote.apkUrl,
         )
         assertTrue((remote.apkSize ?: 0) > 1_000_000)
