@@ -16,3 +16,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "Daydreamin"
 include(":app")
+// Records the startup profile (see baselineprofile/build.gradle.kts). Never shipped.
+include(":baselineprofile")

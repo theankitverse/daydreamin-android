@@ -77,6 +77,23 @@ class MainActivity : ComponentActivity() {
         com.daydreamin.app.data.update.UpdateChecker.recheckIfStale(DaydreaminApp.instance.appScope)
     }
 
+    /**
+     * 90/120 Hz screens: some phones keep apps at 60 Hz unless the window asks for more. Picks the
+     * screen's fastest mode at its current resolution; the system still lowers it in battery saver.
+     */
+    private fun preferFastestRefreshRate() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
+        @Suppress("DEPRECATION")
+        val display = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) display else windowManager.defaultDisplay) ?: return
+        val current = display.mode
+        val fastest = display.supportedModes
+            .filter { it.physicalWidth == current.physicalWidth && it.physicalHeight == current.physicalHeight }
+            .maxByOrNull { it.refreshRate } ?: return
+        if (fastest.refreshRate > current.refreshRate + 1f) {
+            window.attributes = window.attributes.also { it.preferredDisplayModeId = fastest.modeId }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         if (savedInstanceState == null) handleOpenPlayer(intent)
         // The system launch screen can only show the still icon, so it hands over as soon as the
@@ -123,7 +140,7 @@ class MainActivity : ComponentActivity() {
             statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
         )
-
+        preferFastestRefreshRate()
 
         // Only a fresh launch plays the intro — not a rotation or a return from the background.
         val coldStart = savedInstanceState == null

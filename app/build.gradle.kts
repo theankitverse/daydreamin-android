@@ -37,6 +37,12 @@ android {
         debug {
             isMinifyEnabled = false
         }
+        // Release, unshrunk and profileable: only for recording the startup profile (:baselineprofile).
+        create("benchmark") {
+            initWith(getByName("release"))
+            isMinifyEnabled = false
+            matchingFallbacks += "release"
+        }
     }
 
     compileOptions {
@@ -164,7 +170,7 @@ kotlin {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.1.2")
-    val composeBom = platform("androidx.compose:compose-bom:2024.09.02")
+    val composeBom = platform("androidx.compose:compose-bom:2025.11.01")
     implementation(composeBom)
     androidTestImplementation(composeBom)
     debugImplementation("androidx.compose.ui:ui-tooling")
