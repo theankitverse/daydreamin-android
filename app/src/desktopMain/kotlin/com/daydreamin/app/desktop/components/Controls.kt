@@ -112,10 +112,10 @@ fun WithTooltip(text: String?, shortcut: String? = null, modifier: Modifier = Mo
                     .padding(horizontal = 9.dp, vertical = 5.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(text, style = DType.small.copy(color = Color.White))
+                Text(text, style = DType.small.copy(color = DColors.ink))
                 if (shortcut != null) {
                     Spacer(Modifier.width(8.dp))
-                    Text(shortcut, style = DType.small.copy(color = Color.White.copy(alpha = 0.5f)))
+                    Text(shortcut, style = DType.small.copy(color = DColors.ink.copy(alpha = 0.5f)))
                 }
             }
         },
@@ -137,7 +137,7 @@ fun DIconButton(
     size: Dp = DSize.iconButton,
     iconSize: Dp = DSize.icon,
     active: Boolean = false,
-    activeColor: Color = Color.White,
+    activeColor: Color = DColors.ink,
     shortcut: String? = null,
     enabled: Boolean = true,
     tint: Color? = null,
@@ -145,7 +145,7 @@ fun DIconButton(
     val (source, hovered) = rememberHover()
     val color by animateColorAsState(
         when {
-            !enabled -> Color.White.copy(alpha = 0.25f)
+            !enabled -> DColors.ink.copy(alpha = 0.25f)
             active -> activeColor
             tint != null -> tint
             hovered -> DColors.iconHover
@@ -175,18 +175,18 @@ fun DIconButton(
 fun DButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, primary: Boolean = false, icon: ImageVector? = null) {
     val (source, hovered) = rememberHover()
     val bg = when {
-        primary && hovered -> Color.White
-        primary -> Color.White.copy(alpha = 0.92f)
-        hovered -> Color.White.copy(alpha = 0.12f)
+        primary && hovered -> DColors.ink
+        primary -> DColors.ink.copy(alpha = 0.92f)
+        hovered -> DColors.ink.copy(alpha = 0.12f)
         else -> Color.Transparent
     }
-    val fg = if (primary) Color.Black else Color.White
+    val fg = if (primary) DColors.onInk else DColors.ink
     Row(
         modifier
             .height(34.dp)
             .clip(RoundedCornerShape(50))
             .background(bg)
-            .then(if (!primary) Modifier.border(1.dp, Color.White.copy(alpha = if (hovered) 0.6f else 0.3f), RoundedCornerShape(50)) else Modifier)
+            .then(if (!primary) Modifier.border(1.dp, DColors.ink.copy(alpha = if (hovered) 0.6f else 0.3f), RoundedCornerShape(50)) else Modifier)
             .hoverable(source)
             .pointerHoverIcon(PointerIcon.Hand)
             .clickable(interactionSource = source, indication = null, role = Role.Button, onClick = onClick)
@@ -212,7 +212,7 @@ fun DSlider(
     onCommit: (Float) -> Unit,
     modifier: Modifier = Modifier,
     onValueChange: ((Float) -> Unit)? = null,
-    fill: Color = Color.White,
+    fill: Color = DColors.ink,
 ) {
     val (source, hovered) = rememberHover()
     var dragging by remember { mutableStateOf(false) }
@@ -240,7 +240,7 @@ fun DSlider(
         contentAlignment = Alignment.CenterStart,
     ) {
         val track = if (emphasised) 5.dp else 4.dp
-        Box(Modifier.fillMaxWidth().height(track).clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.22f)))
+        Box(Modifier.fillMaxWidth().height(track).clip(RoundedCornerShape(50)).background(DColors.ink.copy(alpha = 0.22f)))
         Box(Modifier.fillMaxWidth(shown).height(track).clip(RoundedCornerShape(50)).background(if (emphasised) LocalAccent.current else fill))
         if (emphasised) {
             val knob = 12.dp
@@ -249,7 +249,7 @@ fun DSlider(
                     .offset(x = (maxWidth - knob) * shown)
                     .size(knob)
                     .clip(CircleShape)
-                    .background(Color.White),
+                    .background(DColors.ink),
             )
         }
     }
@@ -267,8 +267,8 @@ fun DesktopScrollbars(content: @Composable () -> Unit) {
             thickness = 8.dp,
             shape = RoundedCornerShape(4.dp),
             hoverDurationMillis = 200,
-            unhoverColor = Color.White.copy(alpha = 0.16f),
-            hoverColor = Color.White.copy(alpha = 0.34f),
+            unhoverColor = DColors.ink.copy(alpha = 0.16f),
+            hoverColor = DColors.ink.copy(alpha = 0.34f),
         ),
     ) { content() }
 }

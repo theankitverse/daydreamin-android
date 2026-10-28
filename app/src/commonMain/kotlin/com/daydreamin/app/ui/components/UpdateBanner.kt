@@ -55,7 +55,7 @@ import kotlinx.coroutines.launch
  * nothing new.
  */
 @Composable
-fun UpdateBanner(modifier: Modifier = Modifier) {
+fun UpdateBanner(modifier: Modifier = Modifier, backing: Color = Color.Transparent) {
     val state by UpdateChecker.state.collectAsState()
     val remote = state.remote
     val scope = rememberCoroutineScope()
@@ -86,6 +86,8 @@ fun UpdateBanner(modifier: Modifier = Modifier) {
                 Modifier
                     .padding(horizontal = Space.gutter)
                     .fillMaxWidth()
+                    // (Its text is white: on a light page — the computer app's light theme — it sits on a dark [backing].)
+                    .background(backing, Radius.panelShape)
                     .glass(Radius.panelShape, Glass.Clear)
                     .padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically,

@@ -94,8 +94,8 @@ fun DesktopDialog(
                     .width(420.dp)
                     .graphicsLayer { val s = 0.96f + 0.04f * appear.value; scaleX = s; scaleY = s }
                     .shadow(32.dp, RoundedCornerShape(14.dp))
-                    .background(Color(0xFF17171E), RoundedCornerShape(14.dp))
-                    .border(1.dp, Color.White.copy(alpha = 0.09f), RoundedCornerShape(14.dp))
+                    .background(DColors.dialog, RoundedCornerShape(14.dp))
+                    .border(1.dp, DColors.ink.copy(alpha = 0.09f), RoundedCornerShape(14.dp))
                     // Clicks inside the card stay in it.
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
                     .padding(24.dp),
@@ -131,8 +131,8 @@ fun NameDialog(title: String, confirm: String, initial: String = "", onDismiss: 
             value = value,
             onValueChange = { value = it.copy(text = it.text.take(60)) },
             singleLine = true,
-            textStyle = DType.body.copy(color = Color.White, fontSize = 15.sp),
-            cursorBrush = SolidColor(Color.White),
+            textStyle = DType.body.copy(color = DColors.ink, fontSize = 15.sp),
+            cursorBrush = SolidColor(DColors.ink),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { submit() }),
             modifier = Modifier
@@ -146,11 +146,11 @@ fun NameDialog(title: String, confirm: String, initial: String = "", onDismiss: 
                         .fillMaxWidth()
                         .height(40.dp)
                         .background(DColors.field, RoundedCornerShape(8.dp))
-                        .border(1.dp, if (focused) Color.White.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
+                        .border(1.dp, if (focused) DColors.ink.copy(alpha = 0.6f) else DColors.ink.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
                         .padding(horizontal = 12.dp),
                     contentAlignment = Alignment.CenterStart,
                 ) {
-                    if (value.text.isEmpty()) Text("Playlist name", style = DType.body.copy(fontSize = 15.sp, color = Color.White.copy(alpha = 0.4f)))
+                    if (value.text.isEmpty()) Text("Playlist name", style = DType.body.copy(fontSize = 15.sp, color = DColors.ink.copy(alpha = 0.4f)))
                     inner()
                 }
             },
@@ -176,6 +176,6 @@ fun ConfirmDialog(title: String, body: String, confirm: String, onDismiss: () ->
             DButton(confirm, onConfirm, primary = true)
         },
     ) {
-        Text(body, style = DType.body.copy(color = Color.White.copy(alpha = 0.75f)))
+        Text(body, style = DType.body.copy(color = DColors.ink.copy(alpha = 0.75f)))
     }
 }

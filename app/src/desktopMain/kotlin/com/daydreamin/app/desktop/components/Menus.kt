@@ -1,5 +1,7 @@
 package com.daydreamin.app.desktop.components
 
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.hoverable
@@ -123,13 +125,23 @@ fun MenuPopup(entries: List<MenuEntry?>, onDismiss: () -> Unit) {
 
 @Composable
 private fun MenuSurface(entries: List<MenuEntry?>, onDismiss: () -> Unit) {
+    // Opens from the pointer: a quick scale and fade, like the system's own menus.
+    val shown = remember { androidx.compose.animation.core.Animatable(0f) }
+    androidx.compose.runtime.LaunchedEffect(Unit) { shown.animateTo(1f, androidx.compose.animation.core.tween(120, easing = androidx.compose.animation.core.FastOutSlowInEasing)) }
     Column(
         Modifier
             .widthIn(min = 210.dp, max = 300.dp)
             .heightIn(max = 460.dp)
+            .graphicsLayer {
+                alpha = shown.value
+                val s = 0.94f + 0.06f * shown.value
+                scaleX = s; scaleY = s
+                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+            }
+            .shadow(14.dp, RoundedCornerShape(8.dp))
             .clip(RoundedCornerShape(8.dp))
             .background(DColors.popup)
-            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
+            .border(1.dp, DColors.ink.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
             .verticalScroll(rememberScrollState())
             .padding(4.dp),
     ) {
@@ -147,9 +159,9 @@ private fun MenuSurface(entries: List<MenuEntry?>, onDismiss: () -> Unit) {
 private fun MenuRow(entry: MenuEntry, onDismiss: () -> Unit) {
     val (source, hovered) = rememberHover()
     val color = when {
-        !entry.enabled -> Color.White.copy(alpha = 0.3f)
+        !entry.enabled -> DColors.ink.copy(alpha = 0.3f)
         entry.danger -> Color(0xFFFF8A80)
-        else -> Color.White
+        else -> DColors.ink
     }
     Box {
         Row(
@@ -168,7 +180,7 @@ private fun MenuRow(entry: MenuEntry, onDismiss: () -> Unit) {
                 Spacer(Modifier.width(10.dp))
             }
             Text(entry.label, style = DType.body.copy(color = color), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-            if (entry.shortcut != null) Text(entry.shortcut, style = DType.small.copy(color = Color.White.copy(alpha = 0.4f)), modifier = Modifier.padding(start = 16.dp))
+            if (entry.shortcut != null) Text(entry.shortcut, style = DType.small.copy(color = DColors.ink.copy(alpha = 0.4f)), modifier = Modifier.padding(start = 16.dp))
             if (entry.submenu != null) Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = color.copy(alpha = 0.6f), modifier = Modifier.size(16.dp))
         }
         if (entry.submenu != null && hovered) {

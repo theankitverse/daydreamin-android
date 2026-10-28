@@ -111,13 +111,13 @@ private fun HomeButton(selected: Boolean, onClick: () -> Unit) {
             Modifier
                 .size(44.dp)
                 .clip(CircleShape)
-                .background(if (hovered) Color.White.copy(alpha = 0.16f) else DColors.field)
+                .background(if (hovered) DColors.ink.copy(alpha = 0.16f) else DColors.field)
                 .hoverable(source)
                 .pointerHoverIcon(PointerIcon.Hand)
                 .clickable(interactionSource = source, indication = null, onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Rounded.Home, contentDescription = "Home", tint = if (selected || hovered) Color.White else DColors.iconIdle, modifier = Modifier.size(22.dp))
+            Icon(Icons.Rounded.Home, contentDescription = "Home", tint = if (selected || hovered) DColors.ink else DColors.iconIdle, modifier = Modifier.size(22.dp))
         }
     }
 }
@@ -143,17 +143,17 @@ private fun SearchBox(modifier: Modifier) {
         modifier
             .height(44.dp)
             .clip(RoundedCornerShape(50))
-            .background(if (focused) DColors.fieldFocused else if (hovered) Color.White.copy(alpha = 0.11f) else DColors.field)
-            .border(1.dp, if (focused) Color.White.copy(alpha = 0.7f) else Color.Transparent, RoundedCornerShape(50))
+            .background(if (focused) DColors.fieldFocused else if (hovered) DColors.ink.copy(alpha = 0.11f) else DColors.field)
+            .border(1.dp, if (focused) DColors.ink.copy(alpha = 0.7f) else Color.Transparent, RoundedCornerShape(50))
             .hoverable(source)
             .pointerHoverIcon(PointerIcon.Text)
             .padding(start = 14.dp, end = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Rounded.Search, contentDescription = null, tint = if (focused) Color.White else DColors.iconIdle, modifier = Modifier.size(20.dp))
+        Icon(Icons.Rounded.Search, contentDescription = null, tint = if (focused) DColors.ink else DColors.iconIdle, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(10.dp))
         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-            if (text.isEmpty()) Text("What do you want to play?", style = DType.body.copy(color = Color.White.copy(alpha = 0.5f)))
+            if (text.isEmpty()) Text("What do you want to play?", style = DType.body.copy(color = DColors.ink.copy(alpha = 0.5f)))
             BasicTextField(
                 value = text,
                 onValueChange = { v ->
@@ -163,8 +163,8 @@ private fun SearchBox(modifier: Modifier) {
                     if (current is Route.Search) nav.replace(Route.Search(v)) else nav.go(Route.Search(v))
                 },
                 singleLine = true,
-                textStyle = DType.body.copy(color = Color.White),
-                cursorBrush = SolidColor(Color.White),
+                textStyle = DType.body.copy(color = DColors.ink),
+                cursorBrush = SolidColor(DColors.ink),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { searchVm.commitSearch(); focusManager.clearFocus() }),
                 modifier = Modifier
@@ -179,7 +179,7 @@ private fun SearchBox(modifier: Modifier) {
         if (text.isNotEmpty()) {
             DIconButton(Icons.Rounded.Close, "Clear search", { text = ""; nav.replace(Route.Search("")); runCatching { focus.requestFocus() } }, size = 28.dp, iconSize = 17.dp)
         } else if (!focused) {
-            Text("${cmd}K", style = DType.small.copy(color = Color.White.copy(alpha = 0.35f)), modifier = Modifier.padding(end = 8.dp))
+            Text("${cmd}K", style = DType.small.copy(color = DColors.ink.copy(alpha = 0.35f)), modifier = Modifier.padding(end = 8.dp))
         }
     }
 }

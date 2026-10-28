@@ -9,8 +9,11 @@ import kotlin.reflect.KProperty
 /** How big the lyrics are, full window. */
 enum class LyricsSize(val label: String, val fontSize: TextUnit) { SMALL("Small", 28.sp), MEDIUM("Medium", 36.sp), LARGE("Large", 46.sp) }
 
+/** Light or dark: the system's choice, or always one. */
+enum class ThemeMode(val label: String) { SYSTEM("Match system"), LIGHT("Light"), DARK("Dark") }
+
 /** What the window's glass sits on. */
-enum class Backdrop(val label: String) { ARTWORK("Song artwork"), BRAND("Daydreamin colours"), PLAIN("Plain dark") }
+enum class Backdrop(val label: String) { ARTWORK("Song artwork"), BRAND("Daydreamin colours"), PLAIN("Plain") }
 
 /**
  * Settings only the computer app has (the window, the tray, the lyrics view). They live with the
@@ -37,6 +40,8 @@ object DesktopSettings {
     var lyricsBlur: Boolean by flag("lyricsBlur", true)
 
     var backdrop: Backdrop by choice("backdrop", Backdrop.ARTWORK)
+
+    var theme: ThemeMode by choice("theme", ThemeMode.SYSTEM)
 
     /** The sidebar as icons only, however wide the window. */
     var compactSidebar: Boolean by flag("compactSidebar", false)

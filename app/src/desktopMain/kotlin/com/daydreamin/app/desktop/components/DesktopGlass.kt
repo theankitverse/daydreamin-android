@@ -53,22 +53,28 @@ fun WindowBackdrop(modifier: Modifier = Modifier, vivid: Boolean = false) {
     val light = rememberArtworkLight(url.takeIf { style == Backdrop.ARTWORK }, BrandLight)
     // Into and out of the lyrics, the colours swell and settle rather than switching.
     val bright by animateFloatAsState(if (vivid) 1f else 0f, tween(500), label = "backdrop")
-    Box(modifier.fillMaxSize().background(Color.Black)) {
-        if (style == Backdrop.ARTWORK) ArtworkBackdrop(url, Modifier.fillMaxSize().alpha(0.55f + 0.45f * bright), blur = 0.dp, tiny = true)
+    // The light theme: the same colours as a pale wash on a light window, under a white veil.
+    val pale = com.daydreamin.app.desktop.theme.DPalette.light
+    Box(modifier.fillMaxSize().background(if (pale) com.daydreamin.app.desktop.theme.DColors.window else Color.Black)) {
+        if (style == Backdrop.ARTWORK) ArtworkBackdrop(url, Modifier.fillMaxSize().alpha(if (pale) 0.32f else 0.55f + 0.45f * bright), blur = 0.dp, tiny = true)
         if (style != Backdrop.PLAIN) Box(
             Modifier.fillMaxSize().drawBehind {
                 // Key light from the top left, fill from the bottom right, then darkened so text stays crisp.
                 drawRect(Brush.radialGradient(listOf(light.key.copy(alpha = 0.38f + 0.2f * bright), Color.Transparent), center = Offset(size.width * 0.12f, 0f), radius = size.maxDimension * 0.75f))
                 drawRect(Brush.radialGradient(listOf(light.fill.copy(alpha = 0.26f + 0.2f * bright), Color.Transparent), center = Offset(size.width, size.height), radius = size.maxDimension * 0.7f))
-                val dim = 1f - 0.55f * bright
-                drawRect(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.30f * dim), Color.Black.copy(alpha = 0.55f * dim), Color.Black.copy(alpha = 0.72f * dim + 0.1f * bright))))
+                if (pale) {
+                    drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.45f), Color.White.copy(alpha = 0.62f), Color.White.copy(alpha = 0.74f))))
+                } else {
+                    val dim = 1f - 0.55f * bright
+                    drawRect(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.30f * dim), Color.Black.copy(alpha = 0.55f * dim), Color.Black.copy(alpha = 0.72f * dim + 0.1f * bright))))
+                }
             },
-        ) else Box(Modifier.fillMaxSize().background(Color(0xFF07070A)))
+        ) else Box(Modifier.fillMaxSize().background(if (pale) com.daydreamin.app.desktop.theme.DColors.window else Color(0xFF07070A)))
     }
 }
 
-/** A dark see-through pane with the shared glass edge and sheen — the desktop's panels. */
-fun Modifier.desktopGlass(shape: Shape, tint: Color = Color(0xFF09090E).copy(alpha = 0.66f), level: Glass = Glass.Clear): Modifier =
+/** A see-through pane (dark, or frosted white in the light theme) with the shared glass edge and sheen — the desktop's panels. */
+fun Modifier.desktopGlass(shape: Shape, tint: Color = com.daydreamin.app.desktop.theme.DColors.glassTint, level: Glass = Glass.Clear): Modifier =
     glass(shape, level, tint = tint)
 
 /**

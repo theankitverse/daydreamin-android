@@ -67,6 +67,7 @@ import com.daydreamin.app.AppGraph
 import com.daydreamin.app.data.download.DownloadStatus
 import com.daydreamin.app.data.download.Downloads
 import com.daydreamin.app.desktop.Backdrop
+import com.daydreamin.app.desktop.ThemeMode
 import com.daydreamin.app.desktop.DesktopSettings
 import com.daydreamin.app.desktop.LyricsSize
 import com.daydreamin.app.desktop.components.ConfirmDialog
@@ -139,9 +140,9 @@ fun SettingsPage(start: SettingsSection? = null) {
                         .padding(horizontal = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(s.icon, contentDescription = null, tint = if (selected) Color.White else DColors.iconIdle, modifier = Modifier.size(18.dp))
+                    Icon(s.icon, contentDescription = null, tint = if (selected) DColors.ink else DColors.iconIdle, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(12.dp))
-                    Text(s.label, style = DType.itemTitle.copy(color = if (selected) Color.White else Color.White.copy(alpha = 0.75f)))
+                    Text(s.label, style = DType.itemTitle.copy(color = if (selected) DColors.ink else DColors.ink.copy(alpha = 0.75f)))
                 }
             }
         }
@@ -199,12 +200,12 @@ private fun LyricsSettings() {
     Spacer(Modifier.height(20.dp))
     Text("PREVIEW", style = DType.label, modifier = Modifier.padding(bottom = 8.dp))
     // The setting as it'll look.
-    Column(Modifier.fillMaxWidth().desktopGlass(RoundedCornerShape(10.dp), tint = Color.White.copy(alpha = 0.04f)).padding(horizontal = 24.dp, vertical = 18.dp)) {
+    Column(Modifier.fillMaxWidth().desktopGlass(RoundedCornerShape(10.dp), tint = DColors.ink.copy(alpha = 0.04f)).padding(horizontal = 24.dp, vertical = 18.dp)) {
         val size = DesktopSettings.lyricsSize.fontSize
-        val style = TextStyle(fontSize = size, lineHeight = size * 1.18f, fontWeight = FontWeight.ExtraBold, color = Color.White)
+        val style = TextStyle(fontSize = size, lineHeight = size * 1.18f, fontWeight = FontWeight.ExtraBold, color = DColors.ink)
         listOf("A line already sung" to 0.42f, "The line being sung" to 1f, "The next line, coming up" to 0.3f).forEachIndexed { i, (text, alpha) ->
             val soft = DesktopSettings.lyricsBlur && i != 1
-            Text(text, style = style.copy(color = Color.White.copy(alpha = alpha)), modifier = Modifier.padding(vertical = 6.dp).then(if (soft) Modifier.blur(1.4.dp, BlurredEdgeTreatment.Unbounded) else Modifier))
+            Text(text, style = style.copy(color = DColors.ink.copy(alpha = alpha)), modifier = Modifier.padding(vertical = 6.dp).then(if (soft) Modifier.blur(1.4.dp, BlurredEdgeTreatment.Unbounded) else Modifier))
         }
     }
 }
@@ -222,6 +223,12 @@ private fun AppearanceSettings() {
                 AccentPalette.forEach { option -> AccentSwatch(option.name, option.color, option.name == accentName) { theme.setAccent(option.name) } }
             }
         }
+        Divider()
+        ChoiceSetting(
+            "Theme",
+            "Light or dark. Match system follows your computer's own setting, and switches when it does.",
+            ThemeMode.entries.map { it.label }, DesktopSettings.theme.ordinal,
+        ) { DesktopSettings.theme = ThemeMode.entries[it] }
         Divider()
         ChoiceSetting(
             "Window background",
@@ -325,7 +332,7 @@ private fun LibrarySettings() {
         }
         Divider()
         ActionSetting("Import library", "Add songs and playlists from a Daydreamin backup. Importing only adds — nothing here is removed.", "Import…") { importLauncher.launch("") }
-        backupStatus?.let { Text(it, style = DType.small.copy(color = Color.White.copy(alpha = 0.8f)), modifier = Modifier.padding(bottom = 12.dp)) }
+        backupStatus?.let { Text(it, style = DType.small.copy(color = DColors.ink.copy(alpha = 0.8f)), modifier = Modifier.padding(bottom = 12.dp)) }
     }
     Spacer(Modifier.height(16.dp))
     Group {
@@ -367,8 +374,8 @@ private fun ShortcutList() {
             if (i > 0) Divider()
             Row(Modifier.fillMaxWidth().padding(vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(what, style = DType.itemTitle, modifier = Modifier.weight(1f))
-                Box(Modifier.clip(RoundedCornerShape(6.dp)).background(Color.White.copy(alpha = 0.08f)).border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(6.dp)).padding(horizontal = 10.dp, vertical = 4.dp)) {
-                    Text(keys, style = DType.small.copy(color = Color.White, fontWeight = FontWeight.SemiBold))
+                Box(Modifier.clip(RoundedCornerShape(6.dp)).background(DColors.ink.copy(alpha = 0.08f)).border(1.dp, DColors.ink.copy(alpha = 0.1f), RoundedCornerShape(6.dp)).padding(horizontal = 10.dp, vertical = 4.dp)) {
+                    Text(keys, style = DType.small.copy(color = DColors.ink, fontWeight = FontWeight.SemiBold))
                 }
             }
         }
@@ -380,7 +387,7 @@ private fun ShortcutList() {
 private fun AboutSettings() {
     val vm: SettingsViewModel = composeViewModel { SettingsViewModel() }
     val extractor by vm.extractorState.collectAsState()
-    Column(Modifier.desktopGlass(RoundedCornerShape(10.dp), tint = Color.White.copy(alpha = 0.03f)).padding(vertical = 8.dp)) {
+    Column(Modifier.desktopGlass(RoundedCornerShape(10.dp), tint = DColors.ink.copy(alpha = 0.03f)).padding(vertical = 8.dp)) {
         AboutCard(); SupportRow(); UpiRow(); CreatorRow(); UpdateRow(); ExtractorRow(extractor, onCheck = vm::testExtractor)
     }
     com.daydreamin.app.desktop.components.MadeBy(Modifier.padding(top = 14.dp, start = 4.dp))
@@ -389,7 +396,7 @@ private fun AboutSettings() {
 /** Settings that belong together, on one card. */
 @Composable
 private fun Group(content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxWidth().desktopGlass(RoundedCornerShape(10.dp), tint = Color.White.copy(alpha = 0.03f)).padding(horizontal = 18.dp), content = content)
+    Column(Modifier.fillMaxWidth().desktopGlass(RoundedCornerShape(10.dp), tint = DColors.ink.copy(alpha = 0.03f)).padding(horizontal = 18.dp), content = content)
 }
 
 @Composable
@@ -419,7 +426,7 @@ private fun ToggleSetting(title: String, body: String, checked: Boolean, enabled
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f).padding(end = 24.dp)) {
-            Text(title, style = DType.itemTitleStrong.copy(color = if (enabled) Color.White else Color.White.copy(alpha = 0.4f)))
+            Text(title, style = DType.itemTitleStrong.copy(color = if (enabled) DColors.ink else DColors.ink.copy(alpha = 0.4f)))
             Text(body, style = DType.small, modifier = Modifier.padding(top = 2.dp))
         }
         Box(Modifier.dim(enabled)) { GlassSwitch(checked) }
@@ -450,7 +457,7 @@ private fun AccentSwatch(name: String, color: Color, selected: Boolean, onClick:
                 .size(36.dp)
                 .clip(CircleShape)
                 .background(color)
-                .border(if (selected) 2.dp else if (hovered) 1.dp else 0.dp, Color.White.copy(alpha = if (selected) 1f else 0.6f), CircleShape)
+                .border(if (selected) 2.dp else if (hovered) 1.dp else 0.dp, DColors.ink.copy(alpha = if (selected) 1f else 0.6f), CircleShape)
                 .hoverable(source)
                 .pointerHoverIcon(PointerIcon.Hand)
                 .combinedClickable(interactionSource = source, indication = null, onClick = onClick),

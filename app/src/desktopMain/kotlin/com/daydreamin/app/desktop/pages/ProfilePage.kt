@@ -1,5 +1,6 @@
 package com.daydreamin.app.desktop.pages
 
+import com.daydreamin.app.desktop.theme.DColors
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -97,13 +98,13 @@ fun ProfilePage() {
                     Box(Modifier.size(180.dp)) { UserAvatar(size = 180.dp, ring = false) }
                     Spacer(Modifier.width(28.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("PROFILE", style = DType.label.copy(color = Color.White.copy(alpha = 0.8f)))
+                        Text("PROFILE", style = DType.label.copy(color = DColors.ink.copy(alpha = 0.8f)))
                         Spacer(Modifier.height(6.dp))
                         Text(name.ifBlank { "You" }, style = DType.hero.copy(fontSize = 64.sp, lineHeight = 70.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Spacer(Modifier.height(10.dp))
                         Text(
                             listOf("${playlists.size} ${if (playlists.size == 1) "playlist" else "playlists"}", "${liked.size} liked", totalPlays?.let { "$it plays" }).filterNotNull().joinToString(" · "),
-                            style = DType.body.copy(color = Color.White.copy(alpha = 0.8f)),
+                            style = DType.body.copy(color = DColors.ink.copy(alpha = 0.8f)),
                         )
                         Spacer(Modifier.height(16.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -194,7 +195,7 @@ fun StatsPage() {
 
 @Composable
 private fun StatTile(value: String, label: String, modifier: Modifier) {
-    Column(modifier.height(116.dp).desktopGlass(RoundedCornerShape(10.dp), tint = Color.White.copy(alpha = 0.04f)).padding(18.dp)) {
+    Column(modifier.height(116.dp).desktopGlass(RoundedCornerShape(10.dp), tint = DColors.ink.copy(alpha = 0.04f)).padding(18.dp)) {
         Text(value, style = DType.hero.copy(fontSize = 34.sp, lineHeight = 38.sp))
         Spacer(Modifier.height(6.dp))
         Text(label, style = DType.small)

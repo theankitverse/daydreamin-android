@@ -95,12 +95,12 @@ fun ApplicationScope.MiniPlayerWindow(onExpand: () -> Unit, onQuit: () -> Unit, 
                                 Text(song?.artist ?: "", style = DType.itemSubtitle.copy(color = Color.White.copy(alpha = 0.7f)), maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                DIconButton(Icons.Rounded.SkipPrevious, "Previous", { PlayerController.previous() }, iconSize = 22.dp, enabled = song != null)
+                                DIconButton(Icons.Rounded.SkipPrevious, "Previous", { PlayerController.previous() }, iconSize = 22.dp, enabled = song != null, tint = Color.White)
                                 Box(
                                     Modifier.size(32.dp).clip(CircleShape).background(Color.White).desktopClickable(CircleShape, highlight = false, enabled = song != null) { PlayerController.togglePlayPause() },
                                     contentAlignment = Alignment.Center,
                                 ) { Icon(if (meta.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, contentDescription = if (meta.isPlaying) "Pause" else "Play", tint = Color.Black, modifier = Modifier.size(20.dp)) }
-                                DIconButton(Icons.Rounded.SkipNext, "Next", { PlayerController.next() }, iconSize = 22.dp, enabled = song != null)
+                                DIconButton(Icons.Rounded.SkipNext, "Next", { PlayerController.next() }, iconSize = 22.dp, enabled = song != null, tint = Color.White)
                             }
                             // The time, as a thin line along the bottom.
                             val fraction = if (progress.durationMs > 0) (progress.positionMs.toFloat() / progress.durationMs).coerceIn(0f, 1f) else 0f
@@ -109,9 +109,9 @@ fun ApplicationScope.MiniPlayerWindow(onExpand: () -> Unit, onQuit: () -> Unit, 
                             }
                         }
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            DIconButton(Icons.Rounded.OpenInFull, "Back to the full window", onExpand, size = 28.dp, iconSize = 16.dp)
+                            DIconButton(Icons.Rounded.OpenInFull, "Back to the full window", onExpand, size = 28.dp, iconSize = 16.dp, tint = Color.White.copy(alpha = 0.8f))
                             Spacer(Modifier.width(0.dp))
-                            DIconButton(Icons.Rounded.Close, "Quit Daydreamin", onQuit, size = 28.dp, iconSize = 16.dp)
+                            DIconButton(Icons.Rounded.Close, "Quit Daydreamin", onQuit, size = 28.dp, iconSize = 16.dp, tint = Color.White.copy(alpha = 0.8f))
                         }
                     }
                 }

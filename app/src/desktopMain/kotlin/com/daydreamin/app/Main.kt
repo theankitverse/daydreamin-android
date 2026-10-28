@@ -117,6 +117,8 @@ fun main(args: Array<String>) {
     }
     // --onboarded (for development and CI): skip first-run setup, to see Home and the rest.
     if ("--onboarded" in args) kotlinx.coroutines.runBlocking { AppGraph.prefs.setOnboarded() }
+    // --theme light|dark: draw this run light or dark whatever Settings and the system say (for checking both).
+    args.indexOf("--theme").takeIf { it >= 0 }?.let { args.getOrNull(it + 1) }?.let { com.daydreamin.app.desktop.theme.DPalette.forced = it == "light" }
     val snapshotDir = args.indexOf("--snapshot").takeIf { it >= 0 }?.let { args.getOrNull(it + 1) }
     if (snapshotDir != null) {
         // --pages home,settings,now_playing (routes; default: home)
@@ -171,6 +173,11 @@ fun main(args: Array<String>) {
             onKeyEvent = ::handleShortcut,
         ) {
             val titleBar = androidx.compose.runtime.remember { WindowChrome.install(window, com.daydreamin.app.desktop.theme.DSize.topBarHeight) }
+            // Light or dark follows the computer's setting (unless Settings picks one); the window buttons follow too.
+            androidx.compose.runtime.LaunchedEffect(Unit) { com.daydreamin.app.desktop.theme.SystemTheme.follow(this) }
+            androidx.compose.runtime.LaunchedEffect(titleBar) {
+                if (titleBar != null) androidx.compose.runtime.snapshotFlow { com.daydreamin.app.desktop.theme.DPalette.light }.collect { titleBar.setDark(!it) }
+            }
             androidx.compose.runtime.LaunchedEffect(Unit) {
                 // Small enough for half a laptop screen; below this the layout would have to drop things.
                 window.minimumSize = java.awt.Dimension(720, 520)

@@ -204,7 +204,7 @@ private fun TopResultCard(song: Song, onPlay: () -> Unit) {
             Modifier
                 .fillMaxWidth()
                 .height(236.dp)
-                .desktopGlass(RoundedCornerShape(10.dp), tint = if (hovered) Color.White.copy(alpha = 0.10f) else Color.White.copy(alpha = 0.05f))
+                .desktopGlass(RoundedCornerShape(10.dp), tint = if (hovered) DColors.ink.copy(alpha = 0.10f) else DColors.ink.copy(alpha = 0.05f))
                 .hoverable(source)
                 .pointerHoverIcon(PointerIcon.Hand)
                 .combinedClickable(interactionSource = source, indication = null, onClick = onPlay)
@@ -216,7 +216,7 @@ private fun TopResultCard(song: Song, onPlay: () -> Unit) {
                 Text(song.title, style = DType.pageTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.height(6.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(song.artist, style = DType.body.copy(color = Color.White.copy(alpha = 0.75f)), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                    Text(song.artist, style = DType.body.copy(color = DColors.ink.copy(alpha = 0.75f)), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                     Spacer(Modifier.width(10.dp))
                     Box(Modifier.clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.35f)).padding(horizontal = 10.dp, vertical = 3.dp)) {
                         Text("Song", style = DType.small.copy(color = Color.White, fontWeight = FontWeight.SemiBold))
@@ -254,7 +254,7 @@ private fun CompactSongRow(song: Song, onPlay: () -> Unit) {
                 }
             }
             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                Text(song.title, style = DType.itemTitle.copy(color = if (isCurrent) accent else Color.White), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(song.title, style = DType.itemTitle.copy(color = if (isCurrent) accent else DColors.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(song.artist, style = DType.itemSubtitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Text(com.daydreamin.app.desktop.components.formatDuration(song.duration), style = DType.numeric)
@@ -302,7 +302,7 @@ private fun RecentChip(query: String, onOpen: () -> Unit, onRemove: () -> Unit) 
         Modifier
             .height(36.dp)
             .clip(RoundedCornerShape(50))
-            .background(if (hovered) Color.White.copy(alpha = 0.14f) else Color.White.copy(alpha = 0.07f))
+            .background(if (hovered) DColors.ink.copy(alpha = 0.14f) else DColors.ink.copy(alpha = 0.07f))
             .hoverable(source)
             .pointerHoverIcon(PointerIcon.Hand)
             .combinedClickable(interactionSource = source, indication = null, onClick = onOpen)
@@ -311,7 +311,7 @@ private fun RecentChip(query: String, onOpen: () -> Unit, onRemove: () -> Unit) 
     ) {
         Icon(Icons.Rounded.History, contentDescription = null, tint = DColors.iconIdle, modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(8.dp))
-        Text(query, style = DType.small.copy(color = Color.White), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(query, style = DType.small.copy(color = DColors.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
         DIconButton(Icons.Rounded.Close, "Remove “$query”", onRemove, size = 26.dp, iconSize = 14.dp)
     }
 }
@@ -324,11 +324,11 @@ internal fun ViewChip(label: String, selected: Boolean, onClick: () -> Unit) {
         Modifier
             .height(32.dp)
             .clip(RoundedCornerShape(50))
-            .background(if (selected) Color.White else if (hovered) Color.White.copy(alpha = 0.14f) else Color.White.copy(alpha = 0.07f))
+            .background(if (selected) DColors.ink else if (hovered) DColors.ink.copy(alpha = 0.14f) else DColors.ink.copy(alpha = 0.07f))
             .hoverable(source)
             .pointerHoverIcon(PointerIcon.Hand)
             .combinedClickable(interactionSource = source, indication = null, onClick = onClick)
             .padding(horizontal = 14.dp),
         contentAlignment = Alignment.Center,
-    ) { Text(label, style = DType.small.copy(fontWeight = FontWeight.SemiBold, color = if (selected) Color.Black else Color.White)) }
+    ) { Text(label, style = DType.small.copy(fontWeight = FontWeight.SemiBold, color = if (selected) DColors.onInk else DColors.ink)) }
 }

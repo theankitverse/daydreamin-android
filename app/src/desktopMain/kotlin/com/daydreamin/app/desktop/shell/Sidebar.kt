@@ -112,9 +112,9 @@ fun Sidebar(narrow: Boolean, width: Dp, modifier: Modifier = Modifier) {
                             Modifier.weight(1f).desktopClickable(highlight = false) { nav.go(Route.Library) },
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Icon(Icons.Rounded.LibraryMusic, contentDescription = null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(20.dp))
+                            Icon(Icons.Rounded.LibraryMusic, contentDescription = null, tint = DColors.ink.copy(alpha = 0.7f), modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(10.dp))
-                            Text("Your Library", style = DType.panelTitle.copy(color = Color.White.copy(alpha = 0.85f)))
+                            Text("Your Library", style = DType.panelTitle.copy(color = DColors.ink.copy(alpha = 0.85f)))
                         }
                     }
                     DIconButton(Icons.Rounded.Add, "New playlist", { naming = true }, iconSize = 20.dp)
@@ -128,7 +128,7 @@ fun Sidebar(narrow: Boolean, width: Dp, modifier: Modifier = Modifier) {
 
 @Composable
 private fun NavRow(icon: ImageVector, label: String, selected: Boolean, narrow: Boolean, shortcut: String?, onClick: () -> Unit) {
-    val color = if (selected) Color.White else Color.White.copy(alpha = 0.66f)
+    val color = if (selected) DColors.ink else DColors.ink.copy(alpha = 0.66f)
     WithTooltip(if (narrow) label else null, shortcut) {
         Row(
             Modifier.fillMaxWidth().height(40.dp).desktopClickable(RoundedCornerShape(6.dp), onClick = onClick).padding(horizontal = if (narrow) 0.dp else 10.dp),
@@ -232,7 +232,7 @@ private fun LibraryRow(
             Box(Modifier.size(46.dp).clip(RoundedCornerShape(5.dp))) { art(46.dp) }
             if (!narrow) {
                 Column(Modifier.padding(start = 12.dp).weight(1f)) {
-                    Text(title, style = DType.itemTitle.copy(color = if (selected) LocalAccent.current else Color.White), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(title, style = DType.itemTitle.copy(color = if (selected) LocalAccent.current else DColors.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(subtitle, style = DType.itemSubtitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
@@ -241,9 +241,9 @@ private fun LibraryRow(
 }
 
 @Composable
-internal fun IconTile(icon: ImageVector, size: Dp, tint: Color = Color.White) {
+internal fun IconTile(icon: ImageVector, size: Dp, tint: Color = DColors.ink) {
     Box(
-        Modifier.size(size).background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFF2A2A3A), Color(0xFF15151C)))),
+        Modifier.size(size).background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(DColors.tileTop, DColors.tileBottom))),
         contentAlignment = Alignment.Center,
     ) { Icon(icon, contentDescription = null, tint = tint.copy(alpha = 0.85f), modifier = Modifier.size(size * 0.45f)) }
 }

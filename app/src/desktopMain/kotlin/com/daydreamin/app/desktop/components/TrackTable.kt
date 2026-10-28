@@ -154,7 +154,7 @@ private fun TableHeader(state: TrackTableState, showAlbum: Boolean) {
 private fun HeaderCell(label: String?, by: SortBy, state: TrackTableState, modifier: Modifier, icon: Boolean = false) {
     val (source, hovered) = rememberHover()
     val active = state.sortBy == by
-    val color = if (active || hovered) Color.White else DType.label.color
+    val color = if (active || hovered) DColors.ink else DType.label.color
     // The column's width goes on the outside, or the tooltip's own box would swallow it.
     WithTooltip(if (icon) "Sort by length" else "Sort by ${label!!.lowercase()}", modifier = modifier) {
         Row(
@@ -212,7 +212,7 @@ fun TrackRow(
                     hovered -> Icon(
                         Icons.Rounded.PlayArrow,
                         contentDescription = "Play ${song.title}",
-                        tint = Color.White,
+                        tint = DColors.ink,
                         modifier = Modifier.size(20.dp).pointerHoverIcon(PointerIcon.Hand).combinedClickable(onClick = onPlay),
                     )
                     isCurrent && rememberIsPlaying() -> PlayingBars(accent)
@@ -223,7 +223,7 @@ fun TrackRow(
             Row(Modifier.weight(if (showAlbum) 0.55f else 1f), verticalAlignment = Alignment.CenterVertically) {
                 Artwork(url = song.cover.ifBlank { song.artworkUrl }, shape = RoundedCornerShape(4.dp), modifier = Modifier.size(DSize.rowArt))
                 Column(Modifier.padding(start = 12.dp, end = 12.dp)) {
-                    Text(song.title, style = DType.itemTitle.copy(color = if (isCurrent) accent else Color.White), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(song.title, style = DType.itemTitle.copy(color = if (isCurrent) accent else DColors.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         DownloadedMark(song, Modifier.padding(end = 4.dp))
                         Text(song.artist, style = DType.itemSubtitle, maxLines = 1, overflow = TextOverflow.Ellipsis)

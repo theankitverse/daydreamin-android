@@ -1,5 +1,6 @@
 package com.daydreamin.app.desktop.components
 
+import com.daydreamin.app.desktop.theme.DColors
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -103,7 +104,7 @@ fun SongDragGhost() {
         Modifier
             .offset { IntOffset(SongDrag.position.x.roundToInt() + 14, SongDrag.position.y.roundToInt() + 10) }
             .shadow(16.dp, RoundedCornerShape(8.dp))
-            .background(Color(0xFF22222C), RoundedCornerShape(8.dp))
+            .background(DColors.popup, RoundedCornerShape(8.dp))
             .padding(6.dp)
             .widthIn(max = 280.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -112,7 +113,7 @@ fun SongDragGhost() {
         Spacer(Modifier.width(8.dp))
         Text(
             if (target != null) "Add to $target" else song.title,
-            style = DType.itemTitleStrong.copy(color = Color.White),
+            style = DType.itemTitleStrong.copy(color = DColors.ink),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(end = 6.dp),

@@ -1,5 +1,6 @@
 package com.daydreamin.app.desktop.shell
 
+import com.daydreamin.app.desktop.theme.DColors
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
@@ -128,7 +129,7 @@ internal fun LinkText(text: String, style: androidx.compose.ui.text.TextStyle, o
     val (source, hovered) = rememberHover()
     Text(
         text,
-        style = style.copy(textDecoration = if (hovered) TextDecoration.Underline else null, color = if (hovered) Color.White else style.color),
+        style = style.copy(textDecoration = if (hovered) TextDecoration.Underline else null, color = if (hovered) DColors.ink else style.color),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
         modifier = Modifier.hoverable(source).pointerHoverIcon(PointerIcon.Hand).clickable(interactionSource = source, indication = null, onClick = onClick),
@@ -182,14 +183,14 @@ private fun PlayButton(playing: Boolean, buffering: Boolean, enabled: Boolean) {
             Modifier
                 .size(if (hovered) 38.dp else 36.dp)
                 .clip(CircleShape)
-                .background(if (enabled) Color.White else Color.White.copy(alpha = 0.3f))
+                .background(if (enabled) DColors.ink else DColors.ink.copy(alpha = 0.3f))
                 .hoverable(source)
                 .then(if (enabled) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
                 .clickable(interactionSource = source, indication = null, role = Role.Button, enabled = enabled) { PlayerController.togglePlayPause() },
             contentAlignment = Alignment.Center,
         ) {
-            if (buffering && playing) CircularProgressIndicator(color = Color.Black, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
-            else Icon(if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, contentDescription = if (playing) "Pause" else "Play", tint = Color.Black, modifier = Modifier.size(24.dp))
+            if (buffering && playing) CircularProgressIndicator(color = DColors.onInk, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+            else Icon(if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, contentDescription = if (playing) "Pause" else "Play", tint = DColors.onInk, modifier = Modifier.size(24.dp))
         }
     }
 }

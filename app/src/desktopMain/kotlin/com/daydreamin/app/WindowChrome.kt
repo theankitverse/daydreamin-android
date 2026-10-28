@@ -47,6 +47,14 @@ object WindowChrome {
 
         fun refresh() { start = bar.leftInset.dp; end = bar.rightInset.dp }
 
+        /** Windows' buttons: light icons and a white wash on the dark app; dark ones on the light app. */
+        fun setDark(dark: Boolean) {
+            val wash = if (dark) 255 else 0
+            bar.putProperty("controls.dark", dark)
+            bar.putProperty("controls.background.hovered", java.awt.Color(wash, wash, wash, if (dark) 24 else 16))
+            bar.putProperty("controls.background.pressed", java.awt.Color(wash, wash, wash, if (dark) 40 else 28))
+        }
+
         /** true: the pointer is over one of the app's controls; false: over empty title bar. */
         fun forceHitTest(client: Boolean) = bar.forceHitTest(client)
     }
@@ -58,12 +66,9 @@ object WindowChrome {
                 val decorations = JBR.getWindowDecorations()
                 val bar = decorations.createCustomTitleBar()
                 bar.height = height.value
-                // Windows' buttons: light icons on the dark app, a soft white wash under the pointer.
-                bar.putProperty("controls.dark", true)
-                bar.putProperty("controls.background.hovered", java.awt.Color(255, 255, 255, 24))
-                bar.putProperty("controls.background.pressed", java.awt.Color(255, 255, 255, 40))
-                decorations.setCustomTitleBar(window, bar)
                 val titleBar = TitleBar(bar)
+                titleBar.setDark(!com.daydreamin.app.desktop.theme.DPalette.light)
+                decorations.setCustomTitleBar(window, bar)
                 // The buttons' room changes as the window shows, and leaves/enters full screen on a Mac.
                 window.addComponentListener(object : java.awt.event.ComponentAdapter() {
                     override fun componentShown(e: java.awt.event.ComponentEvent) = titleBar.refresh()

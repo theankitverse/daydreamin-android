@@ -118,7 +118,7 @@ fun HomePage() {
         PageGlow(light)
         LazyColumn(state = state, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 20.dp, bottom = 40.dp), verticalArrangement = Arrangement.spacedBy(DSpace.sectionGap)) {
             // A newer desktop version has been published: the same card the phone shows, installing in place.
-            if (update.status == com.daydreamin.app.data.update.UpdateStatus.AVAILABLE) item(key = "update") { com.daydreamin.app.ui.components.UpdateBanner(Modifier.padding(horizontal = DSpace.pagePad - 16.dp)) }
+            if (update.status == com.daydreamin.app.data.update.UpdateStatus.AVAILABLE) item(key = "update") { com.daydreamin.app.ui.components.UpdateBanner(Modifier.padding(horizontal = DSpace.pagePad - 16.dp), backing = if (com.daydreamin.app.desktop.theme.DPalette.light) Color(0xFF26262E) else Color.Transparent) }
             item(key = "greeting") {
                 Column(Modifier.padding(horizontal = DSpace.pagePad)) {
                     Text(greeting(), style = DType.pageTitle)
@@ -206,7 +206,7 @@ private fun JumpTile(title: String, songs: List<Song>, onOpen: () -> Unit, modif
         modifier
             .height(56.dp)
             .clip(RoundedCornerShape(6.dp))
-            .background(if (hovered) Color.White.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.08f))
+            .background(if (hovered) DColors.ink.copy(alpha = 0.16f) else DColors.ink.copy(alpha = 0.08f))
             .hoverable(source)
             .pointerHoverIcon(PointerIcon.Hand)
             .combinedClickable(interactionSource = source, indication = null, onClick = onOpen),
@@ -238,7 +238,7 @@ private fun MixBanner(feed: HomeFeed, light: ArtworkLight, refreshing: Boolean, 
             .padding(horizontal = DSpace.pagePad)
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(Brush.horizontalGradient(listOf(light.key.copy(alpha = 0.30f), light.fill.copy(alpha = 0.14f), Color.White.copy(alpha = 0.03f))))
+            .background(Brush.horizontalGradient(listOf(light.key.copy(alpha = 0.30f), light.fill.copy(alpha = 0.14f), DColors.ink.copy(alpha = 0.03f))))
             .border(1.dp, DColors.panelEdge, RoundedCornerShape(12.dp))
             .padding(20.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -246,7 +246,7 @@ private fun MixBanner(feed: HomeFeed, light: ArtworkLight, refreshing: Boolean, 
         Box(Modifier.size(176.dp).shadow(16.dp, RoundedCornerShape(8.dp)).clip(RoundedCornerShape(8.dp)).combinedClickable { nav.go(Route.Collection(title, null, songs, "Mix")) }) { Mosaic(songs, 176.dp) }
         Spacer(Modifier.width(24.dp))
         Column(Modifier.weight(1f)) {
-            Text(if (popular) "POPULAR RIGHT NOW" else "MADE FOR YOU", style = DType.label.copy(color = Color.White.copy(alpha = 0.7f)))
+            Text(if (popular) "POPULAR RIGHT NOW" else "MADE FOR YOU", style = DType.label.copy(color = DColors.ink.copy(alpha = 0.7f)))
             Spacer(Modifier.height(6.dp))
             // Sized to the space: the full title on a narrow page, not "Your Daydream …".
             BoxWithConstraints { Text(title, style = DType.hero.copy(fontSize = if (maxWidth < 420.dp) 28.sp else if (maxWidth < 560.dp) 34.sp else 40.sp, lineHeight = 46.sp), maxLines = 1, overflow = TextOverflow.Ellipsis) }
@@ -339,7 +339,7 @@ private fun GridSongRow(song: Song, onPlay: () -> Unit) {
                 }
             }
             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                Text(song.title, style = DType.itemTitle.copy(color = if (isCurrent) accent else Color.White), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(song.title, style = DType.itemTitle.copy(color = if (isCurrent) accent else DColors.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(song.artist, style = DType.itemSubtitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }

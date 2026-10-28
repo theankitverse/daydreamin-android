@@ -117,7 +117,7 @@ fun SidePanel(modifier: Modifier = Modifier) {
 @Composable
 private fun TabChip(label: String, selected: Boolean, onClick: () -> Unit) {
     val (source, hovered) = rememberHover()
-    val bg by animateColorAsState(if (selected) Color.White else if (hovered) Color.White.copy(alpha = 0.14f) else Color.White.copy(alpha = 0.07f), tween(120), label = "tab")
+    val bg by animateColorAsState(if (selected) DColors.ink else if (hovered) DColors.ink.copy(alpha = 0.14f) else DColors.ink.copy(alpha = 0.07f), tween(120), label = "tab")
     Box(
         Modifier
             .height(30.dp)
@@ -128,7 +128,7 @@ private fun TabChip(label: String, selected: Boolean, onClick: () -> Unit) {
             .combinedClickable(interactionSource = source, indication = null, onClick = onClick)
             .padding(horizontal = 12.dp),
         contentAlignment = Alignment.Center,
-    ) { Text(label, style = DType.small.copy(fontWeight = FontWeight.SemiBold, color = if (selected) Color.Black else Color.White)) }
+    ) { Text(label, style = DType.small.copy(fontWeight = FontWeight.SemiBold, color = if (selected) DColors.onInk else DColors.ink)) }
 }
 
 @Composable
@@ -156,10 +156,10 @@ private fun NowPlayingView(song: Song, queue: List<Song>) {
                 if (menuOpen) MenuPopup(menu(), onDismiss = { menuOpen = false })
             }
         }
-        meta.streamQuality?.let { Text(it, style = DType.small.copy(color = Color.White.copy(alpha = 0.4f)), modifier = Modifier.padding(top = 4.dp)) }
+        meta.streamQuality?.let { Text(it, style = DType.small.copy(color = DColors.ink.copy(alpha = 0.4f)), modifier = Modifier.padding(top = 4.dp)) }
         Spacer(Modifier.height(20.dp))
         queue.firstOrNull()?.let { next ->
-            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color.White.copy(alpha = 0.06f)).padding(12.dp)) {
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(DColors.ink.copy(alpha = 0.06f)).padding(12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Next in queue", style = DType.panelTitle, modifier = Modifier.weight(1f))
                     Text("Open queue", style = DType.small.copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.desktopClickable { DesktopUi.open(PanelTab.QUEUE) }.padding(4.dp))
@@ -245,7 +245,7 @@ private fun QueueRow(song: Song, onPlay: () -> Unit, onRemove: (() -> Unit)?, on
                 }
             }
             Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
-                Text(song.title, style = DType.itemTitle.copy(color = if (current) accent else Color.White), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(song.title, style = DType.itemTitle.copy(color = if (current) accent else DColors.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(song.artist, style = DType.itemSubtitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             if (hovered && onRemove != null) DIconButton(Icons.Rounded.Close, "Remove from queue", onRemove, size = 26.dp, iconSize = 16.dp)

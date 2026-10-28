@@ -140,7 +140,7 @@ fun CollectionPage(route: Route) {
                     Box(Modifier.size(artSize).shadow(24.dp, RoundedCornerShape(6.dp)).clip(RoundedCornerShape(6.dp))) { c.art(artSize) }
                     Spacer(Modifier.width(24.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(c.kind.uppercase(), style = DType.label.copy(color = Color.White.copy(alpha = 0.8f)))
+                        Text(c.kind.uppercase(), style = DType.label.copy(color = DColors.ink.copy(alpha = 0.8f)))
                         Spacer(Modifier.height(6.dp))
                         Text(
                             c.title,
@@ -150,7 +150,7 @@ fun CollectionPage(route: Route) {
                         Spacer(Modifier.height(10.dp))
                         Text(
                             listOfNotNull(c.owner, songs?.let { "${it.size} ${if (it.size == 1) "song" else "songs"}" + totalLength(it).let { t -> if (t.isNotEmpty()) ", $t" else "" } }).joinToString(" · "),
-                            style = DType.body.copy(color = Color.White.copy(alpha = 0.8f)),
+                            style = DType.body.copy(color = DColors.ink.copy(alpha = 0.8f)),
                         )
                     }
                 }
@@ -225,15 +225,15 @@ private fun ActionRow(c: Collection, shown: List<Song>, playingThis: Boolean, fi
         // Find a song in this list.
         if (searching || filter.isNotEmpty()) {
             Row(
-                Modifier.width(220.dp).height(34.dp).clip(RoundedCornerShape(6.dp)).background(DColors.field).border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(6.dp)).padding(horizontal = 10.dp),
+                Modifier.width(220.dp).height(34.dp).clip(RoundedCornerShape(6.dp)).background(DColors.field).border(1.dp, DColors.ink.copy(alpha = 0.15f), RoundedCornerShape(6.dp)).padding(horizontal = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(Icons.Rounded.Search, contentDescription = null, tint = DColors.iconIdle, modifier = Modifier.size(17.dp))
                 Spacer(Modifier.width(8.dp))
                 Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                    if (filter.isEmpty()) Text("Search in ${if (c.playlistId != null) "playlist" else "this list"}", style = DType.small.copy(color = Color.White.copy(alpha = 0.45f)))
+                    if (filter.isEmpty()) Text("Search in ${if (c.playlistId != null) "playlist" else "this list"}", style = DType.small.copy(color = DColors.ink.copy(alpha = 0.45f)))
                     val focus = remember { androidx.compose.ui.focus.FocusRequester() }
-                    BasicTextField(filter, onFilter, singleLine = true, textStyle = DType.body.copy(color = Color.White), cursorBrush = SolidColor(Color.White), modifier = Modifier.fillMaxWidth().focusRequester(focus))
+                    BasicTextField(filter, onFilter, singleLine = true, textStyle = DType.body.copy(color = DColors.ink), cursorBrush = SolidColor(DColors.ink), modifier = Modifier.fillMaxWidth().focusRequester(focus))
                     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
                 }
             }

@@ -168,7 +168,7 @@ fun SectionHeader(title: String, subtitle: String? = null, onShowAll: (() -> Uni
             val (source, hovered) = rememberHover()
             Text(
                 "Show all",
-                style = DType.label.copy(color = if (hovered) Color.White else DType.itemSubtitle.color, letterSpacing = 0.2.sp),
+                style = DType.label.copy(color = if (hovered) DColors.ink else DType.itemSubtitle.color, letterSpacing = 0.2.sp),
                 modifier = Modifier.hoverable(source).pointerHoverIcon(PointerIcon.Hand).clickable(interactionSource = source, indication = null, onClick = onShowAll).padding(4.dp),
             )
         }

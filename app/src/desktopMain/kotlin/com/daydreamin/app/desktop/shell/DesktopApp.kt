@@ -1,5 +1,7 @@
 package com.daydreamin.app.desktop.shell
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -26,7 +28,6 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -102,8 +103,18 @@ fun DesktopApp(start: Route = Route.Home) {
                         Sidebar(narrowSidebar, sidebarWidth)
                         Spacer(Modifier.width(DSpace.gap))
                         Panel(Modifier.weight(1f).fillMaxHeight()) {
-                            // Typing a search replaces the route on every key; the page itself stays.
-                            key(if (nav.current is Route.Search) "search" else nav.current) { Page(nav.current) }
+                            // A new page fades up into place over a fraction of a second. Typing a search
+                            // replaces the route on every key; the page itself stays (no transition).
+                            androidx.compose.animation.AnimatedContent(
+                                targetState = nav.current,
+                                contentKey = { if (it is Route.Search) "search" else it },
+                                transitionSpec = {
+                                    (androidx.compose.animation.fadeIn(tween(200, delayMillis = 50)) +
+                                        androidx.compose.animation.slideInVertically(tween(280, easing = androidx.compose.animation.core.FastOutSlowInEasing)) { it / 48 }) togetherWith
+                                        androidx.compose.animation.fadeOut(tween(90))
+                                },
+                                label = "page",
+                            ) { route -> Page(route) }
                         }
                         if (showPanel) {
                             Spacer(Modifier.width(DSpace.gap))
@@ -121,7 +132,7 @@ fun DesktopApp(start: Route = Route.Home) {
                     modifier = Modifier.align(Alignment.TopEnd).padding(top = DSize.topBarHeight, end = DSpace.gap, bottom = DSize.playerBarHeight),
                 ) {
                     // Over the page it needs a solid base, or the page would show through its glass.
-                    SidePanel(Modifier.width(DSize.sidePanel).fillMaxHeight().shadow(24.dp, RoundedCornerShape(DSize.panelRadius)).background(Color(0xFF0B0B10), RoundedCornerShape(DSize.panelRadius)))
+                    SidePanel(Modifier.width(DSize.sidePanel).fillMaxHeight().shadow(24.dp, RoundedCornerShape(DSize.panelRadius)).background(DColors.panelSolid, RoundedCornerShape(DSize.panelRadius)))
                 }
 
                 com.daydreamin.app.desktop.components.SongDragGhost()
