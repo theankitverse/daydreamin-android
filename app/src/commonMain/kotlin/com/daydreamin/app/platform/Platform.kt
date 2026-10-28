@@ -26,6 +26,14 @@ expect fun isOnline(): Boolean
 @Composable
 expect fun BackHandler(enabled: Boolean = true, onBack: () -> Unit)
 
+/**
+ * "Back" that follows the finger: on Android 14+ [onProgress] gets the back swipe's progress
+ * (0–1) as it happens, then [onBack] if it's let go or [onCancel] if it's taken back. Elsewhere
+ * (a button press, Esc on desktop) it's a plain [onBack].
+ */
+@Composable
+expect fun PredictiveBackHandler(enabled: Boolean = true, onProgress: (Float) -> Unit, onCancel: () -> Unit, onBack: () -> Unit)
+
 /** Right-click with a mouse (desktop); nothing on a phone. */
 expect fun androidx.compose.ui.Modifier.onSecondaryClick(onClick: () -> Unit): androidx.compose.ui.Modifier
 

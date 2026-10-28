@@ -1,5 +1,6 @@
 package com.daydreamin.app.ui.screens.nowplaying
 
+import androidx.compose.ui.graphics.drawscope.clipPath
 import com.daydreamin.app.platform.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -226,10 +227,20 @@ fun NowPlayingScreen(
         )
     }
 
+    // ---- back swipe: the same pull, following the finger (lyrics, when open, close first)
+    // (The system reports a swipe's progress slowly at first, so the pull eases out: it answers the first movement.)
+    val backPullPx = with(density) { 360.dp.toPx() }
+
     // ---- lyrics mode
     var showLyrics by rememberSaveable { mutableStateOf(false) }
     val lyricsT by animateFloatAsState(if (showLyrics) 1f else 0f, spring(dampingRatio = 0.86f, stiffness = 260f), label = "lyricsT")
     BackHandler(enabled = showLyrics) { showLyrics = false }
+    com.daydreamin.app.platform.PredictiveBackHandler(
+        enabled = !showLyrics,
+        onProgress = { settle[0]?.cancel(); dragY = backPullPx * (1f - (1f - it) * (1f - it)) },
+        onCancel = { settleBack(0f) },
+        onBack = dismiss,
+    )
 
     // Artwork rests a little smaller while paused — the song is "set down", not stopped dead.
     val restScale by animateFloatAsState(if (meta.isPlaying || loading) 1f else 0.86f, spring(dampingRatio = 0.62f, stiffness = 220f), label = "restScale")
@@ -244,7 +255,16 @@ fun NowPlayingScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .graphicsLayer { translationY = dragY }
+            // Outside the sheet's own layer: the card stays put while the sheet moves.
+            .drawBehind { drawBackdropCard(e(), dragY) }
+            .graphicsLayer {
+                translationY = dragY
+                // A pulled sheet shows rounded top corners, like a card lifted off the page.
+                if (dragY > 0f) {
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = sheetCorner(dragY), topEnd = sheetCorner(dragY))
+                    clip = true
+                }
+            }
             .onGloballyPositioned { stageCoords = it }
             .drawBehind { drawRect(Color.Black.copy(alpha = (e() * 1.7f).coerceIn(0f, 1f))) },
     ) {
@@ -757,5 +777,39 @@ private fun friendlyPlaybackError(raw: String): String {
             "You\u2019re offline \u2014 couldn\u2019t play $about."
         raw.startsWith("Skipped") -> "Skipped $about \u2014 it couldn\u2019t be played."
         else -> "Couldn\u2019t play $about right now."
+    }
+}
+
+/**
+ * The page the player opened over ([PlayerSheet.backdrop]), as a card behind it: full size while
+ * the player is still growing out of the mini player, sinking back and dimming as it opens, and
+ * coming forward again as the player is pulled down.
+ */
+/** Corner radius of the pulled sheet's top edge: grows over the first stretch of the pull. */
+private fun androidx.compose.ui.unit.Density.sheetCorner(dragY: Float) = (dragY / 4f).toDp().coerceAtMost(28.dp)
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawBackdropCard(expansion: Float, dragY: Float) {
+    val page = PlayerSheet.backdrop ?: return
+    // Fully hidden under the player's own dark room: nothing to draw.
+    if (dragY <= 0f && expansion * 1.7f >= 1f) return
+    val p = (expansion * (1f - dragY / size.height)).coerceIn(0f, 1f)
+    val scale = 1f - 0.07f * p
+    val w = size.width * scale
+    val h = size.height * scale
+    val left = (size.width - w) / 2f
+    val top = (size.height - h) / 2f + 10.dp.toPx() * p
+    val radius = 26.dp.toPx() * p
+    drawRect(Color.Black)
+    val card = androidx.compose.ui.graphics.Path().apply {
+        addRoundRect(androidx.compose.ui.geometry.RoundRect(left, top, left + w, top + h, androidx.compose.ui.geometry.CornerRadius(radius)))
+    }
+    clipPath(card) {
+        drawImage(
+            page,
+            dstOffset = androidx.compose.ui.unit.IntOffset(left.toInt(), top.toInt()),
+            dstSize = androidx.compose.ui.unit.IntSize(w.toInt(), h.toInt()),
+            filterQuality = androidx.compose.ui.graphics.FilterQuality.Low,
+        )
+        drawRect(Color.Black.copy(alpha = 0.45f * p))
     }
 }

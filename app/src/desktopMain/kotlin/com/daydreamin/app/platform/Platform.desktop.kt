@@ -54,6 +54,9 @@ actual fun BackHandler(enabled: Boolean, onBack: () -> Unit) {
     }
 }
 
+@Composable
+actual fun PredictiveBackHandler(enabled: Boolean, onProgress: (Float) -> Unit, onCancel: () -> Unit, onBack: () -> Unit) = BackHandler(enabled, onBack)
+
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 actual fun androidx.compose.ui.Modifier.onSecondaryClick(onClick: () -> Unit): androidx.compose.ui.Modifier =
     this.onClick(matcher = androidx.compose.foundation.PointerMatcher.mouse(androidx.compose.ui.input.pointer.PointerButton.Secondary), onClick = onClick)

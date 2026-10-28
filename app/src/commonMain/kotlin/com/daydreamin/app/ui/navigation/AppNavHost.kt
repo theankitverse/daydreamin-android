@@ -27,6 +27,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.daydreamin.app.ui.theme.daydreamGlassStyle
@@ -103,7 +105,31 @@ private fun AppNavHost(wide: Boolean, startRoute: String) {
 
     PlayerController.ensureConnected()
 
+    // Once the player has fully closed (not just stepped aside for the queue), its card is let go.
+    val playerGone by remember(currentRoute) {
+        androidx.compose.runtime.derivedStateOf { currentRoute != Dest.NOW_PLAYING && currentRoute != Dest.QUEUE && PlayerSheet.expansion == 0f }
+    }
+    LaunchedEffect(playerGone) { if (playerGone) PlayerSheet.releaseBackdrop() }
+
     fun closeDrawer() = scope.launch { drawerState.close() }
+
+    // The page under the player, recorded as it draws (see PlayerSheet.backdrop). Recording is
+    // just keeping its drawing commands; drawing it costs the same as drawing the page itself.
+    val pageLayer = androidx.compose.ui.graphics.rememberGraphicsLayer()
+    val openPlayer: () -> Unit = remember(navController) {
+        {
+            PlayerSheet.requestMorphOpen()
+            if (PlayerSheet.isMorphPending && !PlayerSheet.backdropHeld) {
+                PlayerSheet.backdropHeld = true
+                scope.launch {
+                    // Older phones can't copy some images (hardware bitmaps) this way: no card, just the dark room.
+                    val page = runCatching { pageLayer.toImageBitmap() }.getOrNull()
+                    if (PlayerSheet.backdropHeld) PlayerSheet.backdrop = page
+                }
+            }
+            navController.navigate(Dest.NOW_PLAYING)
+        }
+    }
 
     // Back closes an open drawer instead of leaving the app from underneath it.
     com.daydreamin.app.platform.BackHandler(enabled = drawerState.isOpen) { closeDrawer() }
@@ -211,10 +237,7 @@ private fun AppNavHost(wide: Boolean, startRoute: String) {
                                     modifier = Modifier.padding(top = 10.dp, bottom = 2.dp),
                                     onTogglePlay = { PlayerController.togglePlayPause() },
                                     onNext = { PlayerController.next() },
-                                    onClick = {
-                                        PlayerSheet.requestMorphOpen()
-                                        navController.navigate(Dest.NOW_PLAYING)
-                                    },
+                                    onClick = openPlayer,
                                 )
                             }
                         }
@@ -224,10 +247,7 @@ private fun AppNavHost(wide: Boolean, startRoute: String) {
             },
         ) { padding ->
           val openPlayer = remember(navController) {
-              {
-                  PlayerSheet.requestMorphOpen()
-                  navController.navigate(Dest.NOW_PLAYING)
-              }
+              openPlayer
           }
           LaunchedEffect(startRoute) { if (startRoute != Dest.HOME) navController.navigate(startRoute) }
           androidx.compose.runtime.DisposableEffect(navController) {
@@ -249,7 +269,12 @@ private fun AppNavHost(wide: Boolean, startRoute: String) {
             NavHost(
                 navController = navController,
                 startDestination = Dest.HOME,
-                modifier = Modifier.hazeSource(hazeState),
+                modifier = Modifier
+                    .drawWithContent {
+                        if (PlayerSheet.backdropHeld) drawContent()
+                        else { pageLayer.record { this@drawWithContent.drawContent() }; drawLayer(pageLayer) }
+                    }
+                    .hazeSource(hazeState),
                 // Fade-through: the outgoing screen clears first, then the incoming one fades in and
                 // settles from a hair smaller — two screens' text never overlaps mid-transition.
                 enterTransition = { fadeThroughEnter() },
@@ -259,7 +284,8 @@ private fun AppNavHost(wide: Boolean, startRoute: String) {
                     if (targetState.destination.route == Dest.NOW_PLAYING) ExitTransition.KeepUntilTransitionsFinished else fadeOut(tween(90))
                 },
                 popEnterTransition = {
-                    if (initialState.destination.route == Dest.NOW_PLAYING) EnterTransition.None else fadeThroughEnter()
+                    // Closing a sheet (the player, Settings and the like) uncovers the page that was under it all along.
+                    if (initialState.destination.route in sheetRoutes) EnterTransition.None else fadeThroughEnter()
                 },
                 popExitTransition = { fadeOut(tween(90)) },
             ) {
@@ -282,10 +308,7 @@ private fun AppNavHost(wide: Boolean, startRoute: String) {
                   Capped(wide) {
                     SearchScreen(
                         contentPadding = padding,
-                        onOpenPlayer = {
-                            PlayerSheet.requestMorphOpen()
-                            navController.navigate(Dest.NOW_PLAYING)
-                        },
+                        onOpenPlayer = openPlayer,
                     )
                   }
                 }
@@ -294,10 +317,7 @@ private fun AppNavHost(wide: Boolean, startRoute: String) {
                     // Draws its own glow behind the status bar, like Home.
                     LibraryScreen(
                         contentPadding = padding,
-                        onOpenPlayer = {
-                            PlayerSheet.requestMorphOpen()
-                            navController.navigate(Dest.NOW_PLAYING)
-                        },
+                        onOpenPlayer = openPlayer,
                         onGoHome = { navController.navigateTopLevel(Dest.HOME) },
                     )
                   }
@@ -314,10 +334,7 @@ private fun AppNavHost(wide: Boolean, startRoute: String) {
                             LibraryLaunch.tab = tab
                             navController.navigateTopLevel(Dest.LIBRARY)
                         },
-                        onOpenPlayer = {
-                            PlayerSheet.requestMorphOpen()
-                            navController.navigate(Dest.NOW_PLAYING)
-                        },
+                        onOpenPlayer = openPlayer,
                     )
                   }
                 }
@@ -415,10 +432,16 @@ private fun slideUpEnter() = slideInVertically(
     animationSpec = tween(320, easing = FastOutSlowInEasing),
 ) + fadeIn(tween(260))
 
+/** Pages that open over the current one like a sheet, and close back down to it. */
+private val sheetRoutes = setOf(Dest.NOW_PLAYING, Dest.SETTINGS, Dest.THEME_CUSTOMIZE, Dest.STATISTICS)
+
+// A sheet pulled away: it sinks a little smaller as it slides down and only fades over the last part,
+// so a back swipe held halfway shows it lifting off the page beneath, not two pages blended together.
 private fun slideDownExit() = slideOutVertically(
     targetOffsetY = { fullHeight -> fullHeight / 3 },
-    animationSpec = tween(280, easing = FastOutSlowInEasing),
-) + fadeOut(tween(220))
+    animationSpec = tween(300, easing = FastOutSlowInEasing),
+) + androidx.compose.animation.scaleOut(targetScale = 0.9f, animationSpec = tween(300, easing = FastOutSlowInEasing)) +
+    fadeOut(tween(160, delayMillis = 140))
 
 /**
  * Pops [route] only if it's what's actually showing. A sheet can ask to close more than once

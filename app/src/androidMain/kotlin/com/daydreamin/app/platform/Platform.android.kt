@@ -32,6 +32,22 @@ actual fun isOnline(): Boolean {
 @Composable
 actual fun BackHandler(enabled: Boolean, onBack: () -> Unit) = androidx.activity.compose.BackHandler(enabled, onBack)
 
+@Composable
+actual fun PredictiveBackHandler(enabled: Boolean, onProgress: (Float) -> Unit, onCancel: () -> Unit, onBack: () -> Unit) {
+    val progress = androidx.compose.runtime.rememberUpdatedState(onProgress)
+    val cancel = androidx.compose.runtime.rememberUpdatedState(onCancel)
+    val back = androidx.compose.runtime.rememberUpdatedState(onBack)
+    androidx.activity.compose.PredictiveBackHandler(enabled) { swipe ->
+        try {
+            swipe.collect { progress.value(it.progress) }
+            back.value()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            cancel.value()
+            throw e
+        }
+    }
+}
+
 actual fun openUrl(url: String, failMessage: String) {
     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     try {

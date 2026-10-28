@@ -37,6 +37,21 @@ object PlayerSheet {
     fun finishMorphOpen() {
         morphInProgress = false
     }
+
+    /**
+     * The page Now Playing opened over, as it last looked: drawn behind the player as a card that
+     * sinks back while the player is open and comes forward as it's pulled down (the page itself
+     * leaves composition once the player has opened). Null when there was nothing to keep.
+     */
+    var backdrop by mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null)
+
+    /** True while the page under Now Playing has been kept as [backdrop] (so it isn't re-recorded with the player on top). */
+    var backdropHeld by mutableStateOf(false)
+
+    fun releaseBackdrop() {
+        backdrop = null
+        backdropHeld = false
+    }
 }
 
 /**

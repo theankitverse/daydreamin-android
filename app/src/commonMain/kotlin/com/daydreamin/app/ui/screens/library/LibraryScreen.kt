@@ -9,6 +9,17 @@ import androidx.compose.runtime.rememberCoroutineScope
 import com.daydreamin.app.ui.components.uniqueKeys
 import com.daydreamin.app.platform.BackHandler
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -125,6 +136,7 @@ private data class NowPlaying(val playId: String?, val isPlaying: Boolean)
  * for you — Liked songs (the main one, with a lit hero), Recently played, and Playlists — and the
  * page is lit by the artwork of whatever collection you're looking at.
  */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun LibraryScreen(contentPadding: PaddingValues, onOpenPlayer: () -> Unit, onGoHome: () -> Unit) {
     val vm: LibraryViewModel = composeViewModel { LibraryViewModel() }
@@ -158,13 +170,16 @@ fun LibraryScreen(contentPadding: PaddingValues, onOpenPlayer: () -> Unit, onGoH
 
     val downloadItems by com.daydreamin.app.data.download.Downloads.items.collectAsState()
     val listState = rememberLazyListState()
-    val scrollY = { if (listState.firstVisibleItemIndex > 0) 2_000f else listState.firstVisibleItemScrollOffset.toFloat() }
+    // Each playlist page keeps its own scroll, and the list keeps its own: back lands where you were.
+    val detailStates = remember { mutableMapOf<String, LazyListState>() }
+    val shownState = openPlaylist?.let { detailStates.getOrPut(it.id) { LazyListState() } } ?: listState
+    val scrollY = { if (shownState.firstVisibleItemIndex > 0) 2_000f else shownState.firstVisibleItemScrollOffset.toFloat() }
     val haze = remember { HazeState() }
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val loaded = likedOrNull != null && historyOrNull != null && playlistsOrNull != null
 
-    // Switching collection (or opening a playlist) starts at the top of it.
-    LaunchedEffect(tab, openId) { if (listState.firstVisibleItemIndex > 1) listState.scrollToItem(1) }
+    // Switching collection starts at the top of it.
+    LaunchedEffect(tab) { if (listState.firstVisibleItemIndex > 1) listState.scrollToItem(1) }
 
     val play = { songs: List<Song>, index: Int, song: Song ->
         // Tapping what's already playing opens the player instead of restarting it.
@@ -174,28 +189,40 @@ fun LibraryScreen(contentPadding: PaddingValues, onOpenPlayer: () -> Unit, onGoH
     Box(Modifier.fillMaxSize().background(BgBase)) {
         Box(Modifier.fillMaxSize().hazeSource(haze)) {
             AmbientGlow(light = light, scrollY = scrollY)
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(top = statusTop + TopBarHeight, bottom = contentPadding.calculateBottomPadding() + Space.l),
-            ) {
-                item(key = "title") { LargeTitle(openPlaylist == null, liked.size, history.size, playlists.size) }
-                if (openPlaylist != null) {
-                    playlistDetail(openPlaylist, light, { nowPlaying }, onBack = { vm.openPlaylist(null) }, play = play)
-                } else {
-                    item(key = "tabs") {
-                        Segmented(tab = tab, onTab = vm::onTabChange, modifier = Modifier.padding(horizontal = Space.gutter).padding(bottom = Space.l))
-                    }
-                    if (!loaded) {
-                        items(6) { RowPlaceholder() }
-                    } else when (tab) {
-                        LibraryTab.LIKED -> likedTab(liked, light, { nowPlaying }, onGoHome, play)
-                        LibraryTab.RECENT -> recentTab(history, { nowPlaying }, onClear = vm::clearHistory, play = { index, song ->
-                            // Recently played isn't a playlist: play the song and let radio follow it.
-                            if (nowPlaying.playId == song.playId) onOpenPlayer() else PlayerController.playSong(song)
-                        }, onGoHome = onGoHome)
-                        LibraryTab.PLAYLISTS -> playlistsTab(playlists, liked, onOpen = { vm.openPlaylist(it.id) }, onOpenLiked = { vm.onTabChange(LibraryTab.LIKED) })
-                        LibraryTab.DOWNLOADS -> downloadsTab(downloadItems.values.toList(), { nowPlaying }, onGoHome, play)
+            // Opening a playlist: its cover flies from the row up into the page's header (and back).
+            SharedTransitionLayout {
+                AnimatedContent(
+                    targetState = openPlaylist,
+                    contentKey = { it?.id },
+                    transitionSpec = { fadeIn(tween(220, delayMillis = 90)) togetherWith fadeOut(tween(100)) },
+                    label = "playlistPage",
+                ) { shown ->
+                    CompositionLocalProvider(LocalCoverMotion provides CoverMotion(this@SharedTransitionLayout, this@AnimatedContent)) {
+                        LazyColumn(
+                            state = shown?.let { detailStates.getOrPut(it.id) { LazyListState() } } ?: listState,
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(top = statusTop + TopBarHeight, bottom = contentPadding.calculateBottomPadding() + Space.l),
+                        ) {
+                            item(key = "title") { LargeTitle(shown == null, liked.size, history.size, playlists.size) }
+                            if (shown != null) {
+                                playlistDetail(shown, light, { nowPlaying }, onBack = { vm.openPlaylist(null) }, play = play)
+                            } else {
+                                item(key = "tabs") {
+                                    Segmented(tab = tab, onTab = vm::onTabChange, modifier = Modifier.padding(horizontal = Space.gutter).padding(bottom = Space.l))
+                                }
+                                if (!loaded) {
+                                    items(6) { RowPlaceholder() }
+                                } else when (tab) {
+                                    LibraryTab.LIKED -> likedTab(liked, light, { nowPlaying }, onGoHome, play)
+                                    LibraryTab.RECENT -> recentTab(history, { nowPlaying }, onClear = vm::clearHistory, play = { index, song ->
+                                        // Recently played isn't a playlist: play the song and let radio follow it.
+                                        if (nowPlaying.playId == song.playId) onOpenPlayer() else PlayerController.playSong(song)
+                                    }, onGoHome = onGoHome)
+                                    LibraryTab.PLAYLISTS -> playlistsTab(playlists, liked, onOpen = { vm.openPlaylist(it.id) }, onOpenLiked = { vm.onTabChange(LibraryTab.LIKED) })
+                                    LibraryTab.DOWNLOADS -> downloadsTab(downloadItems.values.toList(), { nowPlaying }, onGoHome, play)
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -333,7 +360,7 @@ private fun LazyListScope.playlistsTab(playlists: List<Playlist>, liked: List<So
             Modifier.animateItem().fillMaxWidth().height(76.dp).pressable(onClick = { onOpen(p) }).padding(start = Space.gutter, end = Space.m),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            PlaylistCover(p, size = 58.dp)
+            PlaylistCover(p, size = 58.dp, modifier = Modifier.sharedCover(p.id))
             Column(Modifier.weight(1f).padding(horizontal = 16.dp)) {
                 Text(p.name, style = MaterialTheme.typography.titleMedium, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
@@ -371,6 +398,7 @@ private fun LazyListScope.playlistDetail(
             songs = playlist.songs,
             light = light,
             coverUrl = playlist.coverUrl,
+            coverKey = playlist.id,
             byline = playlist.author?.takeIf { playlist.isSaved && it.isNotBlank() },
             onPlay = { PlayerController.playFromList(playlist.songs, 0) },
             onShuffle = { PlayerController.playFromList(playlist.songs.shuffled(), 0) },
@@ -414,10 +442,34 @@ private fun LazyListScope.playlistDetail(
 
 // ---------------------------------------------------------------- pieces
 
+/** What a playlist cover needs to fly between the list and the playlist's page. */
+@OptIn(ExperimentalSharedTransitionApi::class)
+private class CoverMotion(val shared: SharedTransitionScope, val visibility: AnimatedVisibilityScope)
+
+private val LocalCoverMotion = staticCompositionLocalOf<CoverMotion?> { null }
+
+/** The cover of playlist [id]: the same cover in the list and on the page, so it flies between them. */
+@Composable
+private fun Modifier.sharedCover(id: String): Modifier = sharedPiece("cover-$id")
+
+/** Something on both the list and a playlist's page ([key] names it): it moves between them instead of fading out and in. */
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+private fun Modifier.sharedPiece(key: String): Modifier {
+    val motion = LocalCoverMotion.current ?: return this
+    return with(motion.shared) {
+        this@sharedPiece.sharedElement(
+            rememberSharedContentState(key),
+            motion.visibility,
+            boundsTransform = { _, _ -> spring(dampingRatio = 0.86f, stiffness = 360f) },
+        )
+    }
+}
+
 @Composable
 private fun LargeTitle(showCounts: Boolean, liked: Int, played: Int, playlists: Int) {
     Column(Modifier.padding(start = Space.gutter, end = Space.gutter, top = Space.xs, bottom = Space.m + 2.dp)) {
-        Text("Library", style = MaterialTheme.typography.displaySmall, color = Color.White)
+        Text("Library", style = MaterialTheme.typography.displaySmall, color = Color.White, modifier = Modifier.sharedPiece("library-title"))
         if (showCounts) {
             Text(
                 listOf("$liked liked", "$played played", "$playlists ${if (playlists == 1) "playlist" else "playlists"}").joinToString(" · "),
@@ -466,6 +518,7 @@ private fun CollectionHero(
     onShuffle: () -> Unit,
     modifier: Modifier = Modifier,
     coverUrl: String? = null,
+    coverKey: String? = null,
     byline: String? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
@@ -473,7 +526,8 @@ private fun CollectionHero(
         modifier.fillMaxWidth().padding(start = Space.gutter, end = Space.m, bottom = Space.l),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        val coverModifier = Modifier.shadow(28.dp, Radius.cardShape, ambientColor = light.key, spotColor = light.key)
+        val coverModifier = (if (coverKey != null) Modifier.sharedCover(coverKey) else Modifier)
+            .shadow(28.dp, Radius.cardShape, ambientColor = light.key, spotColor = light.key)
         if (!coverUrl.isNullOrBlank()) Artwork(url = coverUrl, shape = Radius.cardShape, modifier = coverModifier.size(136.dp))
         else Mosaic(songs, size = 136.dp, modifier = coverModifier)
         Column(Modifier.weight(1f).padding(start = 18.dp)) {
