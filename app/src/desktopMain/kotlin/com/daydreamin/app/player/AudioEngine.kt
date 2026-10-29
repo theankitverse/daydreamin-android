@@ -16,6 +16,8 @@ private const val TAG = "AudioEngine"
 
 /** How far ahead each song decodes (and downloads). Rides out a slow network without a stutter. */
 private const val BUFFER_SECONDS = 15
+/** The output's own buffer is 200 ms; sound going out further ahead of real time than this isn't being played. */
+private const val OUTPUT_AHEAD_LIMIT_MS = 1_000L
 /** A song whose audio stops more than this long before its end didn't finish — its stream broke off. */
 const val EARLY_END_MS = 15_000L
 /** Mixer step: 10 ms of audio. */
@@ -104,6 +106,11 @@ class Deck(val key: String, val source: ByteSource, val header: WebmHeader, val 
     }
 }
 
+/** For tests: closes the sound output once, as when the computer's sound device goes away. */
+internal object OutputFaults {
+    @Volatile var closeOnce = false
+}
+
 /** What the engine tells the player about. Called on the mixer thread — keep it quick. */
 interface EngineListener {
     /** [to] took over from [from]: the prepared next song, gaplessly or by crossfade. */
@@ -161,6 +168,10 @@ class AudioEngine(private val listener: EngineListener) {
         current = deck
         flushOutput()
         playing = true
+        // Pause stops the output; it has to be running again before the new song's sound goes in. A
+        // stopped output takes its 200 ms and then swallows the rest at once — after a pause, pressing
+        // play on another song used to run through whole songs in seconds, skipping on and on.
+        line?.start()
     }
 
     /** Lines up [deck] to follow the current song (gapless, or crossfaded into); replaces any earlier one. */
@@ -180,6 +191,7 @@ class AudioEngine(private val listener: EngineListener) {
         from.close()
         flushOutput()
         playing = true
+        line?.start() // (see play)
         listener.onTransition(from, to)
         return true
     }
@@ -195,12 +207,14 @@ class AudioEngine(private val listener: EngineListener) {
     @Synchronized fun pause() {
         playing = false
         line?.stop()
+        repace()
     }
 
     @Synchronized fun resume() {
         if (current == null) return
         playing = true
         line?.start()
+        repace()
     }
 
     /** Stops and forgets everything (another song is about to load). */
@@ -228,6 +242,17 @@ class AudioEngine(private val listener: EngineListener) {
 
     private fun flushOutput() {
         line?.flush()
+        repace()
+    }
+
+    // How much sound has gone to the output since [paceFrom]: it can't take more than real time allows
+    // (plus its own small buffer). One that does isn't playing it — see the check in [step].
+    @Volatile private var paceFrom = System.nanoTime()
+    @Volatile private var paceFrames = 0L
+
+    private fun repace() {
+        paceFrom = System.nanoTime()
+        paceFrames = 0
     }
 
     private fun openLine(): SourceDataLine? = runCatching {
@@ -238,7 +263,11 @@ class AudioEngine(private val listener: EngineListener) {
     }.onFailure { Log.e(TAG, "no audio output", it) }.getOrNull()
 
     private fun setBuffering(value: Boolean) {
-        if (buffering != value) { buffering = value; listener.onBuffering(value) }
+        if (buffering != value) {
+            buffering = value
+            if (!value) repace() // the output ran dry while waiting: count from now
+            listener.onBuffering(value)
+        }
     }
 
     private fun loop() {
@@ -257,7 +286,7 @@ class AudioEngine(private val listener: EngineListener) {
     private fun step() {
         val deck = current
         if (!playing || deck == null) { Thread.sleep(10); return }
-        val out = line ?: openLine().also { line = it } ?: run { Thread.sleep(500); return }
+        val out = line ?: openLine().also { line = it; repace() } ?: run { Thread.sleep(500); return }
 
         val n = deck.take(a, a.size)
         if (n == 0) {
@@ -317,7 +346,23 @@ class AudioEngine(private val listener: EngineListener) {
             bytes[i * 2] = s.toByte()
             bytes[i * 2 + 1] = (s shr 8).toByte()
         }
-        out.write(bytes, 0, n * 2)
+        if (OutputFaults.closeOnce) { OutputFaults.closeOnce = false; runCatching { out.close() } }
+        val written = out.write(bytes, 0, n * 2)
+        paceFrames += n / CHANNELS
+        val aheadMs = paceFrames * 1000 / SAMPLE_RATE - (System.nanoTime() - paceFrom) / 1_000_000
+        // (A write cut short on its own is normal: a seek or skip flushes the output mid-write.)
+        if (playing && (!out.isOpen || aheadMs > OUTPUT_AHEAD_LIMIT_MS)) {
+            // The output took the sound without playing it: it was closed under us (the computer's sound
+            // device changed, or it woke from sleep) and now swallows anything at once — whole songs went
+            // by in a second or two, skipping on and on. Open it again and carry on there.
+            Log.w(TAG, "audio output stopped playing (took $written of ${n * 2} bytes, ${aheadMs}ms ahead of real time) — opening it again")
+            synchronized(this) {
+                runCatching { out.close() }
+                if (line === out) line = null
+            }
+            repace()
+            Thread.sleep(100)
+        }
     }
 
     private fun maybeStartCrossfade(deck: Deck) {

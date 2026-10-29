@@ -192,8 +192,8 @@ class PlayerIntegrationTest {
         // running through the queue song after song (what pressing play on a mix used to do).
         StreamFaults.endAfterBytes = 60_000
         try {
-            // (Not the first result: it's downloaded now, and plays from the file.)
-            val streamed = results.drop(1)
+            // (Not the downloaded one: it plays from the file.)
+            val streamed = results.filterNot { Downloads.isDownloaded(it.playId) }
             val first = streamed.first().playId
             val started = linkedSetOf<String>()
             PlayerController.playFromList(streamed, 0)
@@ -202,11 +202,37 @@ class PlayerIntegrationTest {
                 !meta.isPlaying && meta.error != null
             }
             log("11. streams breaking off: stopped after ${started.size} songs ($started) — '${meta.error}'")
-            // The first is on this computer from step 9's download, so it plays (to its end, where it was left);
-            // then three that won't play, and it stops.
-            assertTrue(started.size <= 4, "stops after three songs that won't play, not the whole queue (${started.size})")
+            assertTrue(started.size <= 3, "stops after three songs that won't play, not the whole queue (${started.size})")
         } finally {
             StreamFaults.endAfterBytes = null
         }
+
+        // 12. The sound output goes away mid-song (the computer's sound device changed): the song carries on
+        // in real time through a fresh output — not swallowed in a second, the next one after it, and so on.
+        PlayerController.playFromList(results.drop(2), 0)
+        waitFor("a song to play", 30_000) { meta.isPlaying && !meta.isBuffering && position > 2_000 }
+        val songBeforeClose = meta.currentSong?.playId
+        val positionBeforeClose = position
+        OutputFaults.closeOnce = true
+        Thread.sleep(6_000)
+        val advanced = position - positionBeforeClose
+        log("12. output closed mid-song: same song=${meta.currentSong?.playId == songBeforeClose}, advanced ${advanced}ms in 6s")
+        assertEquals(songBeforeClose, meta.currentSong?.playId, "still the same song")
+        assertTrue(advanced in 3_000..8_000, "plays on in real time ($advanced ms in 6 s)")
+
+        // 13. Pause, then press play on something else (a mix, a playlist): it plays in real time. The
+        // output stayed stopped from the pause and swallowed song after song in seconds each.
+        PlayerController.togglePlayPause()
+        waitFor("pause", 5_000) { !meta.isPlaying }
+        Thread.sleep(1_000)
+        PlayerController.playFromList(results.filterNot { Downloads.isDownloaded(it.playId) }.reversed(), 0)
+        waitFor("the new song to play", 30_000) { meta.isPlaying && !meta.isBuffering && position > 500 }
+        val newSong = meta.currentSong?.playId
+        val newFrom = position
+        Thread.sleep(5_000)
+        val newAdvanced = position - newFrom
+        log("13. after a pause, play on another list: same song=${meta.currentSong?.playId == newSong}, advanced ${newAdvanced}ms in 5s")
+        assertEquals(newSong, meta.currentSong?.playId, "doesn't skip on")
+        assertTrue(newAdvanced in 3_500..6_500, "plays in real time ($newAdvanced ms in 5 s)")
     }
 }
