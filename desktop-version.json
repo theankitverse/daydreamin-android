@@ -1,14 +1,14 @@
 {
-  "versionCode": 10201,
-  "versionName": "1.2.1",
-  "url": "https://github.com/theankitverse/daydreamin-android/releases/tag/desktop-v1.2.1",
-  "notes": "Daydreamin 1.2.1 for your computer.",
+  "versionCode": 10202,
+  "versionName": "1.2.2",
+  "url": "https://github.com/theankitverse/daydreamin-android/releases/tag/desktop-v1.2.2",
+  "notes": "Daydreamin 1.2.2 for your computer.",
   "downloads": {
-    "macos-arm64": {"url": "https://github.com/theankitverse/daydreamin-android/releases/download/desktop-v1.2.1/Daydreamin-1.2.1-macos-arm64.dmg", "size": 129544755, "sha256": "853d833d03710118a3c6b660cc0a5f4fdb3d7ecaebba3258db1cc511ec0fc2a8"},
-    "macos-x64": {"url": "https://github.com/theankitverse/daydreamin-android/releases/download/desktop-v1.2.1/Daydreamin-1.2.1-macos-x64.dmg", "size": 130222669, "sha256": "1142b3d117af694f0af894999d724f17939e4d475f6d6378b692d89b677307d1"},
-    "windows": {"url": "https://github.com/theankitverse/daydreamin-android/releases/download/desktop-v1.2.1/Daydreamin-1.2.1-windows.msi", "size": 123026877, "sha256": "9a2d1b58957ad3098651f320550459456ee9675c4a4cf26d2be3c2e088179c26"},
-    "windows-setup": {"url": "https://github.com/theankitverse/daydreamin-android/releases/download/desktop-v1.2.1/Daydreamin-1.2.1-windows-setup.exe", "size": 103015864, "sha256": "65db9edb3281aa46ca6baed757d76cb64d637d8a19cf99f67387b012f939e1b9"},
-    "deb": {"url": "https://github.com/theankitverse/daydreamin-android/releases/download/desktop-v1.2.1/Daydreamin-1.2.1-linux-amd64.deb", "size": 111586924, "sha256": "f23ce65f96142f099fc40fc54d8755dfa887af6fcd5511cb2b2b13716780b280"},
-    "rpm": {"url": "https://github.com/theankitverse/daydreamin-android/releases/download/desktop-v1.2.1/Daydreamin-1.2.1-linux-x86_64.rpm", "size": 127591096, "sha256": "7ec1c78ca94752d47a2b6d6a40bf25917414f9164297188bf9ce9777789c3258"}
+    "macos-arm64": {"url": "https://github.com/theankitverse/daydreamin-android/releases/download/desktop-v1.2.2/Daydreamin-1.2.2-macos-arm64.dmg", "size": 129522781, "sha256": "ae7b58955d009d02995790ad1d8b383be1b7f178e611a282f8dd7d444c598395"},
+    "macos-x64": {"url": "https://github.com/theankitverse/daydreamin-android/releases/download/desktop-v1.2.2/Daydreamin-1.2.2-macos-x64.dmg", "size": 130224630, "sha256": "ca0fed372f31c21b44dc42c9ec14897cd87d80717bd1ae079bea714e8f401444"},
+    "windows": {"url": "https://github.com/theankitverse/daydreamin-android/releases/download/desktop-v1.2.2/Daydreamin-1.2.2-windows.msi", "size": 123026875, "sha256": "b9440a1b4231bd064320f0bd1e90c1ddcd9b85c3b6876390258a7df25329ab98"},
+    "windows-setup": {"url": "https://github.com/theankitverse/daydreamin-android/releases/download/desktop-v1.2.2/Daydreamin-1.2.2-windows-setup.exe", "size": 103018700, "sha256": "b5f21d2aee0ff60e64be6351b40d30b705ad2e2b23f7e05b139dac8b1d19bffc"},
+    "deb": {"url": "https://github.com/theankitverse/daydreamin-android/releases/download/desktop-v1.2.2/Daydreamin-1.2.2-linux-amd64.deb", "size": 111568058, "sha256": "5dd561ae4f342d669bbf249948adaefc5cfd399b2ef402f2479ae8ce62edda27"},
+    "rpm": {"url": "https://github.com/theankitverse/daydreamin-android/releases/download/desktop-v1.2.2/Daydreamin-1.2.2-linux-x86_64.rpm", "size": 127594125, "sha256": "d912e1c0868d24dd9c7a7138f668a23e80844e82b46cca1f1ae9c127c87d36f2"}
   }
 }
