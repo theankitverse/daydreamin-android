@@ -13,6 +13,8 @@ import java.util.concurrent.TimeUnit
 /** For tests: makes every stream read fail, as if the connection dropped. */
 internal object StreamFaults {
     @Volatile var dropConnection = false
+    /** Each stream reads as finished after this many bytes (a stream that breaks off with no error). */
+    @Volatile var endAfterBytes: Long? = null
 }
 
 /** A song's audio file, readable from any offset: a YouTube stream or a downloaded file. */
@@ -61,7 +63,7 @@ class HttpByteSource(private val url: String) : ByteSource {
  * connection is retried from the exact byte it stopped at (three tries, backing off); an expired
  * URL fails at once with [StreamExpiredException] so the player can fetch a fresh one.
  */
-private class ChunkedHttpStream(private val url: String, start: Long, private val total: Long) : InputStream() {
+private class ChunkedHttpStream(private val url: String, private val start: Long, private val total: Long) : InputStream() {
     private var pos = start
     private var body: InputStream? = null
     private var call: Call? = null
@@ -75,6 +77,7 @@ private class ChunkedHttpStream(private val url: String, start: Long, private va
 
     override fun read(b: ByteArray, off: Int, len: Int): Int {
         if (pos >= total) return -1
+        StreamFaults.endAfterBytes?.let { if (pos - start >= it) return -1 }
         var attempt = 0
         while (true) {
             if (closed) throw IOException("closed")

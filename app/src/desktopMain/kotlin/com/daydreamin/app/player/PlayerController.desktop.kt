@@ -64,7 +64,14 @@ actual object PlayerController {
     private var prepareRequest = 0
     /** Restored or stopped: where to start when play is pressed (there's no deck yet). */
     private var pendingStartMs: Long? = null
-    private var consecutiveFailures = 0
+    /**
+     * Songs in a row that didn't really play: couldn't load, kept cutting out, or were moved past
+     * within seconds without you asking. At three the player stops and says so, instead of racing
+     * through the queue. Back to 0 once a song has played for a while, or when you pick something.
+     */
+    private var troubleInARow = 0
+    /** The next transition is a skip you asked for (it doesn't count as trouble). */
+    private var userSkip = false
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -114,7 +121,7 @@ actual object PlayerController {
     // ---- choosing what plays
 
     actual fun playSong(song: Song, queueContext: List<Song>, autoFillQueue: Boolean) {
-        scope.launch { startSong(song, queueContext.distinctBy { it.playId }.filterNot { it.playId == song.playId }, autoFillQueue, startMs = 0L) }
+        scope.launch { troubleInARow = 0; startSong(song, queueContext.distinctBy { it.playId }.filterNot { it.playId == song.playId }, autoFillQueue, startMs = 0L) }
     }
 
     private suspend fun startSong(song: Song, queue: List<Song>, autoFillQueue: Boolean, startMs: Long, recordPlay: Boolean = true) {
@@ -133,7 +140,6 @@ actual object PlayerController {
 
         val loaded = load(song, startMs, request) ?: return
         if (request != playRequest) { loaded.deck.close(); return }
-        consecutiveFailures = 0
         engine.play(loaded.deck)
         // Loaded: from here the engine itself reports any wait for audio (a slow connection).
         _meta.update { it.copy(streamQuality = loaded.quality, isPlaying = true, isBuffering = false) }
@@ -228,11 +234,23 @@ actual object PlayerController {
     private fun failed(song: Song, e: Throwable) {
         Log.w(TAG, "can't play '${song.title}': ${e.message}")
         _meta.update { it.copy(error = "Couldn't play \"${song.title}\" right now", isBuffering = false) }
-        if (++consecutiveFailures >= 3 || _meta.value.queue.isEmpty()) {
-            _meta.update { it.copy(isPlaying = false) }
-            return
-        }
-        scope.launch { delay(1_500); advance(userInitiated = false) }
+        if (++troubleInARow >= 3) { halt("3 songs in a row wouldn't play"); return }
+        if (_meta.value.queue.isEmpty()) { _meta.update { it.copy(isPlaying = false) }; return }
+        // On to the next one — unless you paused, or picked something else, in the meantime.
+        val request = playRequest
+        scope.launch { delay(1_500); if (request == playRequest && _meta.value.isPlaying) advance(userInitiated = false) }
+    }
+
+    /** Too many songs in a row wouldn't play: stop, and say so, rather than skipping on and on. */
+    private fun halt(reason: String) {
+        Log.w(TAG, "stopping playback: $reason")
+        playRequest++
+        engine.stop()
+        dropPrepared()
+        pendingStartMs = 0L
+        troubleInARow = 0
+        _meta.update { it.copy(isPlaying = false, isBuffering = false, error = "Songs kept stopping, so playback paused. Check your connection, then press play.") }
+        _progress.update { it.copy(positionMs = 0L) }
     }
 
     /** Lines up the next song in the queue (audio and all) so it follows with no gap. */
@@ -276,11 +294,9 @@ actual object PlayerController {
     private suspend fun ended(deck: Deck) {
         val song = songOf(deck) ?: return
         if (song.playId != _meta.value.currentSong?.playId) return
-        val played = deck.decodedPositionMs
-        val length = deck.durationMs.takeIf { it > 0 } ?: song.durationMs()
-        if (length > 30_000 && played < length - 15_000) {
+        if (deck.endedEarly) {
             val tries = earlyEnds.merge(song.playId, 1, Int::plus) ?: 1
-            if (tries <= 2) recover(deck, IOException("audio ended early at ${played}ms of ${length}ms"))
+            if (tries <= 2) recover(deck, IOException("audio ended early at ${deck.decodedPositionMs}ms of ${deck.durationMs}ms"))
             else failed(song, IOException("audio keeps ending early"))
             return
         }
@@ -292,6 +308,9 @@ actual object PlayerController {
     private fun transitioned(from: Deck, to: Deck) {
         val newSong = songOf(to) ?: return
         val previous = songOf(from)
+        // Moved on by itself within seconds of starting: something's wrong with the songs or the connection.
+        val byUser = userSkip.also { userSkip = false }
+        if (!byUser && from.decodedPositionMs - from.startMs < QUICK_MS && ++troubleInARow >= 3) { halt("songs kept ending within seconds"); return }
         if (previous != null && previous.playId != newSong.playId) backStack.addLast(previous)
         playRequest++
         val queue = _meta.value.queue
@@ -333,6 +352,7 @@ actual object PlayerController {
     // ---- transport
 
     actual fun playFromList(songs: List<Song>, startIndex: Int) {
+        // (Resets the trouble count through playSong: you picked something.)
         if (songs.isEmpty()) return
         val start = startIndex.coerceIn(songs.indices)
         val rest = songs.subList(start + 1, songs.size)
@@ -342,8 +362,18 @@ actual object PlayerController {
     actual fun togglePlayPause() {
         scope.launch {
             when {
+                engine.current == null && _meta.value.isPlaying -> {
+                    // Still loading (or about to move on from a song that wouldn't play): pause stops that,
+                    // instead of starting the song loading all over again.
+                    playRequest++
+                    dropPrepared()
+                    pendingStartMs = _progress.value.positionMs
+                    _meta.update { it.copy(isPlaying = false, isBuffering = false) }
+                    persistNow()
+                }
                 engine.current == null -> {
                     // Restored from last time (or stopped): load it and start from where it was.
+                    troubleInARow = 0
                     val song = _meta.value.currentSong ?: return@launch
                     val at = pendingStartMs ?: _progress.value.positionMs
                     startSong(song, _meta.value.queue, autoFillQueue = _meta.value.queue.isEmpty(), startMs = at, recordPlay = false)
@@ -373,8 +403,11 @@ actual object PlayerController {
     actual fun next() {
         scope.launch {
             noteEarlySkip()
+            troubleInARow = 0
             val want = _meta.value.queue.firstOrNull()
+            userSkip = true
             if (want != null && preparedFor == want.playId && engine.skipToNext()) return@launch // already loaded: instant
+            userSkip = false
             advance(userInitiated = true)
         }
     }
@@ -402,6 +435,7 @@ actual object PlayerController {
         scope.launch {
             if (engine.current != null && engine.positionMs > 3_000) { seekTo(0); return@launch }
             val prev = backStack.removeLastOrNull() ?: run { seekTo(0); return@launch }
+            troubleInARow = 0
             val current = _meta.value.currentSong
             val requeue = if (current != null) listOf(current) + _meta.value.queue else _meta.value.queue
             startSong(prev, requeue, autoFillQueue = false, startMs = 0L)
@@ -431,6 +465,7 @@ actual object PlayerController {
         scope.launch {
             val q = _meta.value.queue
             if (index !in q.indices) return@launch
+            troubleInARow = 0
             val remaining = q.toMutableList().apply { removeAt(index) }
             startSong(q[index], remaining, autoFillQueue = remaining.isEmpty(), startMs = 0L)
         }
@@ -472,8 +507,11 @@ actual object PlayerController {
         var n = 0
         while (true) {
             delay(500)
-            if (engine.current != null) {
+            val deck = engine.current
+            if (deck != null) {
                 _progress.update { it.copy(positionMs = engine.positionMs, durationMs = engine.current?.durationMs ?: it.durationMs) }
+                // A song that's really playing clears the count of songs that didn't.
+                if (engine.playing && engine.positionMs - deck.startMs >= 10_000) troubleInARow = 0
                 if (engine.playing && ++n % 10 == 0) persistNow()
             }
         }
@@ -500,4 +538,7 @@ actual object PlayerController {
     private fun persistSoon() { scope.launch { persistNow() } }
 
     private fun Song.durationMs(): Long = duration * 1000L
+
+    /** A song that moves on by itself sooner than this didn't really play. */
+    private const val QUICK_MS = 8_000L
 }

@@ -74,13 +74,22 @@ fun main(args: Array<String>) {
     System.setProperty("apple.laf.useScreenMenuBar", "true")
     System.setProperty("apple.awt.application.name", "Daydreamin")
     val startedAt = elapsedRealtime()
-    // --snapshot also writes the app's log next to the pictures (on Windows the app has no console).
-    args.indexOf("--snapshot").takeIf { it >= 0 }?.let { args.getOrNull(it + 1) }?.let { dir ->
+    // The app's log also goes to a file (an installed app has no console to read it from): daydreamin.log
+    // in its data folder, the previous run's kept as daydreamin.old.log. --snapshot writes app.log next to its pictures.
+    run {
+        val snapshot = args.indexOf("--snapshot").takeIf { it >= 0 }?.let { args.getOrNull(it + 1) }
+        val dir = snapshot ?: args.indexOf("--data-dir").takeIf { it >= 0 }?.let { args.getOrNull(it + 1) } ?: appDataDir().path
         File(dir).mkdirs()
-        val log = java.io.FileOutputStream(File(dir, "app.log"), true)
+        val file = File(dir, if (snapshot != null) "app.log" else "daydreamin.log")
+        if (snapshot == null && file.exists()) runCatching { file.copyTo(File(dir, "daydreamin.old.log"), overwrite = true); file.delete() }
+        val log = java.io.FileOutputStream(file, true)
+        var written = 0L // at most 5 MB a run: a long session can't fill the disk
         fun tee(to: java.io.PrintStream) = java.io.PrintStream(object : java.io.OutputStream() {
-            override fun write(b: Int) { to.write(b); log.write(b) }
-            override fun write(b: ByteArray, off: Int, len: Int) { to.write(b, off, len); log.write(b, off, len); log.flush() }
+            override fun write(b: Int) { to.write(b); if (written++ < 5_000_000) log.write(b) }
+            override fun write(b: ByteArray, off: Int, len: Int) {
+                to.write(b, off, len)
+                if (written < 5_000_000) { log.write(b, off, len); log.flush(); written += len }
+            }
         }, true)
         System.setOut(tee(System.out))
         System.setErr(tee(System.err))

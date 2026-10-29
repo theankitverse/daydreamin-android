@@ -12,10 +12,12 @@ import java.awt.datatransfer.StringSelection
 import java.net.URI
 
 actual object Log {
-    actual fun d(tag: String, msg: String) = println("D/$tag: $msg")
-    actual fun i(tag: String, msg: String) = println("I/$tag: $msg")
-    actual fun w(tag: String, msg: String, tr: Throwable?) = System.err.println("W/$tag: $msg" + (tr?.let { " — $it" } ?: ""))
-    actual fun e(tag: String, msg: String, tr: Throwable?) = System.err.println("E/$tag: $msg" + (tr?.let { " — $it" } ?: ""))
+    private val clock = java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss.SSS")
+    private fun now() = java.time.LocalTime.now().format(clock)
+    actual fun d(tag: String, msg: String) = println("${now()} D/$tag: $msg")
+    actual fun i(tag: String, msg: String) = println("${now()} I/$tag: $msg")
+    actual fun w(tag: String, msg: String, tr: Throwable?) = System.err.println("${now()} W/$tag: $msg" + (tr?.let { " — $it" } ?: ""))
+    actual fun e(tag: String, msg: String, tr: Throwable?) = System.err.println("${now()} E/$tag: $msg" + (tr?.let { " — $it" } ?: ""))
 }
 
 actual fun elapsedRealtime(): Long = System.nanoTime() / 1_000_000

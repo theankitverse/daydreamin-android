@@ -55,6 +55,13 @@ class PlayerIntegrationTest {
         YouTubeExtractorService.init(Region.country)
         YouTubeExtractorService.opusOnly = true
         Downloads.init()
+        // Silently: the volume is this computer's own setting, put back afterwards.
+        val volume = PlayerController.volume.value
+        PlayerController.setVolume(0f)
+        try { scenario() } finally { PlayerController.setVolume(volume); dir.deleteRecursively() }
+    }
+
+    private fun scenario() {
         PlayerController.ensureConnected()
 
         val results = runBlocking { YouTubeExtractorService.search("Tum Hi Ho Arijit Singh", limit = 5) }.map { it.toSong() }
@@ -180,6 +187,26 @@ class PlayerIntegrationTest {
         val saved = runBlocking { AppGraph.prefs.playbackSnapshotJson.first() }.orEmpty()
         assertTrue(toKeep.playId in saved, "snapshot saved")
         log("10. snapshot saved (${saved.length} chars)")
-        dir.deleteRecursively()
+
+        // 11. Streams that keep breaking off a few seconds in: the player stops and says so, instead of
+        // running through the queue song after song (what pressing play on a mix used to do).
+        StreamFaults.endAfterBytes = 60_000
+        try {
+            // (Not the first result: it's downloaded now, and plays from the file.)
+            val streamed = results.drop(1)
+            val first = streamed.first().playId
+            val started = linkedSetOf<String>()
+            PlayerController.playFromList(streamed, 0)
+            waitFor("playback to stop", 90_000) {
+                meta.currentSong?.let { if (it.playId == first || started.isNotEmpty()) started += it.title }
+                !meta.isPlaying && meta.error != null
+            }
+            log("11. streams breaking off: stopped after ${started.size} songs ($started) — '${meta.error}'")
+            // The first is on this computer from step 9's download, so it plays (to its end, where it was left);
+            // then three that won't play, and it stops.
+            assertTrue(started.size <= 4, "stops after three songs that won't play, not the whole queue (${started.size})")
+        } finally {
+            StreamFaults.endAfterBytes = null
+        }
     }
 }

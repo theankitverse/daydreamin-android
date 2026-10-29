@@ -16,6 +16,8 @@ private const val TAG = "AudioEngine"
 
 /** How far ahead each song decodes (and downloads). Rides out a slow network without a stutter. */
 private const val BUFFER_SECONDS = 15
+/** A song whose audio stops more than this long before its end didn't finish — its stream broke off. */
+const val EARLY_END_MS = 15_000L
 /** Mixer step: 10 ms of audio. */
 private const val STEP_FRAMES = SAMPLE_RATE / 100
 
@@ -73,8 +75,14 @@ class Deck(val key: String, val source: ByteSource, val header: WebmHeader, val 
             }
         } finally {
             ended = true
+            if (!closed) Log.d(TAG, "deck $key audio ended at ${startMs + writtenFrames() * 1000 / SAMPLE_RATE}ms of ${durationMs}ms" + (error?.let { " (${it.javaClass.simpleName})" } ?: ""))
         }
     }
+
+    private fun writtenFrames(): Long = synchronized(lock) { writePos / CHANNELS }
+
+    /** Its audio stopped well before the song's end (the stream broke off, or gave back nothing more). */
+    val endedEarly: Boolean get() = durationMs > 30_000 && decodedPositionMs < durationMs - EARLY_END_MS
 
     /** Copies up to [max] decoded samples into [out]; 0 when nothing is decoded yet. */
     fun take(out: ShortArray, max: Int): Int = synchronized(lock) {
@@ -260,7 +268,10 @@ class AudioEngine(private val listener: EngineListener) {
                 deck.finished -> synchronized(this) {
                     if (current !== deck) return
                     val to = next
-                    if (to != null) {
+                    // Only a song that played to its end hands over to the next one. One that stopped short
+                    // goes back to the player (which fetches it again) — handing over there used to run
+                    // through song after song when streams kept breaking off.
+                    if (to != null && !deck.endedEarly) {
                         next = null
                         current = to
                         outgoing?.close(); outgoing = null
