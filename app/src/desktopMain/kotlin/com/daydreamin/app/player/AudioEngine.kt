@@ -1,5 +1,6 @@
 package com.daydreamin.app.player
 
+import kotlin.math.roundToInt
 import com.daydreamin.app.platform.Log
 import javax.sound.sampled.AudioFormat
 import javax.sound.sampled.AudioSystem
@@ -340,9 +341,9 @@ class AudioEngine(private val listener: EngineListener) {
             }
         }
 
-        process(mix, n)
+        process(mix, n, crossfading = fadingOut != null)
         for (i in 0 until n) {
-            val s = (mix[i] * 32767f).toInt().coerceIn(-32768, 32767)
+            val s = toPcm16(mix[i])
             bytes[i * 2] = s.toByte()
             bytes[i * 2 + 1] = (s shr 8).toByte()
         }
@@ -385,19 +386,36 @@ class AudioEngine(private val listener: EngineListener) {
 
     // ---- equalizer and loudness
 
-    private fun process(buf: FloatArray, n: Int) {
+    private fun process(buf: FloatArray, n: Int, crossfading: Boolean) {
         if (eqChanged) { filters = filtersFor(eqPreset); eqChanged = false }
         val gain = if (boost) 1.4125f else 1f // +3 dB
         val fs = filters
+        // The limiter is only for what can push past full scale: EQ, the boost, two songs overlapping.
+        // Otherwise the song goes through untouched (the decoder already left room for its peaks).
+        val limit = boost || fs.isNotEmpty() || crossfading
         for (f in 0 until n / CHANNELS) {
             for (c in 0 until CHANNELS) {
                 val i = f * CHANNELS + c
                 var x = buf[i]
                 for (filter in fs) x = filter.process(x, c)
-                buf[i] = softLimit(x * gain) * volume
+                buf[i] = (if (limit) softLimit(x * gain) else x) * volume
             }
         }
     }
+
+    /**
+     * To 16-bit with TPDF dither: a whisper of noise (two random half-steps) instead of plain
+     * rounding, which otherwise leaves a faint grainy distortion on fades, reverb tails and quiet
+     * passages, more so with the volume turned down. Digital silence stays silent.
+     */
+    private fun toPcm16(x: Float): Int {
+        if (x == 0f) return 0
+        ditherSeed = ditherSeed xor (ditherSeed shl 13); ditherSeed = ditherSeed xor (ditherSeed ushr 17); ditherSeed = ditherSeed xor (ditherSeed shl 5)
+        val r1 = (ditherSeed and 0xFFFF) / 65536f
+        val r2 = ((ditherSeed ushr 16) and 0xFFFF) / 65536f
+        return (x * 32767f + (r1 - r2)).roundToInt().coerceIn(-32768, 32767)
+    }
+    private var ditherSeed = 0x2545F491
 
     /** Leaves normal levels alone; rounds off anything over -2 dBFS instead of clipping it. */
     private fun softLimit(x: Float): Float {

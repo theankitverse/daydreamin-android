@@ -24,6 +24,8 @@ class WebmHeader(
     /** (time ms, absolute file offset of the cluster) */
     val cues: List<Pair<Long, Long>>,
     val firstClusterOffset: Long,
+    /** The song's own output gain from OpusHead, in Q7.8 dB (almost always 0 on YouTube). */
+    val outputGainQ8: Int = 0,
 )
 
 private const val ID_SEGMENT = 0x18538067L
@@ -110,6 +112,7 @@ fun readWebmHeader(source: ByteSource): WebmHeader {
         var scale = 1_000_000L
         var duration = 0.0
         var preSkip = 0
+        var outputGainQ8 = 0
         var cueTime = 0L
         val cueOffsets = mutableListOf<Pair<Long, Long>>() // relative positions until segmentStart is known
         while (true) {
@@ -119,7 +122,7 @@ fun readWebmHeader(source: ByteSource): WebmHeader {
                 ID_CLUSTER -> {
                     val firstCluster = e.start
                     val cues = cueOffsets.map { (t, rel) -> t * scale / 1_000_000 to segmentStart + rel }
-                    return WebmHeader(segmentStart, (duration * scale / 1_000_000).toLong(), preSkip, cues, firstCluster)
+                    return WebmHeader(segmentStart, (duration * scale / 1_000_000).toLong(), preSkip, cues, firstCluster, outputGainQ8)
                 }
                 in CONTAINERS -> {}
                 ID_TIMESCALE -> scale = r.uint(e.size)
@@ -127,6 +130,7 @@ fun readWebmHeader(source: ByteSource): WebmHeader {
                 ID_CODEC_PRIVATE -> {
                     val head = r.bytes(e.size)
                     if (head.size >= 12) preSkip = (head[10].toInt() and 0xFF) or ((head[11].toInt() and 0xFF) shl 8)
+                    if (head.size >= 18) outputGainQ8 = ((head[16].toInt() and 0xFF) or (head[17].toInt() shl 8)).toShort().toInt()
                 }
                 ID_CUE_TIME -> cueTime = r.uint(e.size)
                 ID_CUE_CLUSTER -> cueOffsets += cueTime to r.uint(e.size)
@@ -140,11 +144,18 @@ fun readWebmHeader(source: ByteSource): WebmHeader {
  * Decoded audio of one song from [startMs] on, as interleaved 16-bit stereo at 48 kHz. Starts at
  * the last cue before [startMs] and drops what comes before it, so a seek lands on the exact millisecond.
  */
-class OpusPcmReader(source: ByteSource, header: WebmHeader, private val startMs: Long) : Closeable {
+/**
+ * Room left above the song's loudest moments, in Q7.8 dB (-2 dB, as on the phone). Loud masters
+ * come out of Opus with peaks over full scale (+1.6 dB measured); decoding to 16-bit cut those off,
+ * a crackle on big hits. Taken off inside the decoder, they come through whole.
+ */
+const val OPUS_HEADROOM_Q8 = -2 * 256
+
+class OpusPcmReader(source: ByteSource, header: WebmHeader, private val startMs: Long, gainQ8: Int = header.outputGainQ8 + OPUS_HEADROOM_Q8) : Closeable {
     private val cueOffset: Long
     private val stream: InputStream
     private val r: Ebml
-    private val decoder = OpusDecoder(SAMPLE_RATE, CHANNELS)
+    private val decoder = OpusDecoder(SAMPLE_RATE, CHANNELS).apply { setGain(gainQ8) }
     private val pcm = ShortArray(5760 * CHANNELS) // the longest Opus packet: 120 ms
     private var pcmStart = 0
     private var pcmEnd = 0
