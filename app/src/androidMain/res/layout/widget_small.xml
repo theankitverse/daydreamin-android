@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/widget_tint"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:importantForAccessibility="no"
+        android:scaleType="fitXY"
+        android:src="@drawable/widget_bg" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="10dp">
+
+        <ImageView
+            android:id="@+id/widget_art"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:importantForAccessibility="no"
+            android:scaleType="centerCrop"
+            android:src="@mipmap/ic_launcher" />
+
+        <TextView
+            android:id="@+id/widget_title"
+            android:text="Daydreamin"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:ellipsize="end"
+            android:gravity="center"
+            android:maxLines="1"
+            android:textColor="#FFFFFFFF"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_artist"
+            android:text="Tap to start listening"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:gravity="center"
+            android:maxLines="1"
+            android:textColor="#B3FFFFFF"
+            android:textSize="11sp" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageButton
+                android:id="@+id/widget_play"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:background="@drawable/widget_play_bg"
+                android:contentDescription="Play or pause"
+                android:src="@drawable/ic_widget_play" />
+
+            <ImageButton
+                android:id="@+id/widget_next"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginStart="6dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="Next"
+                android:src="@drawable/ic_widget_next" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

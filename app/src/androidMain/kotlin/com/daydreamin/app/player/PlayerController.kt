@@ -143,6 +143,9 @@ actual object PlayerController {
      *  having opened), and the UI calls it too when it does open; whichever runs first wins. */
     actual fun ensureConnected() = ensureConnected(com.daydreamin.app.DaydreaminApp.instance)
 
+    /** Connected to the playback service (a widget's press from a closed app waits for this). */
+    val isConnected: Boolean get() = controller != null
+
     /** Warms the first seconds of [song] so tapping it starts at once (Home's top pick). */
     actual suspend fun warmUp(song: Song) = SongPrecacher.precacheLeadIn(com.daydreamin.app.DaydreaminApp.instance, song)
 
@@ -364,6 +367,7 @@ actual object PlayerController {
                     controller?.setMediaItem(item, snapshot.positionMs)
                     releaseSwap()
                     controller?.prepare()
+                    if (playWhenRestored) controller?.play()
                     lastKnownGoodSong = song
                     _meta.update { it.copy(isBuffering = false, streamQuality = "Downloaded") }
                     prepareUpcoming()
@@ -384,15 +388,19 @@ actual object PlayerController {
                 controller?.setMediaItem(buildMediaItem(song, resolved), snapshot.positionMs)
                 releaseSwap()
                 controller?.prepare()
+                if (playWhenRestored) controller?.play()
                 lastKnownGoodSong = song
                 val qualityLabel = "${resolved.codec.uppercase().removePrefix("WEBMA_").removePrefix("M4A_")} · ${resolved.bitrateKbps} kbps"
                 _meta.update { it.copy(isBuffering = false, streamQuality = qualityLabel) }
                 prepareUpcoming()
             } finally {
                 releaseSwap()
+                playWhenRestored = false
             }
         }
     }
+    /** Play was pressed while the last song was still being restored. */
+    private var playWhenRestored = false
 
     /** [app.repository.resolveStream] fails transiently often enough (a flaky network blip,
      *  YouTube briefly rate-limiting) that surfacing an error to the user on the very first
@@ -942,7 +950,10 @@ actual object PlayerController {
             recoverCurrentSong(song, _progress.value.positionMs, playWhenReady = true)
             return
         }
-        c.play() // also covers a restore still in flight: it lands playing instead of paused
+        // Still restoring: play once it's in. Playing an empty player now would end it at once, and
+        // the player would take that for the end of the song and move on to the next one.
+        if (song != null && c.mediaItemCount == 0 && pendingStartIsRestore) { playWhenRestored = true; return }
+        c.play()
     }
 
     /** Used by [SleepTimer] — pauses only if something is actually playing. */

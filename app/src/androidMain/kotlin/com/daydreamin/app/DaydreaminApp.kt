@@ -91,6 +91,9 @@ class DaydreaminApp : Application(), coil3.SingletonImageLoader.Factory {
         // then rebuilds it in the background if it's stale.
         AppGraph.startHomeFeed()
 
+        // The home-screen widget follows the player from here on.
+        com.daydreamin.app.widget.WidgetState.follow(appScope)
+
         Log.d(TAG, "DaydreaminApp.onCreate() done at +${SystemClock.elapsedRealtime() - processStartAtMs}ms")
     }
 
