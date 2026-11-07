@@ -1,9 +1,9 @@
 {
-  "versionCode": 22,
-  "versionName": "1.8.0",
+  "versionCode": 23,
+  "versionName": "1.8.1",
   "url": "https://github.com/theankitverse/daydreamin-android/releases/latest",
-  "notes": "Bring your playlists in with a link, share songs as cards, see Your Year in Music, and play from a new home-screen widget or Android Auto.",
-  "apkUrl": "https://github.com/theankitverse/daydreamin-android/releases/download/v1.8.0/Daydreamin.apk",
-  "apkSize": 5153140,
-  "sha256": "627fd437ebd06e050600f73a766b5a2116c95777587509abd9feb77668ff3562"
+  "notes": "A new share screen with six card styles, links that open straight in Daydreamin, and a much bigger Your Year in Music.",
+  "apkUrl": "https://github.com/theankitverse/daydreamin-android/releases/download/v1.8.1/Daydreamin.apk",
+  "apkSize": 5248768,
+  "sha256": "ecfbec26489758a5f1f9c10fc192906d3966aa0fe5d4f265b942b1cd2bb6bb55"
 }

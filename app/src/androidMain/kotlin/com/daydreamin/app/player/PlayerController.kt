@@ -146,6 +146,11 @@ actual object PlayerController {
     /** Connected to the playback service (a widget's press from a closed app waits for this). */
     val isConnected: Boolean get() = controller != null
 
+    actual suspend fun awaitReady() {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { ensureConnected() }
+        kotlinx.coroutines.withTimeoutOrNull(10_000) { while (!isConnected) kotlinx.coroutines.delay(50) }
+    }
+
     /** Warms the first seconds of [song] so tapping it starts at once (Home's top pick). */
     actual suspend fun warmUp(song: Song) = SongPrecacher.precacheLeadIn(com.daydreamin.app.DaydreaminApp.instance, song)
 

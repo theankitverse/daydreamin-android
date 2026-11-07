@@ -36,8 +36,11 @@ liquid-glass design. The same app runs on your phone and your computer.
   stats. Export it to a file and import it on another device.
 - **Make it yours:** your name, photo and an accent colour that lights up the whole app.
 - **Bring your playlists:** paste a YouTube, YouTube Music or Deezer link, or import from Spotify
-  through Exportify. Share any song or playlist as a card.
-- **Your Year in Music:** your top songs, top artists and minutes, ready to share.
+  through Exportify.
+- **Share screen:** turn any song or playlist into a card in six styles, with your choice of
+  colours and size. Shared links open straight in Daydreamin for anyone who has it.
+- **Your Year in Music:** your top songs and artists, your loudest month, a listening clock, a
+  calendar of your year, a guessing game and your listener type, ready to share.
 - **On your phone:** a home-screen widget, and Android Auto in the car.
 - **On your computer:** a sidebar on wide windows, keyboard shortcuts, your keyboard's media keys,
   and the system's Now Playing controls (Control Center on Mac, media controls on Linux).

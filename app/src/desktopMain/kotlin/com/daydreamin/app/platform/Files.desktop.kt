@@ -53,13 +53,29 @@ actual suspend fun PickedFile.readText(): String = withContext(Dispatchers.IO) {
 
 actual suspend fun PickedFile.displayName(): String = file.name
 
-actual suspend fun shareImage(png: ByteArray, fileName: String, text: String) {
-    val saved = withContext(Dispatchers.IO) {
-        val downloads = File(System.getProperty("user.home"), "Downloads").takeIf { it.isDirectory } ?: File(System.getProperty("user.home"))
-        File(downloads, fileName).apply { writeBytes(png) }
-    }
+actual fun shareTargets(): List<ShareTarget> = emptyList()
+actual val hasSystemShare: Boolean = false
+actual val canSaveImage: Boolean = true
+actual val canCopyImage: Boolean = true
+
+actual suspend fun shareImage(png: ByteArray, fileName: String, text: String, target: String?) {
+    saveImage(png, fileName)
     java.awt.Toolkit.getDefaultToolkit().systemClipboard.setContents(java.awt.datatransfer.StringSelection(text), null)
-    com.daydreamin.app.ui.components.Toaster.show("Saved ${saved.name} to ${saved.parentFile.name}. Link copied.")
+}
+
+actual suspend fun saveImage(png: ByteArray, fileName: String): String? = withContext(Dispatchers.IO) {
+    val downloads = File(System.getProperty("user.home"), "Downloads").takeIf { it.isDirectory } ?: File(System.getProperty("user.home"))
+    runCatching { File(downloads, fileName).writeBytes(png); downloads.name }.getOrNull()
+}
+
+actual suspend fun copyImage(png: ByteArray) = withContext(Dispatchers.IO) {
+    val picture = javax.imageio.ImageIO.read(java.io.ByteArrayInputStream(png))
+    val flavor = java.awt.datatransfer.DataFlavor.imageFlavor
+    java.awt.Toolkit.getDefaultToolkit().systemClipboard.setContents(object : java.awt.datatransfer.Transferable {
+        override fun getTransferDataFlavors() = arrayOf(flavor)
+        override fun isDataFlavorSupported(f: java.awt.datatransfer.DataFlavor) = f == flavor
+        override fun getTransferData(f: java.awt.datatransfer.DataFlavor): Any = picture
+    }, null)
 }
 
 actual fun androidx.compose.ui.graphics.ImageBitmap.encodePng(): ByteArray =

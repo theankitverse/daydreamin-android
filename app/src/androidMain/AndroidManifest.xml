@@ -17,6 +17,12 @@
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="upi" android:host="pay" />
         </intent>
+        <!-- The apps the share screen offers directly, when they're installed. -->
+        <package android:name="com.whatsapp" />
+        <package android:name="com.instagram.android" />
+        <package android:name="org.telegram.messenger" />
+        <package android:name="com.snapchat.android" />
+        <package android:name="com.twitter.android" />
     </queries>
 
     <application
@@ -49,6 +55,20 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- A shared song: the app claims its own links (the site publishes our fingerprint). -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="theankitverse.github.io" android:pathPrefix="/s" />
+            </intent-filter>
+            <!-- The same, from the page itself: in-app browsers, and Androids before links could be claimed. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="daydreamin" />
             </intent-filter>
             <!-- "Open with Daydreamin" on a downloaded playlist file. -->
             <intent-filter>

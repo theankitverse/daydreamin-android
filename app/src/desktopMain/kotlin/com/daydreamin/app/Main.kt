@@ -70,6 +70,10 @@ private fun platformName(): String = System.getProperty("os.name").lowercase().l
 }
 
 fun main(args: Array<String>) {
+    // --data-dir <dir> (for development): a separate library, e.g. a fresh one to see first-run setup.
+    val dataDir = args.indexOf("--data-dir").takeIf { it >= 0 }?.let { args.getOrNull(it + 1) }?.let { File(it).apply { mkdirs() } } ?: appDataDir()
+    // A tapped link on Windows or Linux starts the app again: the copy already running takes it from here.
+    if (com.daydreamin.app.system.DesktopLinks.handedOff(dataDir, args)) return
     // The menus go in the Mac's menu bar, not inside the window.
     System.setProperty("apple.laf.useScreenMenuBar", "true")
     System.setProperty("apple.awt.application.name", "Daydreamin")
@@ -103,8 +107,6 @@ fun main(args: Array<String>) {
     AppInfo.lastFmKey = System.getProperty("daydreamin.lastfmKey").orEmpty()
     AppInfo.lastFmSecret = System.getProperty("daydreamin.lastfmSecret").orEmpty()
 
-    // --data-dir <dir> (for development): a separate library, e.g. a fresh one to see first-run setup.
-    val dataDir = args.indexOf("--data-dir").takeIf { it >= 0 }?.let { args.getOrNull(it + 1) }?.let { File(it).apply { mkdirs() } } ?: appDataDir()
     val store = PreferenceDataStoreFactory.create { File(dataDir, "daydreamin.preferences_pb") }
     TasteProfile.init(dataDir)
     AppGraph.init(dataDir, AppPreferences(store, dataDir), startedAt)
@@ -116,6 +118,7 @@ fun main(args: Array<String>) {
     com.daydreamin.app.player.PlayerController.ensureConnected()
     // The system's media controls: Now Playing on macOS, MPRIS on Linux, media keys on Windows.
     com.daydreamin.app.system.SystemMedia.start()
+    com.daydreamin.app.system.DesktopLinks.start(dataDir, args)
     // A development run (no version) never offers updates.
     if (AppInfo.versionCode > 0) com.daydreamin.app.data.update.UpdateChecker.start(AppGraph.prefs, AppGraph.appScope)
     AppGraph.startHomeFeed()
@@ -267,6 +270,11 @@ private fun routeFor(name: String): com.daydreamin.app.desktop.nav.Route {
         "settings-shortcuts" -> DRoute.Settings("SHORTCUTS")
         "nowplaying" -> { com.daydreamin.app.desktop.shell.DesktopUi.expanded = true; DRoute.Home }
         "recap" -> { com.daydreamin.app.ui.screens.recap.RecapLauncher.show(); DRoute.Home }
+        "share" -> {
+            val cover = "https://i.ytimg.com/vi/fJ9rUzIMcZQ/hqdefault.jpg"
+            com.daydreamin.app.ui.components.Share.song(com.daydreamin.app.data.model.Song(id = "fJ9rUzIMcZQ", title = "Bohemian Rhapsody", artist = "Queen", cover = cover, coverXl = cover, duration = 354, videoId = "fJ9rUzIMcZQ"))
+            DRoute.Home
+        }
         // Home's top songs as a collection page (a full list, for checking the song table).
         "picks" -> kotlinx.coroutines.runBlocking {
             kotlinx.coroutines.withTimeoutOrNull(20_000) { AppGraph.homeFeed.feed.first { it != null } }

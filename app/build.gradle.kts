@@ -25,8 +25,8 @@ android {
         // phone's version doesn't install at all ("There was a problem parsing the package").
         minSdk = 21
         targetSdk = 35
-        versionCode = 22
-        versionName = "1.8.0"
+        versionCode = 23
+        versionName = "1.8.1"
         // Where installed apps look for new releases. Overridable only to test the updater locally.
         val updateUrl = (project.findProperty("updateUrl") as String?)
             ?: "https://raw.githubusercontent.com/theankitverse/daydreamin-android/main/version.json"
@@ -229,6 +229,20 @@ compose.desktop {
                 iconFile.set(project.file("desktop-icons/daydreamin.icns"))
                 appCategory = "public.app-category.music"
                 dockName = "Daydreamin"
+                // Opens daydreamin:// links, from the page behind a shared song.
+                infoPlist {
+                    extraKeysRawXml = """
+                        <key>CFBundleURLTypes</key>
+                        <array>
+                            <dict>
+                                <key>CFBundleURLName</key>
+                                <string>com.daydreamin.desktop</string>
+                                <key>CFBundleURLSchemes</key>
+                                <array><string>daydreamin</string></array>
+                            </dict>
+                        </array>
+                    """
+                }
             }
             windows {
                 iconFile.set(project.file("desktop-icons/daydreamin.ico"))

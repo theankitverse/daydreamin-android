@@ -81,7 +81,28 @@ actual suspend fun PickedFile.displayName(): String = withContext(Dispatchers.IO
         ?: uri.lastPathSegment.orEmpty().substringAfterLast('/')
 }
 
-actual suspend fun shareImage(png: ByteArray, fileName: String, text: String) {
+private val POPULAR_APPS = listOf(
+    "com.whatsapp" to "WhatsApp", "com.instagram.android" to "Instagram", "org.telegram.messenger" to "Telegram",
+    "com.snapchat.android" to "Snapchat", "com.twitter.android" to "X",
+)
+
+actual fun shareTargets(): List<ShareTarget> {
+    val packages = com.daydreamin.app.DaydreaminApp.instance.packageManager
+    return POPULAR_APPS.mapNotNull { (id, label) ->
+        val icon = runCatching { packages.getApplicationIcon(id) }.getOrNull() ?: return@mapNotNull null
+        val bitmap = android.graphics.Bitmap.createBitmap(144, 144, android.graphics.Bitmap.Config.ARGB_8888)
+        icon.setBounds(0, 0, 144, 144)
+        icon.draw(android.graphics.Canvas(bitmap))
+        ShareTarget(id, label, bitmap.asImageBitmap())
+    }
+}
+
+actual val hasSystemShare: Boolean = true
+// Older Androids need a storage permission just for this; they still have Share.
+actual val canSaveImage: Boolean get() = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q
+actual val canCopyImage: Boolean = false
+
+actual suspend fun shareImage(png: ByteArray, fileName: String, text: String, target: String?) {
     val app = com.daydreamin.app.DaydreaminApp.instance
     val uri = withContext(Dispatchers.IO) {
         val dir = java.io.File(app.cacheDir, "shared").apply { mkdirs() }
@@ -94,9 +115,28 @@ actual suspend fun shareImage(png: ByteArray, fileName: String, text: String) {
         putExtra(android.content.Intent.EXTRA_TEXT, text)
         clipData = android.content.ClipData.newRawUri(null, uri)
         addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        target?.let(::setPackage)
     }
-    app.startActivity(android.content.Intent.createChooser(send, null).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION))
+    val launch = if (target != null) send else android.content.Intent.createChooser(send, null)
+    app.startActivity(launch.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION))
 }
+
+actual suspend fun saveImage(png: ByteArray, fileName: String): String? = withContext(Dispatchers.IO) {
+    if (!canSaveImage) return@withContext null
+    val resolver = com.daydreamin.app.DaydreaminApp.instance.contentResolver
+    val values = android.content.ContentValues().apply {
+        put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, fileName)
+        put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/png")
+        put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Daydreamin")
+    }
+    runCatching {
+        val uri = resolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return@withContext null
+        resolver.openOutputStream(uri)?.use { it.write(png) } ?: return@withContext null
+        "Pictures"
+    }.getOrNull()
+}
+
+actual suspend fun copyImage(png: ByteArray) = Unit
 
 actual fun androidx.compose.ui.graphics.ImageBitmap.encodePng(): ByteArray =
     java.io.ByteArrayOutputStream().also { out ->

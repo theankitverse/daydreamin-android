@@ -203,7 +203,7 @@ fun ProfileScreen(
             }
             item {
                 Column(Modifier.padding(top = Space.section)) {
-                    LinkRow(Icons.Rounded.AutoAwesome, "Your Year in Music", "Your top songs, artists and minutes") { com.daydreamin.app.ui.screens.recap.RecapLauncher.show() }
+                    LinkRow(Icons.Rounded.AutoAwesome, "Your Year in Music", "Your top songs, habits and listener type") { com.daydreamin.app.ui.screens.recap.RecapLauncher.show() }
                     LinkRow(Icons.Rounded.BarChart, "Statistics", "Your listening, in numbers", onStatistics)
                     Hairline()
                     LinkRow(Icons.Rounded.Palette, "Theme", "Accent colour", onThemeCustomize)

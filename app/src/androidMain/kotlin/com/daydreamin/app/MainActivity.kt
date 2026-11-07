@@ -95,6 +95,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        com.daydreamin.app.data.share.IncomingLinks.showPlayer = { com.daydreamin.app.ui.components.PlayerSheet.openRequested = true }
         if (savedInstanceState == null) { handleOpenPlayer(intent); handleImport(intent) }
         // The system launch screen can only show the still icon, so it hands over as soon as the
         // app can draw: we note exactly where it drew the icon and draw the same icon there
@@ -191,12 +192,16 @@ class MainActivity : ComponentActivity() {
     /** A playlist file opened with the app, or a link or file shared to it. */
     private fun handleImport(intent: android.content.Intent?) {
         when (intent?.action) {
-            android.content.Intent.ACTION_VIEW -> intent.data?.let { com.daydreamin.app.data.library.PlaylistImport.import(com.daydreamin.app.platform.PickedFile(it)) }
+            android.content.Intent.ACTION_VIEW -> intent.data?.let {
+                if (!com.daydreamin.app.data.share.IncomingLinks.open(it.toString())) com.daydreamin.app.data.library.PlaylistImport.import(com.daydreamin.app.platform.PickedFile(it))
+            }
             android.content.Intent.ACTION_SEND -> {
                 @Suppress("DEPRECATION")
                 val file = intent.getParcelableExtra<android.net.Uri>(android.content.Intent.EXTRA_STREAM)
                 if (file != null) com.daydreamin.app.data.library.PlaylistImport.import(com.daydreamin.app.platform.PickedFile(file))
-                else intent.getStringExtra(android.content.Intent.EXTRA_TEXT)?.let { com.daydreamin.app.ui.components.ImportFlow.show(it) }
+                else intent.getStringExtra(android.content.Intent.EXTRA_TEXT)?.let {
+                    if (!com.daydreamin.app.data.share.IncomingLinks.open(it)) com.daydreamin.app.ui.components.ImportFlow.show(it)
+                }
             }
         }
     }

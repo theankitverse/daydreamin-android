@@ -71,3 +71,51 @@ class RecapTest {
         assertNull(recapArtist("Sony Music India"))
     }
 }
+
+class RecapTimeTest {
+    private val zone: ZoneId = ZoneOffset.UTC
+    private fun at(month: Int, day: Int, hour: Int) = LocalDateTime.of(2026, month, day, hour, 0).toInstant(ZoneOffset.UTC).toEpochMilli()
+    private fun listen(id: String, atMs: Long, artist: String = "Artist $id") = ListenEntry(atMs, id, "Song $id", artist, "", 120_000)
+
+    @Test fun `the clock, calendar and months add up`() {
+        val listens = (1..5).flatMap { d -> List(5) { listen("a", at(3, d, 23)) } } + listen("b", at(3, 9, 8)) + listen("b", at(6, 1, 8))
+        val time = assertNotNull(assertNotNull(buildRecap(null, listens, listOf(PlayStat(Song(id = "a", title = "A", artist = "X"), plays = 9)), zone)).time)
+        assertEquals(50L + 2, time.minutesByMonth[2])
+        assertEquals(2L, time.minutesByMonth[5])
+        assertEquals(2, time.peakMonth)
+        assertEquals(23, time.peakHour)
+        assertEquals(7, time.daysListened)
+        assertEquals(5, time.longestStreak)
+        assertEquals(null, time.firstSong) // the log began in March: that wasn't the year's real first song
+        assertEquals(5, time.onRepeat?.plays)
+    }
+
+    @Test fun `the first song counts when the log covers the start of the year`() {
+        val listens = List(25) { listen("a", at(1, 2, 12)) }
+        val stats = listOf(PlayStat(Song(id = "a", title = "A", artist = "X"), plays = 9))
+        assertEquals("a", assertNotNull(assertNotNull(buildRecap(null, listens, stats, zone)).time).firstSong?.playId)
+    }
+
+    @Test fun `too few dated listens leaves the dated pages out`() {
+        val stats = listOf(PlayStat(Song(id = "a", title = "A", artist = "X", duration = 120), plays = 9))
+        val r = assertNotNull(buildRecap(2026, List(5) { listen("a", at(3, 1, 12)) }, stats, zone))
+        assertEquals(null, r.time)
+    }
+
+    @Test fun `only artists first heard well after the log began are new`() {
+        val old = List(20) { listen("a", at(1, 1 + it, 12), "Old Friend") }
+        val fresh = List(3) { listen("n", at(6, 1 + it, 12), "New Face") }
+        val time = assertNotNull(assertNotNull(buildRecap(null, old + fresh, listOf(PlayStat(Song(id = "a", title = "A", artist = "X"), plays = 9)), zone)).time)
+        assertEquals(listOf("New Face"), time.newArtists.map { it.name })
+    }
+
+    @Test fun `a song can be played again from the recap`() {
+        val listens = List(200) { listen("dQw4w9WgXcQ", at(3, 1, 12)) }
+        val song = assertNotNull(buildRecap(2026, listens, emptyList(), zone)).topSongs.first().toSong()
+        assertEquals("dQw4w9WgXcQ", song.videoId)
+    }
+
+    @Test fun `only years with enough listens get their own recap`() {
+        assertEquals(listOf(2026), recapYears(List(200) { listen("a", at(3, 1, 12)) } + listen("a", at(3, 1, 12) - 400L * 86_400_000), zone))
+    }
+}

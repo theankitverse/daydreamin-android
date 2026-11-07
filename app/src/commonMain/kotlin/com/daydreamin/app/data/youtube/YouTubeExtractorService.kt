@@ -46,6 +46,8 @@ data class ResolvedStream(
     val related: List<YtTrack>,
     val bitrateKbps: Int,
     val codec: String,
+    /** The video's own details, for a song known only by its id (a shared link). */
+    val track: YtTrack? = null,
 )
 
 private val BAD_KEYWORDS = listOf(
@@ -293,6 +295,7 @@ object YouTubeExtractorService {
                 related = related,
                 bitrateKbps = audio.averageBitrate.coerceAtLeast(0),
                 codec = audio.format?.name ?: audio.codec ?: "unknown",
+                track = YtTrack(videoId, info.name, info.uploaderName ?: "Unknown", "https://i.ytimg.com/vi/$videoId/hqdefault.jpg", info.duration.toInt().coerceAtLeast(0)),
             )
         } catch (e: Exception) {
             Log.e("YtExtract", "resolveVideoId($videoId) failed: ${e.javaClass.simpleName}: ${e.message}", e)

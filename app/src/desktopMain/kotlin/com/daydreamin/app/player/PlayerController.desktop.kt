@@ -90,6 +90,8 @@ actual object PlayerController {
         settings.putFloat("volume", v)
     }
 
+    actual suspend fun awaitReady() { ensureConnected() }
+
     actual fun ensureConnected() {
         scope.launch {
             if (started) return@launch

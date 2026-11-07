@@ -1,0 +1,10 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.daydreamin.app",
+      "sha256_cert_fingerprints": ["7C:69:4C:BA:DC:80:3D:B0:DD:64:91:75:D2:B3:6C:37:D1:86:95:BC:00:06:85:48:7E:3B:64:C2:E4:CD:DD:55"]
+    }
+  }
+]

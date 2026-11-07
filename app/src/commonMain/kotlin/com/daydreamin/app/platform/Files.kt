@@ -65,8 +65,24 @@ expect object DeviceStorage {
     val audioCacheCapBytes: Long
 }
 
-/** A picture to send somewhere. On a phone: the system's share sheet. On a computer: saved to Downloads, with [text] copied. */
-expect suspend fun shareImage(png: ByteArray, fileName: String, text: String)
+/** An installed app a picture can go straight to. */
+class ShareTarget(val id: String, val label: String, val icon: ImageBitmap?)
+
+/** The popular apps on this device that take a picture directly. */
+expect fun shareTargets(): List<ShareTarget>
+
+/** Whether there's a system share sheet to fall back on. */
+expect val hasSystemShare: Boolean
+expect val canSaveImage: Boolean
+expect val canCopyImage: Boolean
+
+/** Sends a picture and [text] to the app [target], or to the system's share sheet when it's null. */
+expect suspend fun shareImage(png: ByteArray, fileName: String, text: String, target: String? = null)
+
+/** Keeps a copy of the picture where the user can find it; says where, or null if it couldn't. */
+expect suspend fun saveImage(png: ByteArray, fileName: String): String?
+
+expect suspend fun copyImage(png: ByteArray)
 
 expect fun ImageBitmap.encodePng(): ByteArray
 

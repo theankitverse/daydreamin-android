@@ -16,6 +16,9 @@ expect object PlayerController {
     fun ensureConnected()
     fun disconnect()
 
+    /** Returns once playback can be asked for (a cold start has to connect first). */
+    suspend fun awaitReady()
+
     /** Warms the first seconds of [song] so tapping it starts at once (Home's top pick). */
     suspend fun warmUp(song: Song)
 
