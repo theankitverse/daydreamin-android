@@ -409,6 +409,8 @@ private fun AppNavHost(wide: Boolean, startRoute: String) {
       }
       // Long-press song menus lift over everything, the bottom bar included.
       com.daydreamin.app.ui.components.SongContextMenuHost(hazeState)
+      com.daydreamin.app.ui.screens.recap.RecapHost()
+      com.daydreamin.app.ui.components.ShareHost()
      }
     }
 }

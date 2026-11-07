@@ -1,5 +1,7 @@
 package com.daydreamin.app.platform
 
+import coil3.request.allowHardware
+import androidx.compose.ui.graphics.asAndroidBitmap
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -45,6 +47,11 @@ actual fun rememberPicker(kind: PickKind, onPicked: (PickedFile?) -> Unit): Pick
             val l = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json"), deliver)
             PickerLauncher { name -> l.launch(name) }
         }
+        PickKind.OPEN_PLAYLIST -> {
+            val l = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument(), deliver)
+            // Everything: phones label CSV and M3U files all sorts of ways.
+            PickerLauncher { l.launch(arrayOf("*/*")) }
+        }
         PickKind.PHOTO -> {
             val l = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia(), deliver)
             PickerLauncher { l.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
@@ -61,6 +68,42 @@ private class OpenBackupDocument : ActivityResultContracts.OpenDocument() {
             }
         }
 }
+
+actual suspend fun PickedFile.readText(): String = withContext(Dispatchers.IO) {
+    com.daydreamin.app.DaydreaminApp.instance.contentResolver.openInputStream(uri)?.let(com.daydreamin.app.data.library.PlaylistFile::read)
+        ?: throw java.io.IOException("can't open $uri")
+}
+
+actual suspend fun PickedFile.displayName(): String = withContext(Dispatchers.IO) {
+    com.daydreamin.app.DaydreaminApp.instance.contentResolver
+        .query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+        ?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+        ?: uri.lastPathSegment.orEmpty().substringAfterLast('/')
+}
+
+actual suspend fun shareImage(png: ByteArray, fileName: String, text: String) {
+    val app = com.daydreamin.app.DaydreaminApp.instance
+    val uri = withContext(Dispatchers.IO) {
+        val dir = java.io.File(app.cacheDir, "shared").apply { mkdirs() }
+        val file = java.io.File(dir, fileName).apply { writeBytes(png) }
+        androidx.core.content.FileProvider.getUriForFile(app, "${app.packageName}.share", file)
+    }
+    val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+        type = "image/png"
+        putExtra(android.content.Intent.EXTRA_STREAM, uri)
+        putExtra(android.content.Intent.EXTRA_TEXT, text)
+        clipData = android.content.ClipData.newRawUri(null, uri)
+        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    app.startActivity(android.content.Intent.createChooser(send, null).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION))
+}
+
+actual fun androidx.compose.ui.graphics.ImageBitmap.encodePng(): ByteArray =
+    java.io.ByteArrayOutputStream().also { out ->
+        asAndroidBitmap().compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+    }.toByteArray()
+
+actual fun coil3.request.ImageRequest.Builder.forOffscreenDrawing(): coil3.request.ImageRequest.Builder = allowHardware(false)
 
 actual suspend fun PickedFile.writeText(text: String) = withContext(Dispatchers.IO) {
     val stream = DaydreaminApp.instance.contentResolver.openOutputStream(uri, "wt") ?: throw IOException("no output stream")

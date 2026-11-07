@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Download
@@ -190,6 +191,7 @@ private fun PlaylistRow(p: Playlist, narrow: Boolean, selected: Boolean) {
             MenuEntry(if (keep) "Remove download" else "Download", if (keep) Icons.Rounded.DownloadDone else Icons.Rounded.Download) {
                 scope.launch { AppGraph.prefs.setPlaylistDownloaded(p.id, !keep) }
             },
+            MenuEntry("Share", Icons.Rounded.Share) { com.daydreamin.app.ui.components.Share.playlist(p) },
             MenuEntry("Rename…", Icons.Rounded.Edit) { renaming = true },
             MenuEntry("Delete", Icons.Rounded.Delete, danger = true) { SongActions.deletePlaylist(p.id); if (selected) nav.go(Route.Library) },
         )

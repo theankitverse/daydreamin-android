@@ -17,6 +17,8 @@ enum class PickKind {
     SAVE_BACKUP,
     /** A photo for the profile picture. */
     PHOTO,
+    /** A playlist exported from another app (CSV, M3U, a list of songs). */
+    OPEN_PLAYLIST,
 }
 
 fun interface PickerLauncher {
@@ -29,6 +31,12 @@ fun interface PickerLauncher {
 expect fun rememberPicker(kind: PickKind, onPicked: (PickedFile?) -> Unit): PickerLauncher
 
 expect suspend fun PickedFile.writeText(text: String)
+
+/** A picked playlist file's text. Throws [com.daydreamin.app.data.library.PlaylistFileException] for one far too big. */
+expect suspend fun PickedFile.readText(): String
+
+/** The file's name, as the person sees it. */
+expect suspend fun PickedFile.displayName(): String
 
 /**
  * Restores a backup file: merges its library in (never removing anything), applies its profile if
@@ -56,6 +64,14 @@ expect object DeviceStorage {
     fun audioCacheBytes(): Long
     val audioCacheCapBytes: Long
 }
+
+/** A picture to send somewhere. On a phone: the system's share sheet. On a computer: saved to Downloads, with [text] copied. */
+expect suspend fun shareImage(png: ByteArray, fileName: String, text: String)
+
+expect fun ImageBitmap.encodePng(): ByteArray
+
+/** Asks Coil for an image that can be drawn into a picture off screen (not GPU-only on Android). */
+expect fun coil3.request.ImageRequest.Builder.forOffscreenDrawing(): coil3.request.ImageRequest.Builder
 
 /** What Coil needs to reach its image loader outside a composable. */
 expect val platformContext: coil3.PlatformContext

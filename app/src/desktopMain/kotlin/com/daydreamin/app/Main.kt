@@ -264,6 +264,7 @@ private fun routeFor(name: String): com.daydreamin.app.desktop.nav.Route {
         "settings-window" -> DRoute.Settings("WINDOW")
         "settings-shortcuts" -> DRoute.Settings("SHORTCUTS")
         "nowplaying" -> { com.daydreamin.app.desktop.shell.DesktopUi.expanded = true; DRoute.Home }
+        "recap" -> { com.daydreamin.app.ui.screens.recap.RecapLauncher.show(); DRoute.Home }
         // Home's top songs as a collection page (a full list, for checking the song table).
         "picks" -> kotlinx.coroutines.runBlocking {
             kotlinx.coroutines.withTimeoutOrNull(20_000) { AppGraph.homeFeed.feed.first { it != null } }

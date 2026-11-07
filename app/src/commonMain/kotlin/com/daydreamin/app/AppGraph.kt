@@ -34,10 +34,12 @@ object AppGraph {
         this.filesDir = filesDir
         this.prefs = prefs
         this.processStartAtMs = processStartAtMs
+        com.daydreamin.app.data.taste.ListeningLog.init(filesDir)
     }
 
     fun startHomeFeed() {
         homeFeed = HomeFeedRepository().also { it.start() }
+        com.daydreamin.app.data.taste.ListeningLog.track(appScope)
     }
 
     /** Home has something real to show — your mix, or what's popular where you are. */

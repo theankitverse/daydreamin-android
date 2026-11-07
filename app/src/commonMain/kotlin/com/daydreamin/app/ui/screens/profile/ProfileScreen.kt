@@ -6,6 +6,7 @@ import com.daydreamin.app.platform.encodeAvatar
 import com.daydreamin.app.ui.components.uniqueKeys
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
@@ -202,6 +203,7 @@ fun ProfileScreen(
             }
             item {
                 Column(Modifier.padding(top = Space.section)) {
+                    LinkRow(Icons.Rounded.AutoAwesome, "Your Year in Music", "Your top songs, artists and minutes") { com.daydreamin.app.ui.screens.recap.RecapLauncher.show() }
                     LinkRow(Icons.Rounded.BarChart, "Statistics", "Your listening, in numbers", onStatistics)
                     Hairline()
                     LinkRow(Icons.Rounded.Palette, "Theme", "Accent colour", onThemeCustomize)

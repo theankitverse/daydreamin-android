@@ -28,6 +28,8 @@ data class LibraryBackup(
     val history: List<Song> = emptyList(),
     /** Who the user is and how they set the app up. Optional: backups made before it existed simply don't have it. */
     val profile: ProfileBackup? = null,
+    /** The newest listens, for Your Year in Music. Optional, like [profile]. */
+    val listening: List<com.daydreamin.app.data.taste.ListenEntry> = emptyList(),
 )
 
 /**

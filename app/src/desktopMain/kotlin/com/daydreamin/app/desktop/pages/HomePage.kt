@@ -119,6 +119,9 @@ fun HomePage() {
         LazyColumn(state = state, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 20.dp, bottom = 40.dp), verticalArrangement = Arrangement.spacedBy(DSpace.sectionGap)) {
             // A newer desktop version has been published: the same card the phone shows, installing in place.
             if (update.status == com.daydreamin.app.data.update.UpdateStatus.AVAILABLE) item(key = "update") { com.daydreamin.app.ui.components.UpdateBanner(Modifier.padding(horizontal = DSpace.pagePad - 16.dp), backing = if (com.daydreamin.app.desktop.theme.DPalette.light) Color(0xFF26262E) else Color.Transparent) }
+            if (com.daydreamin.app.ui.screens.recap.RecapLauncher.inSeason) item(key = "recap") {
+                com.daydreamin.app.ui.screens.recap.RecapBanner(Modifier.padding(horizontal = DSpace.pagePad))
+            }
             item(key = "greeting") {
                 Column(Modifier.padding(horizontal = DSpace.pagePad)) {
                     Text(greeting(), style = DType.pageTitle)

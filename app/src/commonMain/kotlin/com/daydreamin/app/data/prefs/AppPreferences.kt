@@ -291,6 +291,7 @@ class AppPreferences(private val dataStore: DataStore<Preferences>, private val 
                 offlineOnWifiOnly = prefs[Keys.DOWNLOAD_WIFI_ONLY],
                 avatarJpegBase64 = avatar,
             ),
+            listening = com.daydreamin.app.data.taste.ListeningLog.entries().takeLast(com.daydreamin.app.data.taste.ListeningLog.BACKUP_LIMIT),
         )
     }
 
@@ -328,6 +329,7 @@ class AppPreferences(private val dataStore: DataStore<Preferences>, private val 
             writeLibrary(prefs, merged)
             summary = result
         }
+        com.daydreamin.app.data.taste.ListeningLog.merge(incoming.listening)
         return summary
     }
 

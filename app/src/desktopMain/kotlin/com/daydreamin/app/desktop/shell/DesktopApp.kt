@@ -136,6 +136,8 @@ fun DesktopApp(start: Route = Route.Home) {
                 }
 
                 com.daydreamin.app.desktop.components.SongDragGhost()
+                com.daydreamin.app.ui.screens.recap.RecapHost()
+                com.daydreamin.app.ui.components.ShareHost()
                 ToastHost(Modifier.align(Alignment.BottomCenter).padding(bottom = DSize.playerBarHeight + 12.dp), onOpenDownloads = { nav.go(Route.Downloads) })
             }
         }

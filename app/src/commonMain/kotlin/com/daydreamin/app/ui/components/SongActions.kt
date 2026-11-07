@@ -31,6 +31,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Download
@@ -314,6 +315,7 @@ internal fun SongMenuCard(song: Song, onDismiss: () -> Unit, extra: List<SongMen
                         else -> "Cancel download"
                     },
                 ) { toggleDownload(song, download, downloadScope); onDismiss() }
+                MenuRow(Icons.Rounded.Share, "Share") { Share.song(song); onDismiss() }
                 extra.forEach { a -> MenuRow(a.icon, a.label, destructive = a.destructive) { a.onClick(); onDismiss() } }
             } else {
                 MenuRow(Icons.Rounded.ChevronLeft, "Add to playlist", dim = true) { page = 0 }

@@ -206,6 +206,9 @@ fun HomeScreen(
                 item(key = "update-banner") {
                     com.daydreamin.app.ui.components.UpdateBanner(modifier = Modifier.padding(bottom = Space.s))
                 }
+                if (browse == null && com.daydreamin.app.ui.screens.recap.RecapLauncher.inSeason) item(key = "recap") {
+                    com.daydreamin.app.ui.screens.recap.RecapBanner(Modifier.padding(horizontal = Space.gutter).padding(bottom = Space.m))
+                }
                 val mood = browse
                 if (mood != null) {
                     moodResults(mood, nowPlaying = { nowPlaying }, onBack = vm::closeMood, onRetry = vm::retryMood)

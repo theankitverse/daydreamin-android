@@ -22,6 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Download
@@ -228,6 +229,7 @@ class SongMenus(
             add(MenuEntry("Play", Icons.Rounded.PlayArrow, onClick = onPlay))
             add(MenuEntry("Play next", Icons.Rounded.SkipNext) { SongActions.playNext(song) })
             add(MenuEntry("Add to queue", Icons.AutoMirrored.Rounded.QueueMusic) { SongActions.addToQueue(song) })
+            add(MenuEntry("Share", Icons.Rounded.Share) { com.daydreamin.app.ui.components.Share.song(song) })
             add(null)
             add(MenuEntry(if (liked) "Remove from Liked songs" else "Save to Liked songs", if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder) { SongActions.toggleLiked(song, liked) })
             add(

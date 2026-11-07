@@ -1,5 +1,6 @@
 package com.daydreamin.app.platform
 
+import androidx.compose.ui.graphics.asSkiaBitmap
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -36,6 +37,7 @@ actual fun rememberPicker(kind: PickKind, onPicked: (PickedFile?) -> Unit): Pick
             when (kind) {
                 PickKind.PHOTO -> dialog.setFilenameFilter { _, name -> name.lowercase().substringAfterLast('.') in setOf("jpg", "jpeg", "png", "webp", "gif", "bmp") }
                 PickKind.SAVE_BACKUP -> dialog.file = suggestedName
+                PickKind.OPEN_PLAYLIST -> dialog.setFilenameFilter { _, name -> name.lowercase().substringAfterLast('.') in setOf("csv", "m3u", "m3u8", "txt") }
                 else -> dialog.setFilenameFilter { _, name -> name.lowercase().endsWith(".json") || name.lowercase().endsWith(".txt") }
             }
             dialog.isVisible = true
@@ -46,6 +48,24 @@ actual fun rememberPicker(kind: PickKind, onPicked: (PickedFile?) -> Unit): Pick
 }
 
 actual suspend fun PickedFile.writeText(text: String) = withContext(Dispatchers.IO) { file.writeText(text, Charsets.UTF_8) }
+
+actual suspend fun PickedFile.readText(): String = withContext(Dispatchers.IO) { com.daydreamin.app.data.library.PlaylistFile.read(file.inputStream()) }
+
+actual suspend fun PickedFile.displayName(): String = file.name
+
+actual suspend fun shareImage(png: ByteArray, fileName: String, text: String) {
+    val saved = withContext(Dispatchers.IO) {
+        val downloads = File(System.getProperty("user.home"), "Downloads").takeIf { it.isDirectory } ?: File(System.getProperty("user.home"))
+        File(downloads, fileName).apply { writeBytes(png) }
+    }
+    java.awt.Toolkit.getDefaultToolkit().systemClipboard.setContents(java.awt.datatransfer.StringSelection(text), null)
+    com.daydreamin.app.ui.components.Toaster.show("Saved ${saved.name} to ${saved.parentFile.name}. Link copied.")
+}
+
+actual fun androidx.compose.ui.graphics.ImageBitmap.encodePng(): ByteArray =
+    org.jetbrains.skia.Image.makeFromBitmap(asSkiaBitmap()).encodeToData(org.jetbrains.skia.EncodedImageFormat.PNG)!!.bytes
+
+actual fun coil3.request.ImageRequest.Builder.forOffscreenDrawing(): coil3.request.ImageRequest.Builder = this
 
 actual suspend fun restoreLibrary(prefs: AppPreferences, file: PickedFile, keepBackingUpHere: Boolean): RestoreResult {
     val text = withContext(Dispatchers.IO) {

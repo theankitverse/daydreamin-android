@@ -22,6 +22,7 @@ import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material3.Text
@@ -110,6 +111,7 @@ fun ProfilePage() {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             DButton("Edit profile", { editing = true }, icon = Icons.Rounded.Edit)
                             DButton("Your stats", { nav.go(Route.Stats) }, icon = Icons.Rounded.BarChart)
+                            DButton("Your Year in Music", { com.daydreamin.app.ui.screens.recap.RecapLauncher.show() }, icon = Icons.Rounded.AutoAwesome)
                         }
                     }
                 }

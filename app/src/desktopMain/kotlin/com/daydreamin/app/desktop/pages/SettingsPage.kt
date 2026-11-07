@@ -324,6 +324,7 @@ private fun LibrarySettings() {
     val searches by AppGraph.prefs.searchHistory.collectAsState(initial = emptyList())
     val exportLauncher = rememberPicker(PickKind.SAVE_BACKUP) { file -> if (file != null) vm.exportLibrary(file) }
     val importLauncher = rememberPicker(PickKind.OPEN_BACKUP) { file -> if (file != null) vm.importLibrary(file) }
+    val playlistLauncher = rememberPicker(PickKind.OPEN_PLAYLIST) { file -> file?.let(com.daydreamin.app.data.library.PlaylistImport::import) }
     val scope = rememberCoroutineScope()
     var confirm by remember { mutableStateOf<String?>(null) }
     Group {
@@ -333,6 +334,8 @@ private fun LibrarySettings() {
         Divider()
         ActionSetting("Import library", "Add songs and playlists from a Daydreamin backup. Importing only adds — nothing here is removed.", "Import…") { importLauncher.launch("") }
         backupStatus?.let { Text(it, style = DType.small.copy(color = DColors.ink.copy(alpha = 0.8f)), modifier = Modifier.padding(bottom = 12.dp)) }
+        Divider()
+        ActionSetting("Import a playlist", "Bring a playlist from Spotify or another app: a CSV from Exportify or TuneMyMusic, or an M3U file.", "Choose file…") { playlistLauncher.launch("") }
     }
     Spacer(Modifier.height(16.dp))
     Group {
