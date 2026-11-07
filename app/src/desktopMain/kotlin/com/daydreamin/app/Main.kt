@@ -100,6 +100,8 @@ fun main(args: Array<String>) {
     AppInfo.updateUrl = "https://raw.githubusercontent.com/theankitverse/daydreamin-android/main/desktop-version.json"
     AppInfo.updateMirrors = listOf("https://cdn.jsdelivr.net/gh/theankitverse/daydreamin-android@main/desktop-version.json")
     AppInfo.platformName = platformName()
+    AppInfo.lastFmKey = System.getProperty("daydreamin.lastfmKey").orEmpty()
+    AppInfo.lastFmSecret = System.getProperty("daydreamin.lastfmSecret").orEmpty()
 
     // --data-dir <dir> (for development): a separate library, e.g. a fresh one to see first-run setup.
     val dataDir = args.indexOf("--data-dir").takeIf { it >= 0 }?.let { args.getOrNull(it + 1) }?.let { File(it).apply { mkdirs() } } ?: appDataDir()

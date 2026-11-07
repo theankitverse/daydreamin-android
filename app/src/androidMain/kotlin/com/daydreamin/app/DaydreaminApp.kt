@@ -60,6 +60,8 @@ class DaydreaminApp : Application(), coil3.SingletonImageLoader.Factory {
         }
         AppInfo.usageTestMode = BuildConfig.USAGE_TEST_MODE
         AppInfo.debug = BuildConfig.DEBUG
+        AppInfo.lastFmKey = BuildConfig.LASTFM_KEY
+        AppInfo.lastFmSecret = BuildConfig.LASTFM_SECRET
         AppInfo.platformName = "Android"
         TasteProfile.init(filesDir)
         val prefsStart = SystemClock.elapsedRealtime()

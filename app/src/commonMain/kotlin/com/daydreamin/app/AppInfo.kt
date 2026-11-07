@@ -15,6 +15,9 @@ object AppInfo {
     /** Test builds send usage pings to TelemetryDeck's test view, not the real counts. */
     var usageTestMode: Boolean = false
     var debug: Boolean = false
+    /** This app's Last.fm key, added at build time. Blank in a build without one: no Last.fm then. */
+    var lastFmKey: String = ""
+    var lastFmSecret: String = ""
     /** "Android", "macOS", "Windows", "Linux". */
     var platformName: String = "Android"
 }

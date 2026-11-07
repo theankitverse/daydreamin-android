@@ -57,6 +57,8 @@ class AppPreferences(private val dataStore: DataStore<Preferences>, private val 
         val ASKED_NOTIFICATIONS = booleanPreferencesKey("asked_notifications")
         val AVATAR_STAMP = androidx.datastore.preferences.core.longPreferencesKey("avatar_stamp")
         val AUTO_BACKUP_URI = stringPreferencesKey("auto_backup_uri")
+        val LASTFM_SESSION = stringPreferencesKey("lastfm_session")
+        val LASTFM_USER = stringPreferencesKey("lastfm_user")
         val AUTO_BACKUP_AT = androidx.datastore.preferences.core.longPreferencesKey("auto_backup_at")
         val DISMISSED_UPDATE_VERSION = intPreferencesKey("dismissed_update_version")
     }
@@ -98,6 +100,15 @@ class AppPreferences(private val dataStore: DataStore<Preferences>, private val 
 
     /** What the app calls you. Blank until you've told it. */
     val userName: Flow<String> = dataStore.data.map { it[Keys.USER_NAME].orEmpty() }
+    /** Your Last.fm connection. Stays on this device: backups don't carry it. */
+    val lastFmSession: Flow<String?> = dataStore.data.map { it[Keys.LASTFM_SESSION] }
+    val lastFmUser: Flow<String?> = dataStore.data.map { it[Keys.LASTFM_USER] }
+
+    suspend fun setLastFm(session: String?, user: String?) = edit {
+        if (session == null) { it.remove(Keys.LASTFM_SESSION); it.remove(Keys.LASTFM_USER) }
+        else { it[Keys.LASTFM_SESSION] = session; it[Keys.LASTFM_USER] = user.orEmpty() }
+    }
+
     suspend fun setUserName(value: String) = edit { it[Keys.USER_NAME] = value.trim().take(40) }
 
     /** The picture itself lives at [avatarFile]; this flips (and so re-emits) whenever it changes. */

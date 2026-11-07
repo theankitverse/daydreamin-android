@@ -40,6 +40,7 @@ object AppGraph {
     fun startHomeFeed() {
         homeFeed = HomeFeedRepository().also { it.start() }
         com.daydreamin.app.data.taste.ListeningLog.track(appScope)
+        com.daydreamin.app.data.scrobble.Scrobbler.start(appScope)
     }
 
     /** Home has something real to show — your mix, or what's popular where you are. */

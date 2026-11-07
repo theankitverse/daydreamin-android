@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.multiplatform")
@@ -5,6 +7,13 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
 }
+
+// Last.fm's key: from a Gradle property, local.properties (never pushed), or CI's secrets. Not in the code.
+val localProperties = Properties().apply { rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) } }
+fun buildSecret(name: String, env: String): String =
+    (project.findProperty(name) as String?) ?: localProperties.getProperty(name) ?: System.getenv(env) ?: ""
+val lastFmKey = buildSecret("lastfmKey", "LASTFM_API_KEY")
+val lastFmSecret = buildSecret("lastfmSecret", "LASTFM_API_SECRET")
 
 android {
     namespace = "com.daydreamin.app"
@@ -23,6 +32,8 @@ android {
             ?: "https://raw.githubusercontent.com/theankitverse/daydreamin-android/main/version.json"
         buildConfigField("String", "UPDATE_URL", "\"$updateUrl\"")
         // Test builds pass -PusageTestMode=true so their usage pings land in TelemetryDeck's test view, not the real counts.
+        buildConfigField("String", "LASTFM_KEY", "\"$lastFmKey\"")
+        buildConfigField("String", "LASTFM_SECRET", "\"$lastFmSecret\"")
         buildConfigField("boolean", "USAGE_TEST_MODE", (project.findProperty("usageTestMode") as String? ?: "false"))
     }
 
@@ -192,7 +203,7 @@ compose.desktop {
         mainClass = "com.daydreamin.app.MainKt"
         // jpackage needs a full JDK; Android Studio's bundled one has none. -PpackagingJdk=… picks one locally; CI uses JAVA_HOME.
         (project.findProperty("packagingJdk") as String?)?.let { javaHome = it }
-        jvmArgs += listOf("-Ddaydreamin.version=$desktopVersion", "-Ddaydreamin.versionCode=$desktopVersionCode", "-Xmx512m")
+        jvmArgs += listOf("-Ddaydreamin.version=$desktopVersion", "-Ddaydreamin.versionCode=$desktopVersionCode", "-Ddaydreamin.lastfmKey=$lastFmKey", "-Ddaydreamin.lastfmSecret=$lastFmSecret", "-Xmx512m")
 
         nativeDistributions {
             targetFormats(

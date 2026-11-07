@@ -334,6 +334,19 @@ private fun LibrarySettings() {
         ActionSetting("Import library", "Add songs and playlists from a Daydreamin backup. Importing only adds — nothing here is removed.", "Import…") { importLauncher.launch("") }
         backupStatus?.let { Text(it, style = DType.small.copy(color = DColors.ink.copy(alpha = 0.8f)), modifier = Modifier.padding(bottom = 12.dp)) }
         Divider()
+        if (com.daydreamin.app.data.scrobble.Scrobbler.available) {
+            val user = com.daydreamin.app.data.scrobble.Scrobbler.user
+            ActionSetting(
+                "Last.fm",
+                when {
+                    user != null -> "Connected as $user. What you listen to goes to your Last.fm profile."
+                    com.daydreamin.app.data.scrobble.Scrobbler.connecting -> "Approve Daydreamin on Last.fm in your browser, then come back."
+                    else -> "Keep a record of what you listen to on your Last.fm profile."
+                },
+                if (user != null) "Disconnect" else "Connect…",
+            ) { if (user != null) com.daydreamin.app.data.scrobble.Scrobbler.disconnect(com.daydreamin.app.AppGraph.appScope) else com.daydreamin.app.data.scrobble.Scrobbler.connect(com.daydreamin.app.AppGraph.appScope) }
+            Divider()
+        }
         ActionSetting("Import a playlist", "Paste a link from YouTube, Deezer or Spotify, or choose a playlist file.", "Import…") { com.daydreamin.app.ui.components.ImportFlow.show() }
     }
     Spacer(Modifier.height(16.dp))

@@ -202,6 +202,24 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
 
             // ---- Offline
+            if (com.daydreamin.app.data.scrobble.Scrobbler.available) {
+                item { Section("Last.fm") }
+                item {
+                    val user = com.daydreamin.app.data.scrobble.Scrobbler.user
+                    val connecting = com.daydreamin.app.data.scrobble.Scrobbler.connecting
+                    val scope = com.daydreamin.app.AppGraph.appScope
+                    ActionRow(
+                        icon = Icons.Rounded.GraphicEq,
+                        title = "Scrobbling",
+                        body = when {
+                            user != null -> "Connected as $user. What you listen to goes to your Last.fm profile."
+                            connecting -> "Approve Daydreamin on Last.fm in your browser, then come back."
+                            else -> "Keep a record of what you listen to on your Last.fm profile."
+                        },
+                        action = if (user != null) "Disconnect" else "Connect",
+                    ) { if (user != null) com.daydreamin.app.data.scrobble.Scrobbler.disconnect(scope) else com.daydreamin.app.data.scrobble.Scrobbler.connect(scope) }
+                }
+            }
             item { Section("Offline") }
             item {
                 ToggleRow(
