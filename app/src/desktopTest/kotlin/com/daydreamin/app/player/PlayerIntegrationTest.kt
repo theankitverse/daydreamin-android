@@ -7,6 +7,7 @@ import com.daydreamin.app.data.download.DownloadStatus
 import com.daydreamin.app.data.download.Downloads
 import com.daydreamin.app.data.model.Song
 import com.daydreamin.app.data.prefs.AppPreferences
+import com.daydreamin.app.data.prefs.toJson
 import com.daydreamin.app.data.repository.toSong
 import com.daydreamin.app.data.taste.TasteProfile
 import com.daydreamin.app.data.youtube.YouTubeExtractorService
@@ -234,5 +235,30 @@ class PlayerIntegrationTest {
         log("13. after a pause, play on another list: same song=${meta.currentSong?.playId == newSong}, advanced ${newAdvanced}ms in 5s")
         assertEquals(newSong, meta.currentSong?.playId, "doesn't skip on")
         assertTrue(newAdvanced in 3_500..6_500, "plays in real time ($newAdvanced ms in 5 s)")
+
+        // 14. A playlist from Spotify, start to finish: imported from a file, its first song found by
+        // name and played, the listen logged with its date, and all of it carried through a backup.
+        val csv = File(AppGraph.filesDir, "Road_Trip.csv").apply {
+            writeText("Track URI,Track Name,Artist Name(s),Album Name,Track Duration (ms)\nx,Believer,Imagine Dragons,Evolve,204000\ny,Yellow,Coldplay,Parachutes,266000\n")
+        }
+        com.daydreamin.app.data.library.PlaylistImport.import(com.daydreamin.app.platform.PickedFile(csv))
+        waitFor("the import", 10_000) { runBlocking { AppGraph.prefs.playlists.first() }.any { it.name == "Road Trip" } }
+        val imported = runBlocking { AppGraph.prefs.playlists.first() }.first { it.name == "Road Trip" }
+        assertEquals(2, imported.songs.size)
+        com.daydreamin.app.data.taste.ListeningLog.track(AppGraph.appScope)
+        PlayerController.playFromList(imported.songs, 0)
+        waitFor("the imported song to play", 30_000) { meta.currentSong?.title == "Believer" && meta.isPlaying && !meta.isBuffering && position > 500 }
+        Thread.sleep(33_000)
+        PlayerController.next()
+        waitFor("the next song", 30_000) { meta.currentSong?.title == "Yellow" }
+        waitFor("the listen to be logged", 5_000) { runBlocking { com.daydreamin.app.data.taste.ListeningLog.entries() }.any { it.title == "Believer" } }
+        val listen = runBlocking { com.daydreamin.app.data.taste.ListeningLog.entries() }.first { it.title == "Believer" }
+        log("14. imported 'Road Trip', played '${listen.title}', logged ${listen.listenedMs}ms")
+        assertTrue(listen.listenedMs in 30_000..36_000, "logs the time it played (${listen.listenedMs})")
+        val backup = runBlocking { AppGraph.prefs.exportLibrary() }
+        assertTrue(backup.listening.any { it.title == "Believer" }, "the listen is in the backup")
+        val restored = com.daydreamin.app.data.prefs.parseLibraryBackup(backup.toJson())
+        assertEquals(backup.listening, restored.listening)
+        assertEquals(0, runBlocking { com.daydreamin.app.data.taste.ListeningLog.merge(restored.listening) }, "restoring doesn't double the listens")
     }
 }
