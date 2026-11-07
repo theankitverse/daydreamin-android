@@ -149,7 +149,7 @@ object PlaylistFile {
         return importedSong(title = parts[1], artist = parts[0], durationSec = durationSec)
     }
 
-    private fun importedSong(title: String, artist: String, album: String = "", cover: String = "", durationSec: Int = 0): Song =
+    internal fun importedSong(title: String, artist: String, album: String = "", cover: String = "", durationSec: Int = 0): Song =
         Song(
             // The same song imported twice is the same song (likes, downloads and plays are kept by id).
             id = "imported-" + "${artist.lowercase()}|${title.lowercase()}".hashCode().toUInt().toString(16),

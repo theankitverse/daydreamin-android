@@ -21,6 +21,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.FileOpen
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Delete
@@ -118,6 +120,7 @@ fun Sidebar(narrow: Boolean, width: Dp, modifier: Modifier = Modifier) {
                             Text("Your Library", style = DType.panelTitle.copy(color = DColors.ink.copy(alpha = 0.85f)))
                         }
                     }
+                    DIconButton(Icons.Rounded.FileOpen, "Import a playlist", { com.daydreamin.app.ui.components.ImportFlow.show() }, iconSize = 18.dp)
                     DIconButton(Icons.Rounded.Add, "New playlist", { naming = true }, iconSize = 20.dp)
                 }
                 Box(Modifier.weight(1f)) { LibraryList(narrow) }
@@ -191,6 +194,7 @@ private fun PlaylistRow(p: Playlist, narrow: Boolean, selected: Boolean) {
             MenuEntry(if (keep) "Remove download" else "Download", if (keep) Icons.Rounded.DownloadDone else Icons.Rounded.Download) {
                 scope.launch { AppGraph.prefs.setPlaylistDownloaded(p.id, !keep) }
             },
+            *listOfNotNull(com.daydreamin.app.data.library.PlaylistImport.refreshSource(p)?.let { source -> MenuEntry("Refresh from $source", Icons.Rounded.Refresh) { com.daydreamin.app.data.library.PlaylistImport.refresh(p) } }).toTypedArray(),
             MenuEntry("Share", Icons.Rounded.Share) { com.daydreamin.app.ui.components.Share.playlist(p) },
             MenuEntry("Rename…", Icons.Rounded.Edit) { renaming = true },
             MenuEntry("Delete", Icons.Rounded.Delete, danger = true) { SongActions.deletePlaylist(p.id); if (selected) nav.go(Route.Library) },

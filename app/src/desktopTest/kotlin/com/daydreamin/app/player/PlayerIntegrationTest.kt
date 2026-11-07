@@ -260,5 +260,32 @@ class PlayerIntegrationTest {
         val restored = com.daydreamin.app.data.prefs.parseLibraryBackup(backup.toJson())
         assertEquals(backup.listening, restored.listening)
         assertEquals(0, runBlocking { com.daydreamin.app.data.taste.ListeningLog.merge(restored.listening) }, "restoring doesn't double the listens")
+
+        // 15. The same file again updates that playlist instead of making a second one.
+        csv.writeText("Track URI,Track Name,Artist Name(s),Album Name,Track Duration (ms)\nx,Believer,Imagine Dragons,Evolve,204000\ny,Yellow,Coldplay,Parachutes,266000\nz,Fix You,Coldplay,X&Y,295000\n")
+        com.daydreamin.app.data.library.PlaylistImport.import(com.daydreamin.app.platform.PickedFile(csv))
+        waitFor("the update", 10_000) { runBlocking { AppGraph.prefs.playlists.first() }.first { it.name == "Road Trip" }.songs.size == 3 }
+        assertEquals(1, runBlocking { AppGraph.prefs.playlists.first() }.count { it.name.startsWith("Road Trip") })
+        log("15. the same file again: updated, still one playlist")
+
+        // 16. Paste a link: a Deezer playlist and a long YouTube one, whole, and pasting again updates.
+        val deezer = com.daydreamin.app.data.library.PlaylistLink.parse("https://www.deezer.com/en/playlist/3155776842?utm=x")!!
+        val deezerResult = runBlocking { com.daydreamin.app.data.library.PlaylistImport.importLink(deezer) }
+        log("16. $deezerResult")
+        val top = runBlocking { AppGraph.prefs.playlists.first() }.first { it.sourceUrl == "https://www.deezer.com/playlist/3155776842" }
+        assertTrue(top.songs.size > 50, "the whole Deezer playlist (${top.songs.size})")
+        assertEquals("Deezer", com.daydreamin.app.data.library.PlaylistImport.refreshSource(top))
+        val yt = runBlocking { YouTubeExtractorService.searchPlaylists("bollywood top 200 songs", 15) }.maxBy { it.trackCount }
+        val ytLink = com.daydreamin.app.data.library.PlaylistLink.parse(yt.url)!!
+        val ytResult = runBlocking { com.daydreamin.app.data.library.PlaylistImport.importLink(ytLink) }
+        log("    $ytResult (YouTube says ${yt.trackCount})")
+        val long = runBlocking { AppGraph.prefs.playlists.first() }.first { it.sourceUrl == (ytLink as com.daydreamin.app.data.library.PlaylistLink.YouTube).url }
+        assertTrue(long.songs.size >= minOf(yt.trackCount, 1_000L) * 0.8, "the whole playlist, past YouTube's first page (${long.songs.size} of ${yt.trackCount})")
+        val again = runBlocking { com.daydreamin.app.data.library.PlaylistImport.importLink(ytLink) }
+        assertTrue(again.startsWith("Updated"), again)
+        // A song from a pasted playlist plays like any other.
+        PlayerController.playFromList(top.songs, 0)
+        waitFor("a Deezer playlist song to play", 30_000) { meta.currentSong?.playId == top.songs[0].playId && meta.isPlaying && !meta.isBuffering && position > 500 }
+        log("    plays '${meta.currentSong?.title}' from the Deezer playlist (${meta.streamQuality})")
     }
 }

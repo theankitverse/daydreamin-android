@@ -38,6 +38,8 @@ data class YtPlaylist(
     val trackCount: Long,
 )
 
+data class WholePlaylist(val name: String, val author: String?, val tracks: List<YtTrack>)
+
 data class ResolvedStream(
     val videoId: String,
     val streamUrl: String,
@@ -345,6 +347,20 @@ object YouTubeExtractorService {
     }
 
     /** Loads a real playlist's tracks (from a [YtPlaylist.url]) so it can actually be played, not just browsed. */
+    /** A whole playlist, page after page, with its name and owner. Throws if it can't be read (private, deleted). */
+    suspend fun fetchWholePlaylist(playlistUrl: String, limit: Int = 1_000): WholePlaylist = withContext(Dispatchers.IO) {
+        val extractor = service.getPlaylistExtractor(playlistUrl)
+        extractor.fetchPage()
+        val tracks = mutableListOf<YtTrack>()
+        var page = extractor.initialPage
+        while (true) {
+            tracks += page.items.filterIsInstance<StreamInfoItem>().mapNotNull { it.toYtTrack() }
+            if (tracks.size >= limit || !page.hasNextPage()) break
+            page = extractor.getPage(page.nextPage)
+        }
+        WholePlaylist(extractor.name, runCatching { extractor.uploaderName }.getOrNull(), tracks.take(limit))
+    }
+
     suspend fun fetchPlaylistTracks(playlistUrl: String, limit: Int = 50): List<YtTrack> = withContext(Dispatchers.IO) {
         runCatching {
             val extractor = service.getPlaylistExtractor(playlistUrl)

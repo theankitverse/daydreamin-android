@@ -10,6 +10,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import com.daydreamin.app.desktop.components.acceptsPlaylistFiles
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -85,7 +86,7 @@ fun DesktopApp(start: Route = Route.Home) {
     CompositionLocalProvider(LocalNavigator provides nav, LocalAccent provides accentByName(accentName)) {
       ProvideSharedState {
         DesktopScrollbars {
-            BoxWithConstraints(Modifier.fillMaxSize()) {
+            BoxWithConstraints(Modifier.fillMaxSize().then(Modifier.acceptsPlaylistFiles())) {
                 val expanded = DesktopUi.expanded && hasSong
                 WindowBackdrop(vivid = expanded)
                 val narrowSidebar = maxWidth < WideSidebarFrom || com.daydreamin.app.desktop.DesktopSettings.compactSidebar
@@ -138,6 +139,7 @@ fun DesktopApp(start: Route = Route.Home) {
                 com.daydreamin.app.desktop.components.SongDragGhost()
                 com.daydreamin.app.ui.screens.recap.RecapHost()
                 com.daydreamin.app.ui.components.ShareHost()
+                com.daydreamin.app.ui.components.ImportHost()
                 ToastHost(Modifier.align(Alignment.BottomCenter).padding(bottom = DSize.playerBarHeight + 12.dp), onOpenDownloads = { nav.go(Route.Downloads) })
             }
         }

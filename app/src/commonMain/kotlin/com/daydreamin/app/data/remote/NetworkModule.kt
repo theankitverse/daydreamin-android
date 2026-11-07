@@ -23,6 +23,9 @@ object NetworkModule {
         level = if (AppInfo.debug) HttpLoggingInterceptor.Level.BASIC else HttpLoggingInterceptor.Level.NONE
     }
 
+    /** For the odd plain request that isn't worth a Retrofit interface. */
+    val http: OkHttpClient get() = client
+
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)

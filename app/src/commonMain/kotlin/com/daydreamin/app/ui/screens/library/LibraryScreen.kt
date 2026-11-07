@@ -1,5 +1,6 @@
 package com.daydreamin.app.ui.screens.library
 
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.FileOpen
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Download
@@ -334,9 +335,8 @@ private fun LazyListScope.playlistsTab(playlists: List<Playlist>, liked: List<So
         }
     }
     item(key = "pl-import") {
-        val picker = com.daydreamin.app.platform.rememberPicker(com.daydreamin.app.platform.PickKind.OPEN_PLAYLIST) { file -> file?.let(com.daydreamin.app.data.library.PlaylistImport::import) }
         Row(
-            Modifier.animateItem().fillMaxWidth().height(76.dp).pressable(onClick = { picker.launch("") }).padding(start = Space.gutter, end = Space.m),
+            Modifier.animateItem().fillMaxWidth().height(76.dp).pressable(onClick = { com.daydreamin.app.ui.components.ImportFlow.show() }).padding(start = Space.gutter, end = Space.m),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(Modifier.size(58.dp).glass(Radius.cardShape, Glass.Clear), contentAlignment = Alignment.Center) {
@@ -344,7 +344,7 @@ private fun LazyListScope.playlistsTab(playlists: List<Playlist>, liked: List<So
             }
             Column(Modifier.weight(1f).padding(horizontal = 16.dp)) {
                 Text("Import a playlist", style = MaterialTheme.typography.titleMedium, color = Color.White, maxLines = 1)
-                Text("From Spotify and others: CSV or M3U", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.55f), maxLines = 1)
+                Text("Paste a YouTube, Deezer or Spotify link", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.55f), maxLines = 1)
             }
         }
     }
@@ -613,6 +613,16 @@ private fun PlaylistMenu(playlist: Playlist, onDeleted: () -> Unit) {
                         Icon(Icons.Rounded.Edit, contentDescription = null, tint = Color.White.copy(alpha = 0.9f), modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(14.dp))
                         Text("Rename", style = MaterialTheme.typography.bodyLarge, color = Color.White)
+                    }
+                    com.daydreamin.app.data.library.PlaylistImport.refreshSource(playlist)?.let { source ->
+                        Row(
+                            Modifier.fillMaxWidth().pressable(onClick = { open = false; com.daydreamin.app.data.library.PlaylistImport.refresh(playlist) }).padding(horizontal = 18.dp, vertical = 13.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(Icons.Rounded.Refresh, contentDescription = null, tint = Color.White.copy(alpha = 0.9f), modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(14.dp))
+                            Text("Refresh from $source", style = MaterialTheme.typography.bodyLarge, color = Color.White)
+                        }
                     }
                     Row(
                         Modifier.fillMaxWidth().pressable(onClick = { open = false; com.daydreamin.app.ui.components.Share.playlist(playlist) }).padding(horizontal = 18.dp, vertical = 13.dp),

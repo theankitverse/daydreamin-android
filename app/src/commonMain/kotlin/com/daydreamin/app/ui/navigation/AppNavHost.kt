@@ -411,6 +411,7 @@ private fun AppNavHost(wide: Boolean, startRoute: String) {
       com.daydreamin.app.ui.components.SongContextMenuHost(hazeState)
       com.daydreamin.app.ui.screens.recap.RecapHost()
       com.daydreamin.app.ui.components.ShareHost()
+      com.daydreamin.app.ui.components.ImportHost()
      }
     }
 }
