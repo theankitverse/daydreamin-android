@@ -1,9 +1,9 @@
 {
-  "versionCode": 21,
-  "versionName": "1.7.0",
+  "versionCode": 22,
+  "versionName": "1.8.0",
   "url": "https://github.com/theankitverse/daydreamin-android/releases/latest",
-  "notes": "Smoother and more alive: Now Playing opens over your page like a card, back swipes follow your finger, long-press a song for a lifted menu, pull Home down for a new mix, swipe songs out of playlists, lyrics that glide, and a faster start.",
-  "apkUrl": "https://github.com/theankitverse/daydreamin-android/releases/download/v1.7.0/Daydreamin.apk",
-  "apkSize": 5069505,
-  "sha256": "c74c942db4f76cc0c35372a9ad5cf6ef2ba98a801f0c5f83ef8d1818777f52d4"
+  "notes": "Bring your playlists in with a link, share songs as cards, see Your Year in Music, and play from a new home-screen widget or Android Auto.",
+  "apkUrl": "https://github.com/theankitverse/daydreamin-android/releases/download/v1.8.0/Daydreamin.apk",
+  "apkSize": 5153140,
+  "sha256": "627fd437ebd06e050600f73a766b5a2116c95777587509abd9feb77668ff3562"
 }

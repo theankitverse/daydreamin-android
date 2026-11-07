@@ -44,6 +44,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Favorite
@@ -700,6 +701,7 @@ private fun MoreMenu(onDismiss: () -> Unit, onNewPlaylist: (Song) -> Unit) {
                 "root" -> {
                     if (meta.currentSong != null) {
                         MenuItem(Icons.AutoMirrored.Rounded.PlaylistAdd, "Add to playlist", null) { page = "playlist" }
+                        MenuItem(Icons.Rounded.Share, "Share", null) { meta.currentSong?.let(com.daydreamin.app.ui.components.Share::song); onDismiss() }
                     }
                     MenuItem(
                         Icons.Rounded.Bedtime,
