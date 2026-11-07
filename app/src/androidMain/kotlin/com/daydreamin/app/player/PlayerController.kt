@@ -402,6 +402,11 @@ actual object PlayerController {
     /** Play was pressed while the last song was still being restored. */
     private var playWhenRestored = false
 
+    /** Play from outside the app (a car, a Bluetooth button) with nothing loaded yet. */
+    fun playOnceRestored() {
+        if (pendingStartIsRestore) playWhenRestored = true
+    }
+
     /** [app.repository.resolveStream] fails transiently often enough (a flaky network blip,
      *  YouTube briefly rate-limiting) that surfacing an error to the user on the very first
      *  failure is premature — one silent retry after a short backoff clears most of them

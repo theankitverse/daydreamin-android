@@ -1,5 +1,6 @@
 package com.daydreamin.app.player
 
+import androidx.media3.common.MediaItem
 import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.Player
 
@@ -22,7 +23,38 @@ import androidx.media3.common.Player
  * which [PlayerController] itself calls internally for the gapless-buffered transition; wrapping
  * those too would recurse back into this class through the MediaSession.
  */
-class QueueAwarePlayer(player: Player) : ForwardingPlayer(player) {
+class QueueAwarePlayer(player: Player, private val library: AutoLibrary) : ForwardingPlayer(player) {
+
+    // A song picked in Android Auto arrives as a new playlist. It has no stream yet and its list is
+    // the queue, so it goes through the same path as a tap in the app. The app's own songs pass by.
+    private fun tookOver(items: List<MediaItem>, startIndex: Int = 0): Boolean {
+        val picked = items.getOrNull(startIndex.coerceAtLeast(0))?.takeIf(library::owns) ?: return false
+        library.play(picked)
+        return true
+    }
+
+    // An empty player told to start ends at once, and the app takes that for the end of the song and
+    // moves on. That's what a car (or a Bluetooth button after a cold start) would cause, sending
+    // prepare and play before the song is in: the song is on its way, so those wait for it.
+    override fun prepare() {
+        if (mediaItemCount > 0) super.prepare()
+    }
+
+    override fun play() {
+        if (mediaItemCount > 0) super.play() else PlayerController.playOnceRestored()
+    }
+
+    override fun setMediaItems(mediaItems: MutableList<MediaItem>) {
+        if (!tookOver(mediaItems)) super.setMediaItems(mediaItems)
+    }
+
+    override fun setMediaItems(mediaItems: MutableList<MediaItem>, resetPosition: Boolean) {
+        if (!tookOver(mediaItems)) super.setMediaItems(mediaItems, resetPosition)
+    }
+
+    override fun setMediaItems(mediaItems: MutableList<MediaItem>, startIndex: Int, startPositionMs: Long) {
+        if (!tookOver(mediaItems, startIndex)) super.setMediaItems(mediaItems, startIndex, startPositionMs)
+    }
 
     override fun seekToNext() {
         PlayerController.next()

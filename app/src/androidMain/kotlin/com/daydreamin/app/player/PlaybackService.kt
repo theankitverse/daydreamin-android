@@ -18,7 +18,8 @@ import androidx.media3.exoplayer.audio.AudioRendererEventListener
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
-import androidx.media3.session.MediaSessionService
+import androidx.media3.session.MediaLibraryService
+import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import com.daydreamin.app.DaydreaminApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -43,12 +44,13 @@ private const val EQ_HEADROOM_VOLUME = 0.6f
  * service, Android shows lock-screen / notification transport controls automatically
  * and keeps audio playing with the screen off — the two things the web app could never do.
  */
-class PlaybackService : MediaSessionService() {
+class PlaybackService : MediaLibraryService() {
 
-    private var mediaSession: MediaSession? = null
+    private var mediaSession: MediaLibrarySession? = null
     private var player: ExoPlayer? = null
     private var spare: ExoPlayer? = null
     private var crossfader: Crossfader? = null
+    private var library: AutoLibrary? = null
     @Volatile private var crossfadeMs = 0L
     /** The volume players rest at: full, or lowered to leave the equalizer room to boost. */
     @Volatile private var baseVolume = 1f
@@ -166,7 +168,9 @@ class PlaybackService : MediaSessionService() {
                 .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK),
             android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        val session = MediaSession.Builder(this, QueueAwarePlayer(player)).setSessionActivity(openPlayer).build()
+        val library = AutoLibrary(serviceScope)
+        this.library = library
+        val session = MediaLibrarySession.Builder(this, QueueAwarePlayer(player, library), library).setSessionActivity(openPlayer).build()
         mediaSession = session
 
         crossfader = Crossfader(
@@ -183,7 +187,7 @@ class PlaybackService : MediaSessionService() {
                 outgoing.setHandleAudioBecomingNoisy(false)
                 incoming.setAudioAttributes(audioAttributes, true)
                 incoming.setHandleAudioBecomingNoisy(true)
-                session.player = QueueAwarePlayer(incoming)
+                session.player = QueueAwarePlayer(incoming, library)
                 this.player = incoming
                 this.spare = outgoing
             },
@@ -244,7 +248,7 @@ class PlaybackService : MediaSessionService() {
         if (equalizer != null) Log.d(TAG, "Equalizer attached to session $audioSessionId, preset=${eqPreset.label}")
     }
 
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = mediaSession
 
     /**
      * Swiping Daydreamin out of Recents ends the session: music stops and the notification goes,

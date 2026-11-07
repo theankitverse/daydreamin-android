@@ -144,6 +144,8 @@ actual object PlayerController {
         // Loaded: from here the engine itself reports any wait for audio (a slow connection).
         _meta.update { it.copy(streamQuality = loaded.quality, isPlaying = true, isBuffering = false) }
         _progress.update { it.copy(durationMs = loaded.deck.durationMs) }
+        // The seek bar moved while it loaded: go there now.
+        pendingStartMs?.let { pendingStartMs = null; seekTo(it) }
 
         if (queue.isEmpty() && autoFillQueue) {
             val upNext = loaded.resolved?.related.orEmpty().map { it.toSong() }.filterNot { it.playId == song.playId }
